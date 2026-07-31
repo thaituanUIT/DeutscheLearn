@@ -4,6 +4,7 @@ from datetime import date
 from typing import Any
 
 import duden
+from requests import RequestException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -92,7 +93,7 @@ def get_seeded_word_of_day(db: Session, today: date) -> WordOfDay:
 def get_word_of_day(db: Session, today: date) -> WordOfDay:
     try:
         return duden_word_to_word_of_day(duden.get_word_of_the_day())
-    except Exception:
+    except (AttributeError, IndexError, RequestException, RuntimeError, TypeError):
         return get_seeded_word_of_day(db, today)
 
 

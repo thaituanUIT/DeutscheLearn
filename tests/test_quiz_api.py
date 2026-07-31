@@ -1,4 +1,5 @@
 import json
+from typing import ClassVar
 
 from fastapi.testclient import TestClient
 
@@ -107,7 +108,7 @@ def test_word_of_day_endpoint_returns_duden_word(monkeypatch) -> None:
         name = "Crush"
         article = "der"
         part_of_speech = "Substantiv, maskulin"
-        meaning_overview = ["Person, in die jemand verliebt ist"]
+        meaning_overview: ClassVar[list[str]] = ["Person, in die jemand verliebt ist"]
 
     monkeypatch.setattr(
         "app.services.words.duden.get_word_of_the_day",
