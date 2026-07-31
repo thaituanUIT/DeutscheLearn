@@ -17,7 +17,7 @@ export function leaderboardView(entries: LeaderboardEntry[]): HTMLElement {
     const meta = el(
       "small",
       "muted",
-      `${entry.total_questions} answers · ${formatSeconds(entry.duration_seconds)}`,
+      `${entry.total_questions} correct · ${formatSeconds(entry.duration_seconds)}`,
     );
     const nameWrap = el("div");
     nameWrap.append(el("div", "name", entry.display_name), meta);

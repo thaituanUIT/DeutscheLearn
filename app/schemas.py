@@ -21,6 +21,21 @@ class EndlessStartOut(BaseModel):
     question: QuestionOut
 
 
+class PracticeStartOut(BaseModel):
+    attempt_id: str
+    score: int
+    total_questions: int
+    question: QuestionOut
+
+
+class TimedStartOut(BaseModel):
+    attempt_id: str
+    score: int
+    total_questions: int
+    duration_seconds: int
+    question: QuestionOut
+
+
 class EndlessAnswerIn(BaseModel):
     attempt_id: str
     question_id: str
@@ -32,6 +47,24 @@ class EndlessAnswerOut(BaseModel):
     score: int
     correct_answer: str
     attempt_finished: bool
+    next_question: QuestionOut | None = None
+
+
+class PracticeAnswerOut(BaseModel):
+    correct: bool
+    score: int
+    total_questions: int
+    correct_answer: str
+    next_question: QuestionOut
+
+
+class TimedAnswerOut(BaseModel):
+    correct: bool
+    score: int
+    total_questions: int
+    correct_answer: str
+    attempt_finished: bool
+    seconds_remaining: int
     next_question: QuestionOut | None = None
 
 

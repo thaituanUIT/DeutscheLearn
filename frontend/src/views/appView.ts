@@ -2,8 +2,9 @@ import { getCurrentPlayer, getLeaderboard } from "../api/client";
 import type { LeaderboardEntry, Player } from "../api/types";
 import { setPlayer } from "../state/playerStore";
 import { clear, el } from "../utils/dom";
+import { homeView } from "./homeView";
 import { leaderboardView } from "./leaderboardView";
-import { quizView } from "./quizView";
+import { quizView, type QuizMode } from "./quizView";
 
 export async function renderApp(root: HTMLElement): Promise<void> {
   clear(root);
@@ -35,29 +36,41 @@ function draw(root: HTMLElement, player: Player, initialLeaderboard: Leaderboard
   header.append(el("h1", "brand", "German Word Quiz"), playerNode);
 
   const layout = el("div", "layout");
+  const mainHost = el("div");
   const leaderboardHost = el("div");
   const renderLeaderboard = (): void => {
     leaderboardHost.replaceChildren(leaderboardView(leaderboard));
   };
 
-  const quiz = quizView({
-    bestScore,
-    onLeaderboardRefresh: async () => {
-      leaderboard = await getLeaderboard();
-      const ownBest = leaderboard.find((entry) => entry.display_name === player.display_name);
-      if (ownBest) bestScore = Math.max(bestScore, ownBest.score);
-      renderLeaderboard();
-      return leaderboard;
-    },
-    onRender: () => undefined,
-    onError: (message: string) => {
-      const error = el("div", "error", message);
-      layout.prepend(error);
-    },
-  });
+  const showHome = (): void => {
+    mainHost.replaceChildren(homeView({ onSelectMode: showMode }));
+  };
+
+  const showMode = (mode: QuizMode): void => {
+    mainHost.replaceChildren(
+      quizView({
+        mode,
+        bestScore,
+        onLeaderboardRefresh: async () => {
+          leaderboard = await getLeaderboard();
+          const ownBest = leaderboard.find((entry) => entry.display_name === player.display_name);
+          if (ownBest) bestScore = Math.max(bestScore, ownBest.score);
+          renderLeaderboard();
+          return leaderboard;
+        },
+        onBack: showHome,
+        onRender: () => undefined,
+        onError: (message: string) => {
+          const error = el("div", "error", message);
+          layout.prepend(error);
+        },
+      }),
+    );
+  };
 
   renderLeaderboard();
-  layout.replaceChildren(quiz, leaderboardHost);
+  showHome();
+  layout.replaceChildren(mainHost, leaderboardHost);
   shell.replaceChildren(header, layout);
   clear(root);
   root.append(shell);

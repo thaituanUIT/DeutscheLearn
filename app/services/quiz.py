@@ -1,6 +1,7 @@
 import json
 import random
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import QuizAttempt, QuizAttemptQuestion
@@ -19,12 +20,13 @@ def _shuffle(choices: list[str]) -> list[str]:
 
 def create_question(db: Session, attempt: QuizAttempt) -> QuestionOut:
     question_type, word = _pick_question_candidate(db, attempt)
+    display_word = _display_word(question_type, word.word, word.part_of_speech)
     if question_type == "article":
-        prompt = f"Which article belongs with '{word.word}'?"
+        prompt = f"Which article belongs with '{display_word}'?"
         correct_answer = word.article or "das"
         choices = ARTICLE_CHOICES
     else:
-        prompt = f"What type of word is '{word.word}'?"
+        prompt = f"What type of word is '{display_word}'?"
         correct_answer = word.part_of_speech
         choices = WORD_TYPE_CHOICES
 
@@ -45,13 +47,26 @@ def _pick_question_candidate(db: Session, attempt: QuizAttempt):
     asked_pairs = {
         (question.word, question.question_type)
         for question in attempt.questions
-        if question.answered_at is not None
     }
+    player_seen_pairs = set(
+        db.execute(
+            select(QuizAttemptQuestion.word, QuizAttemptQuestion.question_type)
+            .join(QuizAttempt, QuizAttempt.id == QuizAttemptQuestion.attempt_id)
+            .where(QuizAttempt.player_id == attempt.player_id)
+        ).all()
+    )
     candidates = []
     for question_type in ["article", "word_type"]:
         for word in get_words(db, require_article=question_type == "article"):
-            if (word.word, question_type) not in asked_pairs:
+            pair = (word.word, question_type)
+            if pair not in asked_pairs and pair not in player_seen_pairs:
                 candidates.append((question_type, word))
+
+    if not candidates:
+        for question_type in ["article", "word_type"]:
+            for word in get_words(db, require_article=question_type == "article"):
+                if (word.word, question_type) not in asked_pairs:
+                    candidates.append((question_type, word))
 
     if not candidates:
         for question_type in ["article", "word_type"]:
@@ -61,10 +76,16 @@ def _pick_question_candidate(db: Session, attempt: QuizAttempt):
     return random.choice(candidates)
 
 
+def _display_word(question_type: str, word: str, part_of_speech: str) -> str:
+    if question_type == "word_type" and part_of_speech == "noun":
+        return word.lower()
+    return word
+
+
 def question_to_schema(question: QuizAttemptQuestion) -> QuestionOut:
     return QuestionOut(
         question_id=question.id,
-        word=question.word,
+        word=_display_word(question.question_type, question.word, question.correct_answer),
         type=question.question_type,
         prompt=question.prompt,
         choices=json.loads(question.choices_json),

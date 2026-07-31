@@ -1,8 +1,11 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from app.db.models import QuizAttemptQuestion
 from app.db.session import SessionLocal
 from app.main import app
+from app.services.quiz import question_to_schema
 
 
 def test_player_cookie_is_idempotent() -> None:
@@ -52,6 +55,150 @@ def test_leaderboard_endpoint_returns_list() -> None:
 
         assert response.status_code == 200
         assert isinstance(response.json(), list)
+
+
+def test_leaderboard_question_count_matches_best_streak_not_final_miss() -> None:
+    with TestClient(app) as client:
+        player = client.get("/api/players/me").json()
+        started = client.post("/api/quiz/endless/start")
+        assert started.status_code == 200
+
+        payload = started.json()
+        attempt_id = payload["attempt_id"]
+        question = payload["question"]
+
+        for _ in range(7):
+            db = SessionLocal()
+            try:
+                stored_question = db.get(QuizAttemptQuestion, question["question_id"])
+                assert stored_question is not None
+                answer = stored_question.correct_answer
+            finally:
+                db.close()
+
+            answered = client.post(
+                "/api/quiz/endless/answer",
+                json={
+                    "attempt_id": attempt_id,
+                    "question_id": question["question_id"],
+                    "selected_answer": answer,
+                },
+            )
+            assert answered.status_code == 200
+            body = answered.json()
+            assert body["score"] == _ + 1
+            question = body["next_question"]
+            assert question is not None
+
+        db = SessionLocal()
+        try:
+            stored_question = db.get(QuizAttemptQuestion, question["question_id"])
+            assert stored_question is not None
+            wrong_answer = next(
+                choice for choice in question["choices"] if choice != stored_question.correct_answer
+            )
+        finally:
+            db.close()
+
+        answered = client.post(
+            "/api/quiz/endless/answer",
+            json={
+                "attempt_id": attempt_id,
+                "question_id": question["question_id"],
+                "selected_answer": wrong_answer,
+            },
+        )
+        assert answered.status_code == 200
+        assert answered.json()["score"] == 7
+
+        leaderboard = client.get("/api/leaderboard").json()
+        own_entry = next(
+            entry for entry in leaderboard if entry["display_name"] == player["display_name"]
+        )
+        assert own_entry["score"] == 7
+        assert own_entry["total_questions"] == 7
+
+
+def test_practice_mode_continues_after_wrong_answer() -> None:
+    with TestClient(app) as client:
+        client.get("/api/players/me")
+        started = client.post("/api/quiz/practice/start")
+        assert started.status_code == 200
+
+        payload = started.json()
+        question = payload["question"]
+        db = SessionLocal()
+        try:
+            stored_question = db.get(QuizAttemptQuestion, question["question_id"])
+            assert stored_question is not None
+            wrong_answer = next(
+                choice for choice in question["choices"] if choice != stored_question.correct_answer
+            )
+        finally:
+            db.close()
+
+        answered = client.post(
+            "/api/quiz/practice/answer",
+            json={
+                "attempt_id": payload["attempt_id"],
+                "question_id": question["question_id"],
+                "selected_answer": wrong_answer,
+            },
+        )
+
+        assert answered.status_code == 200
+        body = answered.json()
+        assert body["correct"] is False
+        assert body["score"] == 0
+        assert body["total_questions"] == 1
+        assert body["next_question"] is not None
+
+
+def test_timed_mode_start_returns_duration() -> None:
+    with TestClient(app) as client:
+        client.get("/api/players/me")
+        started = client.post("/api/quiz/timed/start")
+
+        assert started.status_code == 200
+        body = started.json()
+        assert body["duration_seconds"] == 60
+        assert body["score"] == 0
+        assert body["total_questions"] == 0
+        assert body["question"] is not None
+
+
+def test_word_type_noun_question_displays_lowercase_word() -> None:
+    question = QuizAttemptQuestion(
+        id="question-id",
+        attempt_id="attempt-id",
+        word="Haus",
+        question_type="word_type",
+        prompt="What type of word is 'haus'?",
+        correct_answer="noun",
+        choices_json=json.dumps(["noun", "verb", "adjective", "adverb"]),
+    )
+
+    payload = question_to_schema(question)
+
+    assert payload.word == "haus"
+    assert payload.prompt == "What type of word is 'haus'?"
+
+
+def test_new_attempt_for_same_player_prefers_unseen_first_question() -> None:
+    with TestClient(app) as client:
+        client.get("/api/players/me")
+
+        first = client.post("/api/quiz/practice/start")
+        second = client.post("/api/quiz/practice/start")
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        first_question = first.json()["question"]
+        second_question = second.json()["question"]
+        assert (second_question["word"], second_question["type"]) != (
+            first_question["word"],
+            first_question["type"],
+        )
 
 
 def test_endless_questions_do_not_repeat_before_pool_is_exhausted() -> None:

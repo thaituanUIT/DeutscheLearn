@@ -18,11 +18,44 @@ export type EndlessStart = {
   question: QuizQuestion;
 };
 
+export type PracticeStart = {
+  attempt_id: string;
+  score: number;
+  total_questions: number;
+  question: QuizQuestion;
+};
+
+export type TimedStart = {
+  attempt_id: string;
+  score: number;
+  total_questions: number;
+  duration_seconds: number;
+  question: QuizQuestion;
+};
+
 export type EndlessAnswer = {
   correct: boolean;
   score: number;
   correct_answer: string;
   attempt_finished: boolean;
+  next_question: QuizQuestion | null;
+};
+
+export type PracticeAnswer = {
+  correct: boolean;
+  score: number;
+  total_questions: number;
+  correct_answer: string;
+  next_question: QuizQuestion;
+};
+
+export type TimedAnswer = {
+  correct: boolean;
+  score: number;
+  total_questions: number;
+  correct_answer: string;
+  attempt_finished: boolean;
+  seconds_remaining: number;
   next_question: QuizQuestion | null;
 };
 
