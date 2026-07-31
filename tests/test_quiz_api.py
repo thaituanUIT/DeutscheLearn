@@ -65,6 +65,43 @@ def test_leaderboard_endpoint_returns_list() -> None:
         assert isinstance(response.json(), list)
 
 
+def test_zero_score_attempt_is_not_listed_on_leaderboard() -> None:
+    with TestClient(app) as client:
+        player = client.get("/api/players/me").json()
+        started = client.post("/api/quiz/endless/start")
+        assert started.status_code == 200
+
+        payload = started.json()
+        question = payload["question"]
+        db = SessionLocal()
+        try:
+            stored_question = db.get(QuizAttemptQuestion, question["question_id"])
+            assert stored_question is not None
+            wrong_answer = next(
+                choice for choice in question["choices"] if choice != stored_question.correct_answer
+            )
+        finally:
+            db.close()
+
+        answered = client.post(
+            "/api/quiz/endless/answer",
+            json={
+                "attempt_id": payload["attempt_id"],
+                "question_id": question["question_id"],
+                "selected_answer": wrong_answer,
+            },
+        )
+        assert answered.status_code == 200
+        assert answered.json()["score"] == 0
+
+        leaderboard = client.get("/api/leaderboard").json()
+        own_entry = next(
+            (entry for entry in leaderboard if entry["display_name"] == player["display_name"]),
+            None,
+        )
+        assert own_entry is None
+
+
 def test_word_of_day_endpoint_returns_duden_word(monkeypatch) -> None:
     class FakeDudenWord:
         name = "Crush"
@@ -149,6 +186,70 @@ def test_leaderboard_question_count_matches_best_streak_not_final_miss() -> None
         )
         assert own_entry["score"] == 7
         assert own_entry["total_questions"] == 7
+
+
+def test_player_best_endless_score_only_increases() -> None:
+    with TestClient(app) as client:
+        player = client.get("/api/players/me").json()
+        assert player["best_endless_score"] == 0
+
+        _finish_endless_run(client, correct_count=2)
+        assert client.get("/api/players/me").json()["best_endless_score"] == 2
+
+        _finish_endless_run(client, correct_count=1)
+        assert client.get("/api/players/me").json()["best_endless_score"] == 2
+
+
+def _finish_endless_run(client: TestClient, correct_count: int) -> None:
+    started = client.post("/api/quiz/endless/start")
+    assert started.status_code == 200
+
+    payload = started.json()
+    attempt_id = payload["attempt_id"]
+    question = payload["question"]
+
+    for _ in range(correct_count):
+        db = SessionLocal()
+        try:
+            stored_question = db.get(QuizAttemptQuestion, question["question_id"])
+            assert stored_question is not None
+            correct_answer = stored_question.correct_answer
+        finally:
+            db.close()
+
+        answered = client.post(
+            "/api/quiz/endless/answer",
+            json={
+                "attempt_id": attempt_id,
+                "question_id": question["question_id"],
+                "selected_answer": correct_answer,
+            },
+        )
+        assert answered.status_code == 200
+        body = answered.json()
+        question = body["next_question"]
+        assert question is not None
+
+    db = SessionLocal()
+    try:
+        stored_question = db.get(QuizAttemptQuestion, question["question_id"])
+        assert stored_question is not None
+        wrong_answer = next(
+            choice for choice in question["choices"] if choice != stored_question.correct_answer
+        )
+    finally:
+        db.close()
+
+    answered = client.post(
+        "/api/quiz/endless/answer",
+        json={
+            "attempt_id": attempt_id,
+            "question_id": question["question_id"],
+            "selected_answer": wrong_answer,
+        },
+    )
+    assert answered.status_code == 200
+    assert answered.json()["score"] == correct_count
 
 
 def test_practice_mode_continues_after_wrong_answer() -> None:

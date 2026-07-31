@@ -31,6 +31,7 @@ type QuizViewOptions = {
 };
 
 let timedTimerId: number | null = null;
+let pendingAnswerKey: string | null = null;
 
 export function quizView(options: QuizViewOptions): HTMLElement {
   const section = el("section", "panel quiz-card");
@@ -40,6 +41,7 @@ export function quizView(options: QuizViewOptions): HTMLElement {
 
 function renderStart(section: HTMLElement, options: QuizViewOptions): void {
   stopTimedTimer();
+  pendingAnswerKey = null;
   section.replaceChildren();
   const config = modeConfig(options.mode);
   const intro = el("div");
@@ -73,6 +75,7 @@ function renderQuestion(
   options: QuizViewOptions,
 ): void {
   const state = getQuizState();
+  pendingAnswerKey = null;
   section.replaceChildren();
   if (options.mode === "timed") startTimedTimer(section, options);
 
@@ -103,11 +106,18 @@ async function handleAnswer(
   const state = getQuizState();
   if (!state.attemptId || !state.currentQuestion) return;
 
+  const questionId = state.currentQuestion.question_id;
+  const answerKey = `${state.attemptId}:${questionId}`;
+  if (pendingAnswerKey === answerKey) return;
+
+  pendingAnswerKey = answerKey;
+  setAnswerOptionsDisabled(section, true);
+
   try {
     if (options.mode === "practice") {
       const answer = await submitPracticeAnswer(
         state.attemptId,
-        state.currentQuestion.question_id,
+        questionId,
         choice,
       );
       advanceQuestion(answer.next_question, answer.score, answer.total_questions);
@@ -116,7 +126,7 @@ async function handleAnswer(
     }
 
     if (options.mode === "timed") {
-      const answer = await submitTimedAnswer(state.attemptId, state.currentQuestion.question_id, choice);
+      const answer = await submitTimedAnswer(state.attemptId, questionId, choice);
       if (!answer.attempt_finished && answer.next_question) {
         advanceQuestion(
           answer.next_question,
@@ -133,7 +143,7 @@ async function handleAnswer(
       return;
     }
 
-    const answer = await submitEndlessAnswer(state.attemptId, state.currentQuestion.question_id, choice);
+    const answer = await submitEndlessAnswer(state.attemptId, questionId, choice);
     if (answer.correct && answer.next_question) {
       advanceQuestion(answer.next_question, answer.score);
       renderQuestion(section, answer.next_question, options);
@@ -144,7 +154,15 @@ async function handleAnswer(
     await options.onLeaderboardRefresh();
     renderResult(section, answer.score, answer.correct_answer, options);
   } catch (error) {
+    pendingAnswerKey = null;
+    setAnswerOptionsDisabled(section, false);
     options.onError(error instanceof Error ? error.message : "Could not submit answer");
+  }
+}
+
+function setAnswerOptionsDisabled(section: HTMLElement, disabled: boolean): void {
+  for (const option of section.querySelectorAll<HTMLButtonElement>(".answer-option")) {
+    option.disabled = disabled;
   }
 }
 

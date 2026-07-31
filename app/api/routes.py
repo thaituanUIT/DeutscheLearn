@@ -287,6 +287,7 @@ def leaderboard(
             .label("player_rank"),
         )
         .where(QuizAttempt.mode == mode, QuizAttempt.status == "finished")
+        .where(QuizAttempt.score > 0)
         .subquery()
     )
 
