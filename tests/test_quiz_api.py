@@ -52,3 +52,42 @@ def test_leaderboard_endpoint_returns_list() -> None:
 
         assert response.status_code == 200
         assert isinstance(response.json(), list)
+
+
+def test_endless_questions_do_not_repeat_before_pool_is_exhausted() -> None:
+    with TestClient(app) as client:
+        client.get("/api/players/me")
+        started = client.post("/api/quiz/endless/start")
+        assert started.status_code == 200
+
+        payload = started.json()
+        attempt_id = payload["attempt_id"]
+        question = payload["question"]
+        seen = {(question["word"], question["type"])}
+
+        for _ in range(10):
+            db = SessionLocal()
+            try:
+                stored_question = db.get(QuizAttemptQuestion, question["question_id"])
+                assert stored_question is not None
+                correct_answer = stored_question.correct_answer
+            finally:
+                db.close()
+
+            answered = client.post(
+                "/api/quiz/endless/answer",
+                json={
+                    "attempt_id": attempt_id,
+                    "question_id": question["question_id"],
+                    "selected_answer": correct_answer,
+                },
+            )
+            assert answered.status_code == 200
+            body = answered.json()
+            assert body["correct"] is True
+            question = body["next_question"]
+            assert question is not None
+
+            pair = (question["word"], question["type"])
+            assert pair not in seen
+            seen.add(pair)

@@ -50,3 +50,15 @@ SEED_ON_STARTUP=true
 ```
 
 On Render, use the included `render.yaml`. It provisions a web service plus Postgres and sets `COOKIE_SECURE=true`.
+
+## GitHub Actions and Render
+
+The workflow in `.github/workflows/render-deploy.yml` runs backend linting, backend tests,
+frontend audit, and frontend build on pull requests and pushes to `main`.
+
+For Render deploys you have two options:
+
+1. Enable Render's normal GitHub auto-deploy for the service. Render will build from
+   `render.yaml` after each push to `main`.
+2. Or create a Render deploy hook and save it as a GitHub Actions secret named
+   `RENDER_DEPLOY_HOOK_URL`. The workflow will trigger that hook only after the build job passes.

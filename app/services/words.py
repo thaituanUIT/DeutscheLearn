@@ -50,7 +50,7 @@ def seed_words(db: Session) -> None:
     db.commit()
 
 
-def get_random_word(db: Session, *, require_article: bool = False) -> CachedWord:
+def get_words(db: Session, *, require_article: bool = False) -> list[CachedWord]:
     query = select(CachedWord)
     if require_article:
         query = query.where(CachedWord.article.is_not(None))
@@ -58,4 +58,9 @@ def get_random_word(db: Session, *, require_article: bool = False) -> CachedWord
     if not words:
         seed_words(db)
         words = list(db.scalars(query).all())
+    return words
+
+
+def get_random_word(db: Session, *, require_article: bool = False) -> CachedWord:
+    words = get_words(db, require_article=require_article)
     return random.choice(words)
