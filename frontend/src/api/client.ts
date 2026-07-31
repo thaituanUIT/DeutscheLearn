@@ -1,6 +1,9 @@
 import type {
   EndlessAnswer,
   EndlessStart,
+  FocusCard,
+  FocusLevel,
+  FocusTopic,
   LeaderboardEntry,
   Player,
   PracticeAnswer,
@@ -95,4 +98,17 @@ export function submitTimedAnswer(
 
 export function getLeaderboard(): Promise<LeaderboardEntry[]> {
   return request<LeaderboardEntry[]>("/api/leaderboard?mode=endless&limit=20");
+}
+
+export function getFocusLevels(): Promise<FocusLevel[]> {
+  return request<FocusLevel[]>("/api/focus/levels");
+}
+
+export function getFocusTopics(level: string): Promise<FocusTopic[]> {
+  return request<FocusTopic[]>(`/api/focus/topics?level=${encodeURIComponent(level)}`);
+}
+
+export function getFocusCards(level: string, topic: string): Promise<FocusCard[]> {
+  const params = new URLSearchParams({ level, topic });
+  return request<FocusCard[]>(`/api/focus/cards?${params.toString()}`);
 }

@@ -12,6 +12,9 @@ from app.schemas import (
     EndlessAnswerIn,
     EndlessAnswerOut,
     EndlessStartOut,
+    FocusCardOut,
+    FocusLevelOut,
+    FocusTopicOut,
     LeaderboardEntry,
     PlayerOut,
     PracticeAnswerOut,
@@ -20,8 +23,9 @@ from app.schemas import (
     TimedStartOut,
     WordOfDayOut,
 )
+from app.services.focus import get_focus_cards, get_focus_levels, get_focus_topics
 from app.services.quiz import create_question
-from app.services.words import get_word_of_day
+from app.services.words import get_duden_meaning_overview, get_word_of_day
 
 router = APIRouter(prefix="/api")
 TIMED_DURATION_SECONDS = 60
@@ -52,6 +56,28 @@ def word_of_the_day(db: Session = Depends(get_db)) -> WordOfDayOut:
         meaning=word.meaning,
         date=today.isoformat(),
     )
+
+
+@router.get("/focus/levels", response_model=list[FocusLevelOut])
+def focus_levels(db: Session = Depends(get_db)) -> list[FocusLevelOut]:
+    return [FocusLevelOut(**level) for level in get_focus_levels(db)]
+
+
+@router.get("/focus/topics", response_model=list[FocusTopicOut])
+def focus_topics(
+    level: str = Query(pattern="^(A1|A2|B1|B2)$"),
+    db: Session = Depends(get_db),
+) -> list[FocusTopicOut]:
+    return [FocusTopicOut(**topic) for topic in get_focus_topics(db, level)]
+
+
+@router.get("/focus/cards", response_model=list[FocusCardOut])
+def focus_cards(
+    level: str = Query(pattern="^(A1|A2|B1|B2)$"),
+    topic: str = Query(min_length=1, max_length=80),
+    db: Session = Depends(get_db),
+) -> list[FocusCardOut]:
+    return [FocusCardOut(**card) for card in get_focus_cards(db, level, topic)]
 
 
 @router.post("/quiz/endless/start", response_model=EndlessStartOut)
@@ -149,6 +175,8 @@ def answer_endless(
         correct=correct,
         score=attempt.score,
         correct_answer=question.correct_answer,
+        answered_word=question.word,
+        meaning_overview=get_duden_meaning_overview(question.word),
         attempt_finished=not correct,
         next_question=next_question,
     )

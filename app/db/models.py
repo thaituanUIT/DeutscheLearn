@@ -34,6 +34,23 @@ class CachedWord(Base):
     meaning: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
+    focus_entries: Mapped[list["FocusWordEntry"]] = relationship(back_populates="cached_word")
+
+
+class FocusWordEntry(Base):
+    __tablename__ = "focus_word_entries"
+    __table_args__ = (
+        UniqueConstraint("word", "topic", "level", name="uq_focus_word_topic_level"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    word: Mapped[str] = mapped_column(ForeignKey("cached_words.word"), nullable=False)
+    topic: Mapped[str] = mapped_column(String(80), nullable=False)
+    level: Mapped[str] = mapped_column(String(8), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+    cached_word: Mapped[CachedWord] = relationship(back_populates="focus_entries")
+
 
 class QuizAttempt(Base):
     __tablename__ = "quiz_attempts"

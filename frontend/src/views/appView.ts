@@ -2,9 +2,10 @@ import { getCurrentPlayer, getLeaderboard, getWordOfDay } from "../api/client";
 import type { LeaderboardEntry, Player, WordOfDay } from "../api/types";
 import { setPlayer } from "../state/playerStore";
 import { clear, el } from "../utils/dom";
-import { homeView } from "./homeView";
+import { focusView } from "./focusView";
+import { homeView, type HomeMode } from "./homeView";
 import { leaderboardView, wordOfDayView } from "./leaderboardView";
-import { quizView, type QuizMode } from "./quizView";
+import { quizView } from "./quizView";
 
 export async function renderApp(root: HTMLElement): Promise<void> {
   clear(root);
@@ -56,7 +57,17 @@ function draw(
     mainHost.replaceChildren(homeView({ onSelectMode: showMode }));
   };
 
-  const showMode = (mode: QuizMode): void => {
+  const showMode = (mode: HomeMode): void => {
+    if (mode === "focus") {
+      mainHost.replaceChildren(
+        focusView({
+          onBack: showHome,
+          onError: showError,
+        }),
+      );
+      return;
+    }
+
     mainHost.replaceChildren(
       quizView({
         mode,
@@ -70,12 +81,14 @@ function draw(
         },
         onBack: showHome,
         onRender: () => undefined,
-        onError: (message: string) => {
-          const error = el("div", "error", message);
-          layout.prepend(error);
-        },
+        onError: showError,
       }),
     );
+  };
+
+  const showError = (message: string): void => {
+    const error = el("div", "error", message);
+    layout.prepend(error);
   };
 
   renderLeaderboard();

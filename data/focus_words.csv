@@ -1,0 +1,181 @@
+word,topic,level,article,part_of_speech,meaning
+ich,self_introduction_family,A1,,pronoun,I
+du,self_introduction_family,A1,,pronoun,you informal
+Name,self_introduction_family,A1,der,noun,name
+Familie,self_introduction_family,A1,die,noun,family
+Mutter,self_introduction_family,A1,die,noun,mother
+Vater,self_introduction_family,A1,der,noun,father
+Kind,self_introduction_family,A1,das,noun,child
+Bruder,self_introduction_family,A1,der,noun,brother
+Schwester,self_introduction_family,A1,die,noun,sister
+Freund,self_introduction_family,A1,der,noun,friend
+Essen,food_drink,A1,das,noun,food
+Trinken,food_drink,A1,das,noun,drinking
+Brot,food_drink,A1,das,noun,bread
+Wasser,food_drink,A1,das,noun,water
+Kaffee,food_drink,A1,der,noun,coffee
+Tee,food_drink,A1,der,noun,tea
+Milch,food_drink,A1,die,noun,milk
+Apfel,food_drink,A1,der,noun,apple
+Suppe,food_drink,A1,die,noun,soup
+Käse,food_drink,A1,der,noun,cheese
+Morgen,daily_routine,A1,der,noun,morning
+Abend,daily_routine,A1,der,noun,evening
+Tag,daily_routine,A1,der,noun,day
+Nacht,daily_routine,A1,die,noun,night
+aufstehen,daily_routine,A1,,verb,to get up
+arbeiten,daily_routine,A1,,verb,to work
+lernen,daily_routine,A1,,verb,to learn
+schlafen,daily_routine,A1,,verb,to sleep
+gehen,daily_routine,A1,,verb,to go
+kommen,daily_routine,A1,,verb,to come
+Haus,housing_furniture,A1,das,noun,house
+Wohnung,housing_furniture,A1,die,noun,apartment
+Zimmer,housing_furniture,A1,das,noun,room
+Küche,housing_furniture,A1,die,noun,kitchen
+Bad,housing_furniture,A1,das,noun,bathroom
+Tisch,housing_furniture,A1,der,noun,table
+Stuhl,housing_furniture,A1,der,noun,chair
+Bett,housing_furniture,A1,das,noun,bed
+Schrank,housing_furniture,A1,der,noun,wardrobe
+Lampe,housing_furniture,A1,die,noun,lamp
+kaufen,shopping_prices,A1,,verb,to buy
+Preis,shopping_prices,A1,der,noun,price
+Geld,shopping_prices,A1,das,noun,money
+Euro,shopping_prices,A1,der,noun,euro
+Geschäft,shopping_prices,A1,das,noun,shop
+Supermarkt,shopping_prices,A1,der,noun,supermarket
+Rechnung,shopping_prices,A1,die,noun,bill
+billig,shopping_prices,A1,,adjective,cheap
+teuer,shopping_prices,A1,,adjective,expensive
+bezahlen,shopping_prices,A1,,verb,to pay
+Kunst,art_painting,A1,die,noun,art
+Bild,art_painting,A1,das,noun,picture
+Farbe,art_painting,A1,die,noun,color
+malen,art_painting,A1,,verb,to paint
+zeichnen,art_painting,A1,,verb,to draw
+Museum,art_painting,A1,das,noun,museum
+Galerie,art_painting,A1,die,noun,gallery
+Pinsel,art_painting,A1,der,noun,paintbrush
+Leinwand,art_painting,A1,die,noun,canvas
+Künstler,art_painting,A1,der,noun,artist
+Gesundheit,health_body,A2,die,noun,health
+Körper,health_body,A2,der,noun,body
+Kopf,health_body,A2,der,noun,head
+Hand,health_body,A2,die,noun,hand
+Fuß,health_body,A2,der,noun,foot
+Auge,health_body,A2,das,noun,eye
+Arzt,health_body,A2,der,noun,doctor
+Apotheke,health_body,A2,die,noun,pharmacy
+Schmerz,health_body,A2,der,noun,pain
+krank,health_body,A2,,adjective,sick
+Reise,travel_transport,A2,die,noun,trip
+Zug,travel_transport,A2,der,noun,train
+Bus,travel_transport,A2,der,noun,bus
+Auto,travel_transport,A2,das,noun,car
+Flugzeug,travel_transport,A2,das,noun,airplane
+Bahnhof,travel_transport,A2,der,noun,train station
+Flughafen,travel_transport,A2,der,noun,airport
+Fahrkarte,travel_transport,A2,die,noun,ticket
+fahren,travel_transport,A2,,verb,to travel by vehicle
+ankommen,travel_transport,A2,,verb,to arrive
+Kleidung,clothing_appearance,A2,die,noun,clothing
+Hemd,clothing_appearance,A2,das,noun,shirt
+Hose,clothing_appearance,A2,die,noun,pants
+Schuh,clothing_appearance,A2,der,noun,shoe
+Jacke,clothing_appearance,A2,die,noun,jacket
+Kleid,clothing_appearance,A2,das,noun,dress
+tragen,clothing_appearance,A2,,verb,to wear
+aussehen,clothing_appearance,A2,,verb,to look
+schön,clothing_appearance,A2,,adjective,beautiful
+groß,clothing_appearance,A2,,adjective,big
+Teller,kitchen_utensils,A2,der,noun,plate
+Tasse,kitchen_utensils,A2,die,noun,cup
+Glas,kitchen_utensils,A2,das,noun,glass
+Messer,kitchen_utensils,A2,das,noun,knife
+Gabel,kitchen_utensils,A2,die,noun,fork
+Löffel,kitchen_utensils,A2,der,noun,spoon
+Topf,kitchen_utensils,A2,der,noun,pot
+Pfanne,kitchen_utensils,A2,die,noun,pan
+Schüssel,kitchen_utensils,A2,die,noun,bowl
+Herd,kitchen_utensils,A2,der,noun,stove
+Wetter,weather_seasons,A2,das,noun,weather
+Sonne,weather_seasons,A2,die,noun,sun
+Regen,weather_seasons,A2,der,noun,rain
+Schnee,weather_seasons,A2,der,noun,snow
+Wind,weather_seasons,A2,der,noun,wind
+Wolke,weather_seasons,A2,die,noun,cloud
+Frühling,weather_seasons,A2,der,noun,spring
+Sommer,weather_seasons,A2,der,noun,summer
+Herbst,weather_seasons,A2,der,noun,autumn
+Winter,weather_seasons,A2,der,noun,winter
+Hotel,hotel_accommodation_reception,B1,das,noun,hotel
+Unterkunft,hotel_accommodation_reception,B1,die,noun,accommodation
+Rezeption,hotel_accommodation_reception,B1,die,noun,reception
+Zimmer,hotel_accommodation_reception,B1,das,noun,room
+Reservierung,hotel_accommodation_reception,B1,die,noun,reservation
+Schlüssel,hotel_accommodation_reception,B1,der,noun,key
+Ankunft,hotel_accommodation_reception,B1,die,noun,arrival
+Abreise,hotel_accommodation_reception,B1,die,noun,departure
+übernachten,hotel_accommodation_reception,B1,,verb,to stay overnight
+buchen,hotel_accommodation_reception,B1,,verb,to book
+Arbeit,work_career,B1,die,noun,work
+Beruf,work_career,B1,der,noun,profession
+Büro,work_career,B1,das,noun,office
+Kollege,work_career,B1,der,noun,colleague
+Chef,work_career,B1,der,noun,boss
+Bewerbung,work_career,B1,die,noun,job application
+Gehalt,work_career,B1,das,noun,salary
+Termin,work_career,B1,der,noun,appointment
+Aufgabe,work_career,B1,die,noun,task
+arbeiten,work_career,B1,,verb,to work
+Ausbildung,education_studies,B1,die,noun,vocational training
+Studium,education_studies,B1,das,noun,university studies
+Universität,education_studies,B1,die,noun,university
+Schule,education_studies,B1,die,noun,school
+Prüfung,education_studies,B1,die,noun,exam
+Unterricht,education_studies,B1,der,noun,lesson
+Lehrer,education_studies,B1,der,noun,teacher
+Student,education_studies,B1,der,noun,student
+lernen,education_studies,B1,,verb,to learn
+bestehen,education_studies,B1,,verb,to pass
+Beziehung,relationships_living_together,B1,die,noun,relationship
+Zusammenleben,relationships_living_together,B1,das,noun,living together
+Partner,relationships_living_together,B1,der,noun,partner
+Freundschaft,relationships_living_together,B1,die,noun,friendship
+Nachbar,relationships_living_together,B1,der,noun,neighbor
+Streit,relationships_living_together,B1,der,noun,argument
+Vertrauen,relationships_living_together,B1,das,noun,trust
+Gespräch,relationships_living_together,B1,das,noun,conversation
+helfen,relationships_living_together,B1,,verb,to help
+teilen,relationships_living_together,B1,,verb,to share
+Medien,media_technology,B1,die,noun,media
+Technologie,media_technology,B1,die,noun,technology
+Internet,media_technology,B1,das,noun,internet
+Computer,media_technology,B1,der,noun,computer
+Handy,media_technology,B1,das,noun,mobile phone
+Nachricht,media_technology,B1,die,noun,message
+Zeitung,media_technology,B1,die,noun,newspaper
+Fernsehen,media_technology,B1,das,noun,television
+App,media_technology,B1,die,noun,app
+herunterladen,media_technology,B1,,verb,to download
+Wirtschaft,economy_consumption,B2,die,noun,economy
+Konsum,economy_consumption,B2,der,noun,consumption
+Unternehmen,economy_consumption,B2,das,noun,company
+Markt,economy_consumption,B2,der,noun,market
+Kunde,economy_consumption,B2,der,noun,customer
+Angebot,economy_consumption,B2,das,noun,offer
+Nachfrage,economy_consumption,B2,die,noun,demand
+Gewinn,economy_consumption,B2,der,noun,profit
+Ausgabe,economy_consumption,B2,die,noun,expense
+investieren,economy_consumption,B2,,verb,to invest
+Psychologie,psychology_personality,B2,die,noun,psychology
+Persönlichkeit,psychology_personality,B2,die,noun,personality
+Verhalten,psychology_personality,B2,das,noun,behavior
+Gefühl,psychology_personality,B2,das,noun,feeling
+Gedanke,psychology_personality,B2,der,noun,thought
+Motivation,psychology_personality,B2,die,noun,motivation
+Selbstbewusstsein,psychology_personality,B2,das,noun,self confidence
+Eigenschaft,psychology_personality,B2,die,noun,trait
+Gewohnheit,psychology_personality,B2,die,noun,habit
+wahrnehmen,psychology_personality,B2,,verb,to perceive

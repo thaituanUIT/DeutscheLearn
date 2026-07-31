@@ -54,6 +54,8 @@ class EndlessAnswerOut(BaseModel):
     correct: bool
     score: int
     correct_answer: str
+    answered_word: str
+    meaning_overview: str
     attempt_finished: bool
     next_question: QuestionOut | None = None
 
@@ -74,6 +76,28 @@ class TimedAnswerOut(BaseModel):
     attempt_finished: bool
     seconds_remaining: int
     next_question: QuestionOut | None = None
+
+
+class FocusLevelOut(BaseModel):
+    level: str
+    word_count: int
+    topic_count: int
+
+
+class FocusTopicOut(BaseModel):
+    topic: str
+    label: str
+    word_count: int
+
+
+class FocusCardOut(BaseModel):
+    word: str
+    article: str | None
+    part_of_speech: str
+    meaning_overview: str
+    topic: str
+    topic_label: str
+    level: str
 
 
 class LeaderboardEntry(BaseModel):

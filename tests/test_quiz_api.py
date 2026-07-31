@@ -1,12 +1,18 @@
 import json
 from typing import ClassVar
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.db.models import QuizAttemptQuestion
 from app.db.session import SessionLocal
 from app.main import app
 from app.services.quiz import question_to_schema
+
+
+@pytest.fixture(autouse=True)
+def avoid_duden_meaning_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.services.words._get_duden_meaning_overview", lambda word: None)
 
 
 def test_player_cookie_is_idempotent() -> None:
@@ -56,6 +62,80 @@ def test_endless_attempt_finishes_on_wrong_answer() -> None:
 
         assert answered.status_code == 200
         assert answered.json()["attempt_finished"] is True
+
+
+def test_endless_answer_returns_duden_meaning_overview(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.words._get_duden_meaning_overview",
+        lambda word: "Gebäude, das Menschen zum Wohnen dient.",
+    )
+
+    with TestClient(app) as client:
+        client.get("/api/players/me")
+        started = client.post("/api/quiz/endless/start")
+        assert started.status_code == 200
+
+        payload = started.json()
+        question = payload["question"]
+        db = SessionLocal()
+        try:
+            stored_question = db.get(QuizAttemptQuestion, question["question_id"])
+            assert stored_question is not None
+            correct_answer = stored_question.correct_answer
+            answered_word = stored_question.word
+        finally:
+            db.close()
+
+        answered = client.post(
+            "/api/quiz/endless/answer",
+            json={
+                "attempt_id": payload["attempt_id"],
+                "question_id": question["question_id"],
+                "selected_answer": correct_answer,
+            },
+        )
+
+        assert answered.status_code == 200
+        body = answered.json()
+        assert body["correct"] is True
+        assert body["answered_word"] == answered_word
+        assert body["meaning_overview"] == "Gebäude, das Menschen zum Wohnen dient."
+
+
+def test_endless_answer_handles_missing_duden_meaning_overview() -> None:
+    with TestClient(app) as client:
+        client.get("/api/players/me")
+        started = client.post("/api/quiz/endless/start")
+        assert started.status_code == 200
+
+        payload = started.json()
+        question = payload["question"]
+        db = SessionLocal()
+        try:
+            stored_question = db.get(QuizAttemptQuestion, question["question_id"])
+            assert stored_question is not None
+            wrong_answer = next(
+                choice for choice in question["choices"] if choice != stored_question.correct_answer
+            )
+        finally:
+            db.close()
+
+        answered = client.post(
+            "/api/quiz/endless/answer",
+            json={
+                "attempt_id": payload["attempt_id"],
+                "question_id": question["question_id"],
+                "selected_answer": wrong_answer,
+            },
+        )
+
+        assert answered.status_code == 200
+        body = answered.json()
+        assert body["correct"] is False
+        assert body["attempt_finished"] is True
+        assert body["meaning_overview"] == "No Duden meaning overview is available yet."
 
 
 def test_leaderboard_endpoint_returns_list() -> None:
@@ -125,6 +205,45 @@ def test_word_of_day_endpoint_returns_duden_word(monkeypatch) -> None:
         assert body["part_of_speech"] == "Substantiv, maskulin"
         assert body["meaning"] == "Person, in die jemand verliebt ist"
         assert body["date"]
+
+
+def test_focus_levels_are_loaded_from_csv() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/focus/levels")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body == [
+            {"level": "A1", "word_count": 60, "topic_count": 6},
+            {"level": "A2", "word_count": 50, "topic_count": 5},
+            {"level": "B1", "word_count": 50, "topic_count": 5},
+            {"level": "B2", "word_count": 20, "topic_count": 2},
+        ]
+
+
+def test_focus_topics_are_filtered_by_level() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/focus/topics?level=A1")
+
+        assert response.status_code == 200
+        topics = response.json()
+        assert {"topic": "food_drink", "label": "Food & Drink", "word_count": 10} in topics
+        assert {"topic": "work_career", "label": "Work & Career", "word_count": 10} not in topics
+
+
+def test_focus_cards_are_filtered_by_level_and_topic() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/focus/cards?level=A1&topic=food_drink")
+
+        assert response.status_code == 200
+        cards = response.json()
+        assert len(cards) == 10
+        assert {card["topic"] for card in cards} == {"food_drink"}
+        assert {card["level"] for card in cards} == {"A1"}
+        bread = next(card for card in cards if card["word"] == "Brot")
+        assert bread["article"] == "das"
+        assert bread["part_of_speech"] == "noun"
+        assert bread["meaning_overview"] == "bread"
 
 
 def test_leaderboard_question_count_matches_best_streak_not_final_miss() -> None:

@@ -146,13 +146,26 @@ async function handleAnswer(
     const answer = await submitEndlessAnswer(state.attemptId, questionId, choice);
     if (answer.correct && answer.next_question) {
       advanceQuestion(answer.next_question, answer.score);
-      renderQuestion(section, answer.next_question, options);
+      renderEndlessFeedback(
+        section,
+        answer.answered_word,
+        answer.meaning_overview,
+        answer.next_question,
+        options,
+      );
       return;
     }
 
     finishAttempt(answer.score);
     await options.onLeaderboardRefresh();
-    renderResult(section, answer.score, answer.correct_answer, options);
+    renderResult(
+      section,
+      answer.score,
+      answer.correct_answer,
+      answer.answered_word,
+      answer.meaning_overview,
+      options,
+    );
   } catch (error) {
     pendingAnswerKey = null;
     setAnswerOptionsDisabled(section, false);
@@ -164,6 +177,25 @@ function setAnswerOptionsDisabled(section: HTMLElement, disabled: boolean): void
   for (const option of section.querySelectorAll<HTMLButtonElement>(".answer-option")) {
     option.disabled = disabled;
   }
+}
+
+function renderEndlessFeedback(
+  section: HTMLElement,
+  answeredWord: string,
+  meaningOverview: string,
+  nextQuestion: QuizQuestion,
+  options: QuizViewOptions,
+): void {
+  section.replaceChildren();
+  const content = el("div", "result");
+  content.append(
+    el("h2", "", "Correct"),
+    el("p", "answered-word", answeredWord),
+    el("p", "meaning-overview", meaningOverview),
+  );
+  const next = button("Next question", "button primary");
+  next.addEventListener("click", () => renderQuestion(section, nextQuestion, options));
+  section.append(stats(options), content, next);
 }
 
 function renderPracticeFeedback(
@@ -188,6 +220,8 @@ function renderResult(
   section: HTMLElement,
   score: number,
   correctAnswer: string,
+  answeredWord: string,
+  meaningOverview: string,
   options: QuizViewOptions,
 ): void {
   section.replaceChildren();
@@ -195,6 +229,8 @@ function renderResult(
   content.append(
     el("h2", "", "Run finished"),
     el("p", "prompt", `Final streak: ${score}. Correct answer: ${correctAnswer}.`),
+    el("p", "answered-word", answeredWord),
+    el("p", "meaning-overview", meaningOverview),
   );
   const retry = button("Try again", "button primary");
   retry.addEventListener("click", () => renderStart(section, options));

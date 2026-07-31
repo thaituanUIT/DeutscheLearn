@@ -45,6 +45,8 @@ export type EndlessAnswer = {
   correct: boolean;
   score: number;
   correct_answer: string;
+  answered_word: string;
+  meaning_overview: string;
   attempt_finished: boolean;
   next_question: QuizQuestion | null;
 };
@@ -65,6 +67,28 @@ export type TimedAnswer = {
   attempt_finished: boolean;
   seconds_remaining: number;
   next_question: QuizQuestion | null;
+};
+
+export type FocusLevel = {
+  level: "A1" | "A2" | "B1" | "B2";
+  word_count: number;
+  topic_count: number;
+};
+
+export type FocusTopic = {
+  topic: string;
+  label: string;
+  word_count: number;
+};
+
+export type FocusCard = {
+  word: string;
+  article: string | null;
+  part_of_speech: string;
+  meaning_overview: string;
+  topic: string;
+  topic_label: string;
+  level: "A1" | "A2" | "B1" | "B2";
 };
 
 export type LeaderboardEntry = {

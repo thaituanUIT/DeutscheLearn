@@ -2,12 +2,14 @@ import { button } from "../components/button";
 import { el } from "../utils/dom";
 import type { QuizMode } from "./quizView";
 
+export type HomeMode = QuizMode | "focus";
+
 type HomeViewOptions = {
-  onSelectMode: (mode: QuizMode) => void;
+  onSelectMode: (mode: HomeMode) => void;
 };
 
 const modes: Array<{
-  mode: QuizMode;
+  mode: HomeMode;
   title: string;
   meta: string;
   description: string;
@@ -34,6 +36,13 @@ const modes: Array<{
     description: "Race the clock and answer as many German word questions as possible.",
     action: "Start timed",
   },
+  {
+    mode: "focus",
+    title: "Focus",
+    meta: "Flashcards",
+    description: "Pick a level and topic, then review Duden-backed vocabulary cards.",
+    action: "Study words",
+  },
 ];
 
 export function homeView(options: HomeViewOptions): HTMLElement {
@@ -41,8 +50,8 @@ export function homeView(options: HomeViewOptions): HTMLElement {
   const intro = el("div", "home-intro");
   intro.append(
     el("div", "question-type", "Choose mode"),
-    el("h2", "", "What do you want to play?"),
-    el("p", "prompt", "Pick a mode to start a quiz session."),
+    el("h2", "", "What do you want to do?"),
+    el("p", "prompt", "Pick a quiz mode or study by topic."),
   );
 
   const grid = el("div", "mode-grid");

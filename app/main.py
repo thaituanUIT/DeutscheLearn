@@ -10,6 +10,7 @@ from app.api.routes import router
 from app.core.config import get_settings
 from app.db.models import Base
 from app.db.session import SessionLocal, engine
+from app.services.focus import import_focus_words
 from app.services.words import seed_words
 
 
@@ -21,6 +22,7 @@ async def lifespan(api: FastAPI) -> AsyncIterator[None]:
         db = SessionLocal()
         try:
             seed_words(db)
+            import_focus_words(db)
         finally:
             db.close()
     yield

@@ -83,7 +83,7 @@ button {
 
 .mode-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -158,6 +158,88 @@ button {
   gap: 24px;
 }
 
+.focus-card {
+  min-height: 410px;
+  display: grid;
+  align-content: start;
+  gap: 22px;
+}
+
+.focus-title {
+  margin: 8px 0 0;
+  font-size: 1.65rem;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.focus-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.topics-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.focus-option {
+  min-height: 132px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #dfe3df;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #202124;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease,
+    background 120ms ease;
+}
+
+.focus-option:hover {
+  border-color: #33658a;
+  background: #f8fbfb;
+}
+
+.focus-option strong {
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.focus-option span {
+  color: #4d555e;
+  font-size: 0.92rem;
+}
+
+.topic-option strong {
+  font-size: 1.08rem;
+}
+
+.flashcard {
+  min-height: 280px;
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.flashcard-count {
+  color: #687078;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.flashcard-word {
+  margin: 0;
+  font-size: clamp(2rem, 8vw, 4.6rem);
+  line-height: 1;
+  font-weight: 800;
+}
+
 .stats {
   display: flex;
   flex-wrap: wrap;
@@ -206,6 +288,22 @@ button {
   font-size: 1.05rem;
 }
 
+.answered-word {
+  margin: 10px 0 0;
+  color: #202124;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.meaning-overview {
+  max-width: 64ch;
+  margin: 6px auto 0;
+  color: #5f6972;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 .answers {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -236,6 +334,16 @@ button {
 .button:hover {
   border-color: #33658a;
   background: #f1f7f8;
+}
+
+.button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.button:disabled:hover {
+  border-color: #cfd6d8;
+  background: #ffffff;
 }
 
 .answer-option:active,
@@ -360,6 +468,15 @@ button {
   }
 
   .mode-card {
+    min-height: 0;
+  }
+
+  .focus-grid,
+  .topics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .focus-option {
     min-height: 0;
   }
 

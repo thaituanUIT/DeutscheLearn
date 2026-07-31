@@ -1,6 +1,7 @@
 import random
 from dataclasses import dataclass
 from datetime import date
+from functools import lru_cache
 from typing import Any
 
 import duden
@@ -95,6 +96,26 @@ def get_word_of_day(db: Session, today: date) -> WordOfDay:
         return duden_word_to_word_of_day(duden.get_word_of_the_day())
     except (AttributeError, IndexError, RequestException, RuntimeError, TypeError):
         return get_seeded_word_of_day(db, today)
+
+
+def get_duden_meaning_overview(word: str) -> str:
+    duden_meaning = _get_duden_meaning_overview(word)
+    if duden_meaning:
+        return duden_meaning
+    return "No Duden meaning overview is available yet."
+
+
+@lru_cache(maxsize=256)
+def _get_duden_meaning_overview(word: str) -> str | None:
+    try:
+        matches = duden.search(word, exact=True)
+    except (AttributeError, IndexError, RequestException, RuntimeError, TypeError):
+        return None
+
+    if not matches:
+        return None
+    pieces = _flatten_meaning(getattr(matches[0], "meaning_overview", None))
+    return "; ".join(pieces) if pieces else None
 
 
 def duden_word_to_word_of_day(word: Any) -> WordOfDay:
