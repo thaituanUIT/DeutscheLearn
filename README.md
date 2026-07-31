@@ -51,6 +51,12 @@ SEED_ON_STARTUP=true
 
 On Render, use the included `render.yaml`. It provisions a web service plus Postgres and sets `COOKIE_SECURE=true`.
 
+Do not run production with the default SQLite URL. Render web service disks are ephemeral, so
+`sqlite:///./quiz.db` can disappear on a new deploy. Create the service from `render.yaml`, or
+manually provision a Render Postgres database and set the web service `DATABASE_URL` environment
+variable to that database connection string. The app refuses to start in `ENVIRONMENT=production`
+when `DATABASE_URL` still points to SQLite.
+
 ## GitHub Actions and Render
 
 The workflow in `.github/workflows/render-deploy.yml` runs backend linting, backend tests,
