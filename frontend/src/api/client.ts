@@ -97,7 +97,7 @@ export function submitTimedAnswer(
 }
 
 export function getLeaderboard(): Promise<LeaderboardEntry[]> {
-  return request<LeaderboardEntry[]>("/api/leaderboard?mode=endless&limit=20");
+  return request<LeaderboardEntry[]>("/api/leaderboard?mode=endless&limit=5");
 }
 
 export function getFocusLevels(): Promise<FocusLevel[]> {

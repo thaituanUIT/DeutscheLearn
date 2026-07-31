@@ -41,6 +41,12 @@ button {
   font-weight: 800;
 }
 
+.header-start {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+}
+
 .player {
   display: grid;
   gap: 2px;
@@ -62,6 +68,7 @@ button {
 .sidebar {
   display: grid;
   gap: 16px;
+  padding-top: 86px;
 }
 
 .home {
@@ -319,6 +326,7 @@ button {
 .answer-option,
 .button {
   min-height: 48px;
+  padding: 0 16px;
   border: 1px solid #cfd6d8;
   border-radius: 8px;
   background: #ffffff;
@@ -352,10 +360,13 @@ button {
 }
 
 .primary {
-  padding: 0 18px;
   background: #2f6f5e;
   color: #ffffff;
   border-color: #2f6f5e;
+}
+
+.header-back {
+  min-width: 94px;
 }
 
 .primary:hover {
@@ -461,6 +472,10 @@ button {
 
   .layout {
     grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    padding-top: 0;
   }
 
   .mode-grid {

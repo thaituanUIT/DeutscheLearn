@@ -51,8 +51,6 @@ function renderStart(section: HTMLElement, options: QuizViewOptions): void {
     el("p", "prompt", config.prompt),
   );
   const actions = el("div", "actions");
-  const back = button("Back", "button");
-  back.addEventListener("click", options.onBack);
   const start = button(config.startLabel, "button primary");
   start.addEventListener("click", async () => {
     try {
@@ -65,7 +63,7 @@ function renderStart(section: HTMLElement, options: QuizViewOptions): void {
       options.onError(error instanceof Error ? error.message : "Could not start quiz");
     }
   });
-  actions.append(back, start);
+  actions.append(start);
   section.append(stats(options), intro, actions);
 }
 

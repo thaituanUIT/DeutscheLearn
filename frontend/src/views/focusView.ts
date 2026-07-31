@@ -29,9 +29,7 @@ async function renderLevels(section: HTMLElement, options: FocusViewOptions): Pr
       grid.append(levelCard(level, () => renderTopics(section, level.level, options)));
     }
 
-    const back = button("Back", "button");
-    back.addEventListener("click", options.onBack);
-    section.replaceChildren(intro, grid, actions(back));
+    section.replaceChildren(intro, grid);
   } catch (error) {
     options.onError(error instanceof Error ? error.message : "Could not load focus levels");
   }

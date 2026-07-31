@@ -1,5 +1,6 @@
 import { getCurrentPlayer, getLeaderboard, getWordOfDay } from "../api/client";
 import type { LeaderboardEntry, Player, WordOfDay } from "../api/types";
+import { button } from "../components/button";
 import { setPlayer } from "../state/playerStore";
 import { clear, el } from "../utils/dom";
 import { focusView } from "./focusView";
@@ -41,9 +42,10 @@ function draw(
 
   const shell = el("div", "shell");
   const header = el("header", "topbar");
+  const headerStart = el("div", "header-start");
   const playerNode = el("div", "player");
   playerNode.append(el("span", "muted", "Anonymous player"), el("strong", "", player.display_name));
-  header.append(el("h1", "brand", "German Word Quiz"), playerNode);
+  header.append(headerStart, playerNode);
 
   const layout = el("div", "layout");
   const mainHost = el("div");
@@ -54,10 +56,18 @@ function draw(
   };
 
   const showHome = (): void => {
+    headerStart.replaceChildren(el("h1", "brand", "German Word Quiz"));
     mainHost.replaceChildren(homeView({ onSelectMode: showMode }));
   };
 
+  const renderHeaderBack = (onClick: () => void): void => {
+    const back = button("Back", "button header-back");
+    back.addEventListener("click", onClick);
+    headerStart.replaceChildren(back);
+  };
+
   const showMode = (mode: HomeMode): void => {
+    renderHeaderBack(showHome);
     if (mode === "focus") {
       mainHost.replaceChildren(
         focusView({
