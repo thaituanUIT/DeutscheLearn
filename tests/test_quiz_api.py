@@ -18,6 +18,14 @@ def test_player_cookie_is_idempotent() -> None:
         assert first.json()["player_id"] == second.json()["player_id"]
 
 
+def test_spa_html_is_not_cached_across_deploys() -> None:
+    with TestClient(app) as client:
+        response = client.get("/")
+
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "no-store"
+
+
 def test_endless_attempt_finishes_on_wrong_answer() -> None:
     with TestClient(app) as client:
         client.get("/api/players/me")

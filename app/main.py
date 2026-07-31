@@ -40,8 +40,8 @@ def create_app() -> FastAPI:
     def serve_spa(path: str) -> FileResponse:
         index = dist / "index.html"
         if index.exists():
-            return FileResponse(index)
-        return FileResponse("frontend/index.html")
+            return FileResponse(index, headers={"Cache-Control": "no-store"})
+        return FileResponse("frontend/index.html", headers={"Cache-Control": "no-store"})
 
     return api
 
