@@ -68,7 +68,6 @@ button {
 .sidebar {
   display: grid;
   gap: 16px;
-  padding-top: 86px;
 }
 
 .home {
@@ -484,10 +483,6 @@ button {
 
   .layout {
     grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    padding-top: 0;
   }
 
   .mode-grid {

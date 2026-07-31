@@ -5,6 +5,7 @@ import { el } from "../utils/dom";
 
 type FocusViewOptions = {
   onBack: () => void;
+  onBackChange: (handler: () => void) => void;
   onError: (message: string) => void;
 };
 
@@ -15,6 +16,7 @@ export function focusView(options: FocusViewOptions): HTMLElement {
 }
 
 async function renderLevels(section: HTMLElement, options: FocusViewOptions): Promise<void> {
+  options.onBackChange(options.onBack);
   section.replaceChildren(el("p", "prompt", "Loading focus levels..."));
   try {
     const levels = await getFocusLevels();
@@ -40,6 +42,7 @@ async function renderTopics(
   level: FocusLevel["level"],
   options: FocusViewOptions,
 ): Promise<void> {
+  options.onBackChange(() => renderLevels(section, options));
   section.replaceChildren(el("p", "prompt", "Loading topics..."));
   try {
     const topics = await getFocusTopics(level);
@@ -66,6 +69,7 @@ async function renderFlashcards(
   topic: FocusTopic,
   options: FocusViewOptions,
 ): Promise<void> {
+  options.onBackChange(() => renderTopics(section, level, options));
   section.replaceChildren(el("p", "prompt", "Loading flashcards..."));
   try {
     const cards = await getFocusCards(level, topic.topic);

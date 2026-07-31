@@ -72,6 +72,7 @@ function draw(
       mainHost.replaceChildren(
         focusView({
           onBack: showHome,
+          onBackChange: renderHeaderBack,
           onError: showError,
         }),
       );

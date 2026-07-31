@@ -1,5 +1,6 @@
 import json
 from typing import ClassVar
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -187,6 +188,7 @@ def test_zero_score_attempt_is_not_listed_on_leaderboard() -> None:
 def test_leaderboard_includes_current_player_rank_beyond_visible_limit() -> None:
     with TestClient(app) as client:
         current_player = client.get("/api/players/me").json()
+        name_suffix = uuid4().hex[:8]
         db = SessionLocal()
         try:
             current = db.get(AnonymousPlayer, current_player["player_id"])
@@ -203,7 +205,7 @@ def test_leaderboard_includes_current_player_rank_beyond_visible_limit() -> None
             )
             db.add(current_attempt)
             for index in range(6):
-                player = AnonymousPlayer(display_name=f"RankedPlayer{index}")
+                player = AnonymousPlayer(display_name=f"RankedPlayer{name_suffix}{index}")
                 db.add(player)
                 db.flush()
                 db.add(
