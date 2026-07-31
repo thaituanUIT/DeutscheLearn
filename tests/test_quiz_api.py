@@ -65,6 +65,30 @@ def test_leaderboard_endpoint_returns_list() -> None:
         assert isinstance(response.json(), list)
 
 
+def test_word_of_day_endpoint_returns_duden_word(monkeypatch) -> None:
+    class FakeDudenWord:
+        name = "Crush"
+        article = "der"
+        part_of_speech = "Substantiv, maskulin"
+        meaning_overview = ["Person, in die jemand verliebt ist"]
+
+    monkeypatch.setattr(
+        "app.services.words.duden.get_word_of_the_day",
+        lambda: FakeDudenWord(),
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/api/word-of-the-day")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["word"] == "Crush"
+        assert body["article"] == "der"
+        assert body["part_of_speech"] == "Substantiv, maskulin"
+        assert body["meaning"] == "Person, in die jemand verliebt ist"
+        assert body["date"]
+
+
 def test_leaderboard_question_count_matches_best_streak_not_final_miss() -> None:
     with TestClient(app) as client:
         player = client.get("/api/players/me").json()

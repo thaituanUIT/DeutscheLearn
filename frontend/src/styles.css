@@ -59,6 +59,11 @@ button {
   align-items: start;
 }
 
+.sidebar {
+  display: grid;
+  gap: 16px;
+}
+
 .home {
   display: grid;
   gap: 18px;
@@ -256,9 +261,40 @@ button {
 }
 
 .result h2,
+.word-card h2,
 .leaderboard h2 {
   margin: 0;
   font-size: 1.25rem;
+}
+
+.card-label {
+  color: #33658a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.word-card {
+  display: grid;
+  gap: 8px;
+}
+
+.word-card h2 {
+  font-size: 1.8rem;
+  line-height: 1.08;
+}
+
+.word-card p {
+  margin: 0;
+  color: #4d555e;
+  line-height: 1.45;
+}
+
+.word-meta {
+  color: #2f6f5e;
+  font-weight: 800;
+  text-transform: capitalize;
 }
 
 .leaderboard-list {

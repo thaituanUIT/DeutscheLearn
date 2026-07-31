@@ -1,9 +1,9 @@
-import { getCurrentPlayer, getLeaderboard } from "../api/client";
-import type { LeaderboardEntry, Player } from "../api/types";
+import { getCurrentPlayer, getLeaderboard, getWordOfDay } from "../api/client";
+import type { LeaderboardEntry, Player, WordOfDay } from "../api/types";
 import { setPlayer } from "../state/playerStore";
 import { clear, el } from "../utils/dom";
 import { homeView } from "./homeView";
-import { leaderboardView } from "./leaderboardView";
+import { leaderboardView, wordOfDayView } from "./leaderboardView";
 import { quizView, type QuizMode } from "./quizView";
 
 export async function renderApp(root: HTMLElement): Promise<void> {
@@ -11,9 +11,13 @@ export async function renderApp(root: HTMLElement): Promise<void> {
   root.append(el("div", "shell", "Loading..."));
 
   try {
-    const [player, leaderboard] = await Promise.all([getCurrentPlayer(), getLeaderboard()]);
+    const [player, leaderboard, wordOfDay] = await Promise.all([
+      getCurrentPlayer(),
+      getLeaderboard(),
+      getWordOfDay(),
+    ]);
     setPlayer(player);
-    draw(root, player, leaderboard);
+    draw(root, player, leaderboard, wordOfDay);
   } catch (error) {
     clear(root);
     const shell = el("div", "shell");
@@ -25,7 +29,12 @@ export async function renderApp(root: HTMLElement): Promise<void> {
   }
 }
 
-function draw(root: HTMLElement, player: Player, initialLeaderboard: LeaderboardEntry[]): void {
+function draw(
+  root: HTMLElement,
+  player: Player,
+  initialLeaderboard: LeaderboardEntry[],
+  wordOfDay: WordOfDay,
+): void {
   let leaderboard = initialLeaderboard;
   let bestScore = player.best_endless_score;
 
@@ -37,6 +46,7 @@ function draw(root: HTMLElement, player: Player, initialLeaderboard: Leaderboard
 
   const layout = el("div", "layout");
   const mainHost = el("div");
+  const sidebar = el("div", "sidebar");
   const leaderboardHost = el("div");
   const renderLeaderboard = (): void => {
     leaderboardHost.replaceChildren(leaderboardView(leaderboard));
@@ -70,7 +80,8 @@ function draw(root: HTMLElement, player: Player, initialLeaderboard: Leaderboard
 
   renderLeaderboard();
   showHome();
-  layout.replaceChildren(mainHost, leaderboardHost);
+  sidebar.replaceChildren(wordOfDayView(wordOfDay), leaderboardHost);
+  layout.replaceChildren(mainHost, sidebar);
   shell.replaceChildren(header, layout);
   clear(root);
   root.append(shell);

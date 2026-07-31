@@ -4,6 +4,14 @@ export type Player = {
   best_endless_score: number;
 };
 
+export type WordOfDay = {
+  word: string;
+  article: string | null;
+  part_of_speech: string;
+  meaning: string;
+  date: string;
+};
+
 export type QuizQuestion = {
   question_id: string;
   word: string;

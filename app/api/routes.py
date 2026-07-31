@@ -18,8 +18,10 @@ from app.schemas import (
     PracticeStartOut,
     TimedAnswerOut,
     TimedStartOut,
+    WordOfDayOut,
 )
 from app.services.quiz import create_question
+from app.services.words import get_word_of_day
 
 router = APIRouter(prefix="/api")
 TIMED_DURATION_SECONDS = 60
@@ -36,6 +38,19 @@ def me(player: AnonymousPlayer = Depends(get_or_create_player)) -> PlayerOut:
         player_id=player.id,
         display_name=player.display_name,
         best_endless_score=player.best_endless_score,
+    )
+
+
+@router.get("/word-of-the-day", response_model=WordOfDayOut)
+def word_of_the_day(db: Session = Depends(get_db)) -> WordOfDayOut:
+    today = utc_now().date()
+    word = get_word_of_day(db, today)
+    return WordOfDayOut(
+        word=word.word,
+        article=word.article,
+        part_of_speech=word.part_of_speech,
+        meaning=word.meaning,
+        date=today.isoformat(),
     )
 
 

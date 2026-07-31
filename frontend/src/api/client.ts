@@ -7,6 +7,7 @@ import type {
   PracticeStart,
   TimedAnswer,
   TimedStart,
+  WordOfDay,
 } from "./types";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -29,6 +30,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export function getCurrentPlayer(): Promise<Player> {
   return request<Player>("/api/players/me");
+}
+
+export function getWordOfDay(): Promise<WordOfDay> {
+  return request<WordOfDay>("/api/word-of-the-day");
 }
 
 export function startEndlessQuiz(): Promise<EndlessStart> {

@@ -1,6 +1,18 @@
-import type { LeaderboardEntry } from "../api/types";
+import type { LeaderboardEntry, WordOfDay } from "../api/types";
 import { el } from "../utils/dom";
 import { formatSeconds } from "../utils/format";
+
+export function wordOfDayView(word: WordOfDay): HTMLElement {
+  const section = el("aside", "panel word-card");
+  const shownWord = word.article ? `${word.article} ${word.word}` : word.word;
+  section.append(
+    el("div", "card-label", "Word of the day"),
+    el("h2", "", shownWord),
+    el("div", "word-meta", word.part_of_speech),
+    el("p", "", word.meaning),
+  );
+  return section;
+}
 
 export function leaderboardView(entries: LeaderboardEntry[]): HTMLElement {
   const section = el("aside", "panel leaderboard");

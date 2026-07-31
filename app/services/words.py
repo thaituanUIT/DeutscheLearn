@@ -1,6 +1,9 @@
 import random
 from dataclasses import dataclass
+from datetime import date
+from typing import Any
 
+import duden
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -64,3 +67,71 @@ def get_words(db: Session, *, require_article: bool = False) -> list[CachedWord]
 def get_random_word(db: Session, *, require_article: bool = False) -> CachedWord:
     words = get_words(db, require_article=require_article)
     return random.choice(words)
+
+
+@dataclass(frozen=True)
+class WordOfDay:
+    word: str
+    article: str | None
+    part_of_speech: str
+    meaning: str
+
+
+def get_seeded_word_of_day(db: Session, today: date) -> WordOfDay:
+    words = sorted(get_words(db), key=lambda item: item.word.casefold())
+    days_since_epoch = today.toordinal()
+    word = words[days_since_epoch % len(words)]
+    return WordOfDay(
+        word=word.word,
+        article=word.article,
+        part_of_speech=word.part_of_speech,
+        meaning=word.meaning,
+    )
+
+
+def get_word_of_day(db: Session, today: date) -> WordOfDay:
+    try:
+        return duden_word_to_word_of_day(duden.get_word_of_the_day())
+    except Exception:
+        return get_seeded_word_of_day(db, today)
+
+
+def duden_word_to_word_of_day(word: Any) -> WordOfDay:
+    return WordOfDay(
+        word=str(word.name).strip(),
+        article=_clean_optional_text(getattr(word, "article", None)),
+        part_of_speech=_clean_optional_text(getattr(word, "part_of_speech", None)) or "Duden",
+        meaning=_meaning_to_text(getattr(word, "meaning_overview", None)),
+    )
+
+
+def _clean_optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = " ".join(str(value).split())
+    return text or None
+
+
+def _meaning_to_text(value: Any) -> str:
+    pieces = _flatten_meaning(value)
+    return "; ".join(pieces) if pieces else "See the full Duden entry for details."
+
+
+def _flatten_meaning(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = " ".join(value.split())
+        return [text] if text else []
+    if isinstance(value, dict):
+        pieces: list[str] = []
+        for nested in value.values():
+            pieces.extend(_flatten_meaning(nested))
+        return pieces
+    if isinstance(value, list | tuple | set):
+        pieces = []
+        for nested in value:
+            pieces.extend(_flatten_meaning(nested))
+        return pieces
+    text = " ".join(str(value).split())
+    return [text] if text else []

@@ -7,6 +7,14 @@ class PlayerOut(BaseModel):
     best_endless_score: int
 
 
+class WordOfDayOut(BaseModel):
+    word: str
+    article: str | None
+    part_of_speech: str
+    meaning: str
+    date: str
+
+
 class QuestionOut(BaseModel):
     question_id: str
     word: str
