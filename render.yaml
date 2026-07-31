@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: german-word-quiz
+    env: python
+    plan: free
+    buildCommand: uv sync && npm install --prefix frontend && npm run build --prefix frontend
+    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: SEED_ON_STARTUP
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: german-word-quiz-db
+          property: connectionString
+
+databases:
+  - name: german-word-quiz-db
+    plan: free
