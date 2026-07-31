@@ -108,3 +108,4 @@ class LeaderboardEntry(BaseModel):
     accuracy: float | None
     duration_seconds: int | None
     ended_at: str | None
+    is_current_player: bool = False

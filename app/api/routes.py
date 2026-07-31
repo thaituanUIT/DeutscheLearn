@@ -298,9 +298,10 @@ def answer_timed(
 def leaderboard(
     mode: str = Query(default="endless", pattern="^(endless|timed)$"),
     limit: int = Query(default=20, ge=1, le=100),
+    player: AnonymousPlayer = Depends(get_or_create_player),
     db: Session = Depends(get_db),
 ) -> list[LeaderboardEntry]:
-    ranked = (
+    player_best_attempts = (
         select(
             QuizAttempt.id.label("attempt_id"),
             func.row_number()
@@ -318,34 +319,66 @@ def leaderboard(
         .where(QuizAttempt.score > 0)
         .subquery()
     )
+    ranked = (
+        select(
+            player_best_attempts.c.attempt_id,
+            func.row_number()
+            .over(
+                order_by=(
+                    QuizAttempt.score.desc(),
+                    QuizAttempt.accuracy.desc(),
+                    QuizAttempt.ended_at.asc(),
+                )
+            )
+            .label("rank"),
+        )
+        .join(QuizAttempt, QuizAttempt.id == player_best_attempts.c.attempt_id)
+        .where(player_best_attempts.c.player_rank == 1)
+        .subquery()
+    )
 
     attempts = db.execute(
-        select(QuizAttempt, AnonymousPlayer.display_name)
+        select(QuizAttempt, AnonymousPlayer.display_name, ranked.c.rank)
         .join(ranked, ranked.c.attempt_id == QuizAttempt.id)
         .join(AnonymousPlayer, AnonymousPlayer.id == QuizAttempt.player_id)
-        .where(ranked.c.player_rank == 1)
-        .order_by(
-            QuizAttempt.score.desc(),
-            QuizAttempt.accuracy.desc(),
-            QuizAttempt.ended_at.asc(),
-        )
+        .order_by(ranked.c.rank)
         .limit(limit)
     ).all()
 
+    current_player_attempt = db.execute(
+        select(QuizAttempt, AnonymousPlayer.display_name, ranked.c.rank)
+        .join(ranked, ranked.c.attempt_id == QuizAttempt.id)
+        .join(AnonymousPlayer, AnonymousPlayer.id == QuizAttempt.player_id)
+        .where(AnonymousPlayer.id == player.id)
+    ).first()
+
     entries: list[LeaderboardEntry] = []
-    for rank, (attempt, display_name) in enumerate(attempts, start=1):
-        duration = None
-        if attempt.ended_at:
-            duration = int((attempt.ended_at - attempt.started_at).total_seconds())
-        entries.append(
-            LeaderboardEntry(
-                rank=rank,
-                display_name=display_name,
-                score=attempt.score,
-                total_questions=attempt.score,
-                accuracy=attempt.accuracy,
-                duration_seconds=duration,
-                ended_at=attempt.ended_at.isoformat() if attempt.ended_at else None,
-            )
-        )
+    for attempt, display_name, rank in attempts:
+        entries.append(_leaderboard_entry(attempt, display_name, rank, attempt.player_id == player.id))
+
+    if current_player_attempt is not None:
+        attempt, display_name, rank = current_player_attempt
+        if not any(entry.is_current_player for entry in entries):
+            entries.append(_leaderboard_entry(attempt, display_name, rank, True))
     return entries
+
+
+def _leaderboard_entry(
+    attempt: QuizAttempt,
+    display_name: str,
+    rank: int,
+    is_current_player: bool,
+) -> LeaderboardEntry:
+    duration = None
+    if attempt.ended_at:
+        duration = int((attempt.ended_at - attempt.started_at).total_seconds())
+    return LeaderboardEntry(
+        rank=rank,
+        display_name=display_name,
+        score=attempt.score,
+        total_questions=attempt.score,
+        accuracy=attempt.accuracy,
+        duration_seconds=duration,
+        ended_at=attempt.ended_at.isoformat() if attempt.ended_at else None,
+        is_current_player=is_current_player,
+    )

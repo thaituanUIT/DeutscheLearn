@@ -24,18 +24,27 @@ export function leaderboardView(entries: LeaderboardEntry[]): HTMLElement {
   }
 
   const list = el("ol", "leaderboard-list");
-  for (const entry of entries) {
+  entries.forEach((entry, index) => {
+    if (entry.is_current_player && index > 0 && !entries[index - 1].is_current_player) {
+      const previousRank = entries[index - 1].rank;
+      if (entry.rank > previousRank + 1) {
+        list.append(el("li", "leaderboard-gap", "..."));
+      }
+    }
     const row = el("li", "leaderboard-row");
+    if (entry.is_current_player) row.classList.add("current-player");
     const meta = el(
       "small",
       "muted",
-      `${entry.total_questions} correct · ${formatSeconds(entry.duration_seconds)}`,
+      `${entry.total_questions} correct · ${formatSeconds(entry.duration_seconds)}${
+        entry.is_current_player ? " · You" : ""
+      }`,
     );
     const nameWrap = el("div");
     nameWrap.append(el("div", "name", entry.display_name), meta);
     row.append(el("span", "rank", `#${entry.rank}`), nameWrap, el("span", "score", String(entry.score)));
     list.append(row);
-  }
+  });
 
   section.append(list);
   return section;

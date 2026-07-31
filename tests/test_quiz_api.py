@@ -4,7 +4,8 @@ from typing import ClassVar
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db.models import QuizAttemptQuestion
+from app.core.time import utc_now
+from app.db.models import AnonymousPlayer, QuizAttempt, QuizAttemptQuestion
 from app.db.session import SessionLocal
 from app.main import app
 from app.services.quiz import question_to_schema
@@ -181,6 +182,53 @@ def test_zero_score_attempt_is_not_listed_on_leaderboard() -> None:
             None,
         )
         assert own_entry is None
+
+
+def test_leaderboard_includes_current_player_rank_beyond_visible_limit() -> None:
+    with TestClient(app) as client:
+        current_player = client.get("/api/players/me").json()
+        db = SessionLocal()
+        try:
+            current = db.get(AnonymousPlayer, current_player["player_id"])
+            assert current is not None
+            current_attempt = QuizAttempt(
+                player_id=current.id,
+                mode="endless",
+                status="finished",
+                score=1,
+                total_questions=1,
+                accuracy=1,
+                ended_at=utc_now(),
+                ended_reason="wrong_answer",
+            )
+            db.add(current_attempt)
+            for index in range(6):
+                player = AnonymousPlayer(display_name=f"RankedPlayer{index}")
+                db.add(player)
+                db.flush()
+                db.add(
+                    QuizAttempt(
+                        player_id=player.id,
+                        mode="endless",
+                        status="finished",
+                        score=10 - index,
+                        total_questions=10 - index,
+                        accuracy=1,
+                        ended_at=utc_now(),
+                        ended_reason="wrong_answer",
+                    )
+                )
+            db.commit()
+        finally:
+            db.close()
+
+        leaderboard = client.get("/api/leaderboard?limit=5").json()
+
+        assert len(leaderboard) == 6
+        assert leaderboard[-1]["display_name"] == current_player["display_name"]
+        assert leaderboard[-1]["rank"] > 5
+        assert leaderboard[-1]["is_current_player"] is True
+        assert all(entry["is_current_player"] is False for entry in leaderboard[:-1])
 
 
 def test_word_of_day_endpoint_returns_duden_word(monkeypatch) -> None:

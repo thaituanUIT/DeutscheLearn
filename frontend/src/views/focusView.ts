@@ -54,9 +54,7 @@ async function renderTopics(
       grid.append(topicCard(topic, () => renderFlashcards(section, level, topic, options)));
     }
 
-    const back = button("Back", "button");
-    back.addEventListener("click", () => renderLevels(section, options));
-    section.replaceChildren(intro, grid, actions(back));
+    section.replaceChildren(intro, grid);
   } catch (error) {
     options.onError(error instanceof Error ? error.message : "Could not load focus topics");
   }
@@ -71,7 +69,7 @@ async function renderFlashcards(
   section.replaceChildren(el("p", "prompt", "Loading flashcards..."));
   try {
     const cards = await getFocusCards(level, topic.topic);
-    renderFlashcard(section, cards, 0, () => renderTopics(section, level, options));
+    renderFlashcard(section, cards, 0);
   } catch (error) {
     options.onError(error instanceof Error ? error.message : "Could not load flashcards");
   }
@@ -81,13 +79,10 @@ function renderFlashcard(
   section: HTMLElement,
   cards: FocusCard[],
   index: number,
-  onBack: () => void,
 ): void {
   section.replaceChildren();
   if (cards.length === 0) {
-    const back = button("Back", "button");
-    back.addEventListener("click", onBack);
-    section.append(el("p", "prompt", "No cards available for this topic yet."), actions(back));
+    section.append(el("p", "prompt", "No cards available for this topic yet."));
     return;
   }
 
@@ -102,16 +97,14 @@ function renderFlashcard(
     el("p", "meaning-overview", card.meaning_overview),
   );
 
-  const back = button("Back", "button");
-  back.addEventListener("click", onBack);
   const previous = button("Previous", "button");
   previous.disabled = index === 0;
-  previous.addEventListener("click", () => renderFlashcard(section, cards, index - 1, onBack));
+  previous.addEventListener("click", () => renderFlashcard(section, cards, index - 1));
   const next = button("Next", "button primary");
   next.disabled = index === cards.length - 1;
-  next.addEventListener("click", () => renderFlashcard(section, cards, index + 1, onBack));
+  next.addEventListener("click", () => renderFlashcard(section, cards, index + 1));
 
-  section.append(content, actions(back, previous, next));
+  section.append(content, cardActions(previous, next));
 }
 
 function levelCard(level: FocusLevel, onClick: () => void): HTMLButtonElement {
@@ -135,7 +128,7 @@ function topicCard(topic: FocusTopic, onClick: () => void): HTMLButtonElement {
   return card;
 }
 
-function actions(...nodes: HTMLElement[]): HTMLElement {
+function cardActions(...nodes: HTMLElement[]): HTMLElement {
   const wrap = el("div", "actions");
   wrap.append(...nodes);
   return wrap;

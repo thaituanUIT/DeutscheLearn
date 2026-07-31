@@ -99,4 +99,5 @@ export type LeaderboardEntry = {
   accuracy: number | null;
   duration_seconds: number | null;
   ended_at: string | null;
+  is_current_player: boolean;
 };
