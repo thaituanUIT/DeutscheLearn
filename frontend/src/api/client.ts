@@ -28,6 +28,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new Error(message || `Request failed with status ${response.status}`);
   }
 
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    const message = await response.text();
+    throw new Error(message || `Expected JSON but received ${contentType || "an unknown response type"}`);
+  }
+
   return response.json() as Promise<T>;
 }
 

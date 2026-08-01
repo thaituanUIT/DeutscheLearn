@@ -40,7 +40,7 @@ const modes: Array<{
     mode: "focus",
     title: "Focus",
     meta: "Flashcards",
-    description: "Pick a level and topic, then review Duden-backed vocabulary cards.",
+    description: "Pick a level and topic, then review with flash vocabulary cards.",
     action: "Study words",
   },
 ];
@@ -56,15 +56,17 @@ export function homeView(options: HomeViewOptions): HTMLElement {
 
   const grid = el("div", "mode-grid");
   for (const item of modes) {
-    const card = button("", "mode-card");
+    const card = button("", `mode-card mode-card-${item.mode}`);
     card.setAttribute("aria-label", item.action);
     card.addEventListener("click", () => options.onSelectMode(item.mode));
-    card.append(
+    const content = el("span", "mode-content");
+    content.append(
       el("span", "mode-meta", item.meta),
       el("strong", "", item.title),
       el("span", "mode-description", item.description),
       el("span", "mode-action", item.action),
     );
+    card.append(content, el("span", "mode-art"));
     grid.append(card);
   }
 
