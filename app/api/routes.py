@@ -1,14 +1,34 @@
 import json
+from secrets import compare_digest
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_or_create_player, require_player
+from app.core.config import get_settings
 from app.core.time import utc_now
-from app.db.models import AnonymousPlayer, QuizAttempt, QuizAttemptQuestion
+from app.db.models import (
+    AnonymousPlayer,
+    CachedWord,
+    FocusWordEntry,
+    QuizAttempt,
+    QuizAttemptQuestion,
+    ReadingAnswer,
+    ReadingPassage,
+    ReadingQuestion,
+)
 from app.db.session import get_db
 from app.schemas import (
+    AdminFocusEntryOut,
+    AdminReadingAnswerOut,
+    AdminReadingPassageIn,
+    AdminReadingPassageOut,
+    AdminReadingPassageSummaryOut,
+    AdminReadingQuestionOut,
+    AdminWordIn,
+    AdminWordOut,
+    AdminWordPatchIn,
     EndlessAnswerIn,
     EndlessAnswerOut,
     EndlessStartOut,
@@ -35,6 +55,18 @@ from app.services.words import get_meaning_overview, get_word_of_day
 
 router = APIRouter(prefix="/api")
 TIMED_DURATION_SECONDS = 60
+
+
+def require_admin(authorization: str | None = Header(default=None)) -> None:
+    settings = get_settings()
+    if not settings.admin_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin access is not configured",
+        )
+    scheme, _, token = (authorization or "").partition(" ")
+    if scheme.casefold() != "bearer" or not compare_digest(token, settings.admin_token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
 
 
 @router.get("/health")
@@ -96,6 +128,179 @@ def focus_revision(
         FocusRevisionQuestionOut(**question)
         for question in get_focus_revision_questions(db, level, topic)
     ]
+
+
+@router.get(
+    "/admin/words",
+    response_model=list[AdminWordOut],
+    dependencies=[Depends(require_admin)],
+)
+def admin_words(
+    search: str = Query(default="", max_length=120),
+    level: str | None = Query(default=None, pattern="^(A1|A2|B1|B2)$"),
+    topic: str | None = Query(default=None, max_length=80),
+    db: Session = Depends(get_db),
+) -> list[AdminWordOut]:
+    query = select(CachedWord).options(selectinload(CachedWord.focus_entries))
+    if search.strip():
+        query = query.where(CachedWord.word.ilike(f"%{search.strip()}%"))
+    if level or topic:
+        query = query.join(FocusWordEntry)
+        if level:
+            query = query.where(FocusWordEntry.level == level)
+        if topic:
+            query = query.where(FocusWordEntry.topic == topic)
+    query = query.order_by(CachedWord.word).limit(200)
+    words = db.scalars(query).unique().all()
+    return [_admin_word_out(word) for word in words]
+
+
+@router.post(
+    "/admin/words",
+    response_model=AdminWordOut,
+    dependencies=[Depends(require_admin)],
+)
+def admin_create_word(payload: AdminWordIn, db: Session = Depends(get_db)) -> AdminWordOut:
+    word_key = payload.word.strip()
+    if db.get(CachedWord, word_key) is not None:
+        raise HTTPException(status_code=409, detail="Word already exists")
+    word = CachedWord(
+        word=word_key,
+        article=_clean_optional_text(payload.article),
+        part_of_speech=payload.part_of_speech.strip(),
+        meaning=payload.meaning.strip(),
+    )
+    db.add(word)
+    db.flush()
+    _replace_focus_entries(db, word_key, payload.focus_entries)
+    db.commit()
+    db.refresh(word)
+    return _admin_word_out(word)
+
+
+@router.patch(
+    "/admin/words/{word_key}",
+    response_model=AdminWordOut,
+    dependencies=[Depends(require_admin)],
+)
+def admin_update_word(
+    word_key: str,
+    payload: AdminWordPatchIn,
+    db: Session = Depends(get_db),
+) -> AdminWordOut:
+    word = db.get(CachedWord, word_key)
+    if word is None:
+        raise HTTPException(status_code=404, detail="Word not found")
+    word.article = _clean_optional_text(payload.article)
+    word.part_of_speech = payload.part_of_speech.strip()
+    word.meaning = payload.meaning.strip()
+    _replace_focus_entries(db, word.word, payload.focus_entries)
+    db.commit()
+    db.refresh(word)
+    return _admin_word_out(word)
+
+
+@router.delete(
+    "/admin/words/{word_key}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+def admin_delete_word(word_key: str, db: Session = Depends(get_db)) -> None:
+    word = db.get(CachedWord, word_key)
+    if word is None:
+        raise HTTPException(status_code=404, detail="Word not found")
+    for entry in list(word.focus_entries):
+        db.delete(entry)
+    db.delete(word)
+    db.commit()
+
+
+@router.get(
+    "/admin/reading/passages",
+    response_model=list[AdminReadingPassageSummaryOut],
+    dependencies=[Depends(require_admin)],
+)
+def admin_reading_passages(
+    level: str | None = Query(default=None, pattern="^(A1|A2|B1|B2)$"),
+    db: Session = Depends(get_db),
+) -> list[AdminReadingPassageSummaryOut]:
+    question_counts = (
+        select(ReadingQuestion.passage_id, func.count(ReadingQuestion.id).label("question_count"))
+        .group_by(ReadingQuestion.passage_id)
+        .subquery()
+    )
+    query = (
+        select(ReadingPassage, func.coalesce(question_counts.c.question_count, 0))
+        .outerjoin(question_counts, question_counts.c.passage_id == ReadingPassage.id)
+        .order_by(ReadingPassage.level, ReadingPassage.order_index, ReadingPassage.title)
+    )
+    if level:
+        query = query.where(ReadingPassage.level == level)
+    rows = db.execute(query).all()
+    return [
+        AdminReadingPassageSummaryOut(
+            id=passage.id,
+            level=passage.level,
+            topic=passage.topic,
+            title=passage.title,
+            order_index=passage.order_index,
+            question_count=question_count,
+        )
+        for passage, question_count in rows
+    ]
+
+
+@router.post(
+    "/admin/reading/passages",
+    response_model=AdminReadingPassageOut,
+    dependencies=[Depends(require_admin)],
+)
+def admin_create_reading_passage(
+    payload: AdminReadingPassageIn,
+    db: Session = Depends(get_db),
+) -> AdminReadingPassageOut:
+    passage = ReadingPassage()
+    db.add(passage)
+    _apply_reading_payload(passage, payload)
+    db.commit()
+    return _admin_reading_passage_out(passage)
+
+
+@router.get(
+    "/admin/reading/passages/{passage_id}",
+    response_model=AdminReadingPassageOut,
+    dependencies=[Depends(require_admin)],
+)
+def admin_reading_passage(passage_id: str, db: Session = Depends(get_db)) -> AdminReadingPassageOut:
+    passage = _get_reading_passage(db, passage_id)
+    return _admin_reading_passage_out(passage)
+
+
+@router.patch(
+    "/admin/reading/passages/{passage_id}",
+    response_model=AdminReadingPassageOut,
+    dependencies=[Depends(require_admin)],
+)
+def admin_update_reading_passage(
+    passage_id: str,
+    payload: AdminReadingPassageIn,
+    db: Session = Depends(get_db),
+) -> AdminReadingPassageOut:
+    passage = _get_reading_passage(db, passage_id)
+    _apply_reading_payload(passage, payload)
+    db.commit()
+    return _admin_reading_passage_out(passage)
+
+
+@router.delete(
+    "/admin/reading/passages/{passage_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+def admin_delete_reading_passage(passage_id: str, db: Session = Depends(get_db)) -> None:
+    passage = _get_reading_passage(db, passage_id)
+    db.delete(passage)
+    db.commit()
 
 
 @router.post("/quiz/endless/start", response_model=EndlessStartOut)
@@ -400,3 +605,107 @@ def _leaderboard_entry(
         ended_at=attempt.ended_at.isoformat() if attempt.ended_at else None,
         is_current_player=is_current_player,
     )
+
+
+def _admin_word_out(word: CachedWord) -> AdminWordOut:
+    return AdminWordOut(
+        word=word.word,
+        article=word.article,
+        part_of_speech=word.part_of_speech,
+        meaning=word.meaning,
+        focus_entries=[
+            AdminFocusEntryOut(id=entry.id, level=entry.level, topic=entry.topic)
+            for entry in sorted(word.focus_entries, key=lambda item: (item.level, item.topic))
+        ],
+    )
+
+
+def _replace_focus_entries(
+    db: Session,
+    word: str,
+    entries: list,
+) -> None:
+    existing = db.scalars(select(FocusWordEntry).where(FocusWordEntry.word == word)).all()
+    for entry in existing:
+        db.delete(entry)
+    db.flush()
+
+    seen = set()
+    for entry in entries:
+        key = (entry.level, entry.topic.strip())
+        if key in seen:
+            continue
+        seen.add(key)
+        db.add(FocusWordEntry(word=word, level=entry.level, topic=key[1]))
+
+
+def _get_reading_passage(db: Session, passage_id: str) -> ReadingPassage:
+    passage = db.scalar(
+        select(ReadingPassage)
+        .options(selectinload(ReadingPassage.questions).selectinload(ReadingQuestion.answers))
+        .where(ReadingPassage.id == passage_id)
+    )
+    if passage is None:
+        raise HTTPException(status_code=404, detail="Reading passage not found")
+    return passage
+
+
+def _apply_reading_payload(passage: ReadingPassage, payload: AdminReadingPassageIn) -> None:
+    passage.level = payload.level
+    passage.topic = _clean_optional_text(payload.topic)
+    passage.title = payload.title.strip()
+    passage.passage_text = payload.passage_text.strip()
+    passage.order_index = payload.order_index
+    passage.updated_at = utc_now()
+    passage.questions = [
+        ReadingQuestion(
+            prompt=question.prompt.strip(),
+            explanation=_clean_optional_text(question.explanation),
+            order_index=question.order_index,
+            answers=[
+                ReadingAnswer(
+                    answer_text=answer.answer_text.strip(),
+                    is_correct=answer.is_correct,
+                    order_index=answer.order_index,
+                )
+                for answer in question.answers
+            ],
+        )
+        for question in payload.questions
+    ]
+
+
+def _admin_reading_passage_out(passage: ReadingPassage) -> AdminReadingPassageOut:
+    return AdminReadingPassageOut(
+        id=passage.id,
+        level=passage.level,
+        topic=passage.topic,
+        title=passage.title,
+        passage_text=passage.passage_text,
+        order_index=passage.order_index,
+        questions=[
+            AdminReadingQuestionOut(
+                id=question.id,
+                prompt=question.prompt,
+                explanation=question.explanation,
+                order_index=question.order_index,
+                answers=[
+                    AdminReadingAnswerOut(
+                        id=answer.id,
+                        answer_text=answer.answer_text,
+                        is_correct=answer.is_correct,
+                        order_index=answer.order_index,
+                    )
+                    for answer in question.answers
+                ],
+            )
+            for question in passage.questions
+        ],
+    )
+
+
+def _clean_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = " ".join(value.split())
+    return text or None

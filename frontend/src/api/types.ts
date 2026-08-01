@@ -96,6 +96,54 @@ export type FocusRevisionQuestion = FocusCard & {
   correct_answer: string;
 };
 
+export type AdminFocusEntry = {
+  id?: string;
+  level: "A1" | "A2" | "B1" | "B2";
+  topic: string;
+};
+
+export type AdminWord = {
+  word: string;
+  article: string | null;
+  part_of_speech: string;
+  meaning: string;
+  focus_entries: AdminFocusEntry[];
+};
+
+export type AdminReadingAnswer = {
+  id?: string;
+  answer_text: string;
+  is_correct: boolean;
+  order_index: number;
+};
+
+export type AdminReadingQuestion = {
+  id?: string;
+  prompt: string;
+  explanation: string | null;
+  order_index: number;
+  answers: AdminReadingAnswer[];
+};
+
+export type AdminReadingPassageSummary = {
+  id: string;
+  level: "A1" | "A2" | "B1" | "B2";
+  topic: string | null;
+  title: string;
+  order_index: number;
+  question_count: number;
+};
+
+export type AdminReadingPassage = {
+  id?: string;
+  level: "A1" | "A2" | "B1" | "B2";
+  topic: string | null;
+  title: string;
+  passage_text: string;
+  order_index: number;
+  questions: AdminReadingQuestion[];
+};
+
 export type LeaderboardEntry = {
   rank: number;
   display_name: string;

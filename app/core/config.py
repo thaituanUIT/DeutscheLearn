@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     cookie_samesite: str = "lax"
     cookie_max_age_seconds: int = 60 * 60 * 24 * 365
     seed_on_startup: bool = True
+    admin_token: str | None = None
 
     @model_validator(mode="after")
     def require_persistent_database_in_production(self) -> "Settings":

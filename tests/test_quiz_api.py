@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import Settings
 from app.core.time import utc_now
 from app.db.models import AnonymousPlayer, CachedWord, QuizAttempt, QuizAttemptQuestion
 from app.db.session import SessionLocal
@@ -34,6 +35,101 @@ def test_spa_html_is_not_cached_across_deploys() -> None:
 
         assert response.status_code == 200
         assert response.headers["cache-control"] == "no-store"
+
+
+def test_admin_words_require_valid_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+
+    with TestClient(app) as client:
+        missing = client.get("/api/admin/words")
+        invalid = client.get("/api/admin/words", headers={"Authorization": "Bearer wrong"})
+
+        assert missing.status_code == 401
+        assert invalid.status_code == 401
+
+
+def test_admin_word_crud(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    word = f"Adminwort-{uuid4()}"
+    headers = {"Authorization": "Bearer secret"}
+
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/admin/words",
+            headers=headers,
+            json={
+                "word": word,
+                "article": "das",
+                "part_of_speech": "noun",
+                "meaning": "A word managed from the admin interface.",
+                "focus_entries": [{"level": "A1", "topic": "admin_topic"}],
+            },
+        )
+        assert created.status_code == 200
+        assert created.json()["focus_entries"][0]["topic"] == "admin_topic"
+
+        updated = client.patch(
+            f"/api/admin/words/{word}",
+            headers=headers,
+            json={
+                "article": None,
+                "part_of_speech": "verb",
+                "meaning": "Updated meaning.",
+                "focus_entries": [{"level": "A2", "topic": "updated_topic"}],
+            },
+        )
+        assert updated.status_code == 200
+        assert updated.json()["part_of_speech"] == "verb"
+        assert updated.json()["focus_entries"][0]["level"] == "A2"
+
+        deleted = client.delete(f"/api/admin/words/{word}", headers=headers)
+        assert deleted.status_code == 204
+
+
+def test_admin_reading_passage_crud(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    headers = {"Authorization": "Bearer secret"}
+
+    payload = {
+        "level": "A1",
+        "topic": "daily_life",
+        "title": f"Admin Passage {uuid4()}",
+        "passage_text": "Mia liest am Morgen ein Buch.",
+        "order_index": 1,
+        "questions": [
+            {
+                "prompt": "Wann liest Mia?",
+                "explanation": "The passage says am Morgen.",
+                "order_index": 0,
+                "answers": [
+                    {"answer_text": "Am Morgen", "is_correct": True, "order_index": 0},
+                    {"answer_text": "Am Abend", "is_correct": False, "order_index": 1},
+                ],
+            }
+        ],
+    }
+
+    with TestClient(app) as client:
+        created = client.post("/api/admin/reading/passages", headers=headers, json=payload)
+        assert created.status_code == 200
+        passage_id = created.json()["id"]
+        assert created.json()["questions"][0]["answers"][0]["is_correct"] is True
+
+        listed = client.get("/api/admin/reading/passages?level=A1", headers=headers)
+        assert listed.status_code == 200
+        assert any(passage["id"] == passage_id for passage in listed.json())
+
+        payload["title"] = "Updated Admin Passage"
+        updated = client.patch(
+            f"/api/admin/reading/passages/{passage_id}",
+            headers=headers,
+            json=payload,
+        )
+        assert updated.status_code == 200
+        assert updated.json()["title"] == "Updated Admin Passage"
+
+        deleted = client.delete(f"/api/admin/reading/passages/{passage_id}", headers=headers)
+        assert deleted.status_code == 204
 
 
 def test_endless_attempt_finishes_on_wrong_answer() -> None:

@@ -52,6 +52,59 @@ class FocusWordEntry(Base):
     cached_word: Mapped[CachedWord] = relationship(back_populates="focus_entries")
 
 
+class ReadingPassage(Base):
+    __tablename__ = "reading_passages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    level: Mapped[str] = mapped_column(String(8), nullable=False)
+    topic: Mapped[str | None] = mapped_column(String(80))
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    passage_text: Mapped[str] = mapped_column(Text, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+    questions: Mapped[list["ReadingQuestion"]] = relationship(
+        back_populates="passage",
+        cascade="all, delete-orphan",
+        order_by="ReadingQuestion.order_index",
+    )
+
+
+class ReadingQuestion(Base):
+    __tablename__ = "reading_questions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    passage_id: Mapped[str] = mapped_column(ForeignKey("reading_passages.id"), nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    explanation: Mapped[str | None] = mapped_column(Text)
+    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    passage: Mapped[ReadingPassage] = relationship(back_populates="questions")
+    answers: Mapped[list["ReadingAnswer"]] = relationship(
+        back_populates="question",
+        cascade="all, delete-orphan",
+        order_by="ReadingAnswer.order_index",
+    )
+
+
+class ReadingAnswer(Base):
+    __tablename__ = "reading_answers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    question_id: Mapped[str] = mapped_column(ForeignKey("reading_questions.id"), nullable=False)
+    answer_text: Mapped[str] = mapped_column(Text, nullable=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    question: Mapped[ReadingQuestion] = relationship(back_populates="answers")
+
+
 class QuizAttempt(Base):
     __tablename__ = "quiz_attempts"
 
