@@ -482,6 +482,18 @@ button {
   align-items: center;
 }
 
+.flashcard-actions > * {
+  justify-self: start;
+}
+
+.flashcard-next {
+  min-width: 132px;
+}
+
+.revision-next {
+  min-width: 180px;
+}
+
 .flashcard-actions > :last-child {
   justify-self: end;
 }

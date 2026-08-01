@@ -175,7 +175,10 @@ function renderRevisionFeedback(
     content.append(el("p", "prompt", `You chose: ${selectedAnswer}`));
   }
 
-  const next = button(index === questions.length - 1 ? "Finish" : "Next", "button primary");
+  const next = button(
+    index === questions.length - 1 ? "Finish" : "Next",
+    "button primary revision-next",
+  );
   next.addEventListener("click", () =>
     renderRevisionQuestion(section, questions, index + 1, score, onRetry),
   );
@@ -207,12 +210,12 @@ function renderFlashcard(
     el("p", "meaning-overview", card.meaning_overview),
   );
 
-  const previous = button("Previous", "button");
+  const previous = button("Previous", "button flashcard-previous");
   previous.disabled = index === 0;
   previous.addEventListener("click", () => renderFlashcard(section, cards, index - 1, level, topic, options));
   const quiz = button("Quiz", "button");
   quiz.addEventListener("click", () => renderRevision(section, level, topic, options));
-  const next = button("Next", "button primary");
+  const next = button("Next", "button primary flashcard-next");
   next.disabled = index === cards.length - 1;
   next.addEventListener("click", () => renderFlashcard(section, cards, index + 1, level, topic, options));
 
