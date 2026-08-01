@@ -42,3 +42,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+#miscellaneous
+data/placeholder.csv

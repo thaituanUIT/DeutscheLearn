@@ -386,9 +386,10 @@ button {
 .meaning-overview {
   max-width: 64ch;
   margin: 6px auto 0;
-  color: #5f6972;
-  font-size: 0.88rem;
-  line-height: 1.45;
+  color: #4d555e;
+  font-size: 1.08rem;
+  line-height: 1.5;
+  font-weight: 600;
 }
 
 .answers {

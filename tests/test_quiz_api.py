@@ -264,10 +264,10 @@ def test_focus_levels_are_loaded_from_csv() -> None:
         assert response.status_code == 200
         body = response.json()
         assert body == [
-            {"level": "A1", "word_count": 60, "topic_count": 6},
-            {"level": "A2", "word_count": 50, "topic_count": 5},
-            {"level": "B1", "word_count": 50, "topic_count": 5},
-            {"level": "B2", "word_count": 20, "topic_count": 2},
+            {"level": "A1", "word_count": 82, "topic_count": 6},
+            {"level": "A2", "word_count": 72, "topic_count": 5},
+            {"level": "B1", "word_count": 68, "topic_count": 5},
+            {"level": "B2", "word_count": 32, "topic_count": 2},
         ]
 
 
@@ -277,7 +277,7 @@ def test_focus_topics_are_filtered_by_level() -> None:
 
         assert response.status_code == 200
         topics = response.json()
-        assert {"topic": "food_drink", "label": "Food & Drink", "word_count": 10} in topics
+        assert {"topic": "food_drink", "label": "Food & Drink", "word_count": 14} in topics
         assert {"topic": "work_career", "label": "Work & Career", "word_count": 10} not in topics
 
 
@@ -287,13 +287,17 @@ def test_focus_cards_are_filtered_by_level_and_topic() -> None:
 
         assert response.status_code == 200
         cards = response.json()
-        assert len(cards) == 10
+        assert len(cards) == 14
         assert {card["topic"] for card in cards} == {"food_drink"}
         assert {card["level"] for card in cards} == {"A1"}
         bread = next(card for card in cards if card["word"] == "Brot")
         assert bread["article"] == "das"
         assert bread["part_of_speech"] == "noun"
         assert bread["meaning_overview"] == "bread"
+        studentenfutter = next(card for card in cards if card["word"] == "Studentenfutter")
+        assert studentenfutter["article"] == "das"
+        assert studentenfutter["part_of_speech"] == "noun"
+        assert studentenfutter["meaning_overview"] == "trail mix made from nuts and dried fruit"
 
 
 def test_leaderboard_question_count_matches_best_streak_not_final_miss() -> None:

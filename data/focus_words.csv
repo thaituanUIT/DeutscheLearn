@@ -179,3 +179,77 @@ Selbstbewusstsein,psychology_personality,B2,das,noun,self confidence
 Eigenschaft,psychology_personality,B2,die,noun,trait
 Gewohnheit,psychology_personality,B2,die,noun,habit
 wahrnehmen,psychology_personality,B2,,verb,to perceive
+Neffe,self_introduction_family,A1,der,noun,nephew; the son of a sibling
+heiraten / verheiratet sein,self_introduction_family,A1,,verb / adjective,to marry; to be married
+grüßen,self_introduction_family,A1,,verb,to greet someone or say hello
+schälen,food_drink,A1,,verb,to peel fruit or vegetables
+Studentenfutter,food_drink,A1,das,noun,trail mix made from nuts and dried fruit
+schmecken,food_drink,A1,,verb,to taste good; to be enjoyable as food
+Chips,food_drink,A1,die,noun,crisps or chips; thin fried potato slices
+Feierabend,daily_routine,A1,der,noun,the end of the working day; time after work
+spazieren gehen,daily_routine,A1,,verb,to go for a relaxed walk without a fixed goal
+Stadtbummel / bummeln,daily_routine,A1,der,noun / verb,"a stroll around town, often looking at shops; to stroll"
+Telefonat / anrufen,daily_routine,A1,das,noun / verb,a phone call; to call someone by phone
+Gebäude,housing_furniture,A1,das,noun,building; a large house or structure
+Kamin,housing_furniture,A1,der,noun,fireplace or chimney area where a fire can burn
+Kerze,housing_furniture,A1,die,noun,candle; a wax object that gives light when lit
+Preisvergleich,shopping_prices,A1,der,noun,price comparison across shops or products
+gebraucht,shopping_prices,A1,,adjective,used; not new and already owned by someone
+Verhandlungsbasis (VHB),shopping_prices,A1,die,noun,negotiable price basis; the price can still be discussed
+Kuscheltier,shopping_prices,A1,das,noun,soft toy or stuffed animal for children
+Bühne,art_painting,A1,die,noun,stage; raised area where actors perform
+Vorhang,art_painting,A1,der,noun,"curtain, especially the large curtain in front of a stage"
+Bühnenbild / die Kulisse,art_painting,A1,das,noun,"stage set, scenery, or decorative background for a play"
+Scheinwerfer / der Spot,art_painting,A1,der,noun,spotlight or strong stage lamp
+Gesundheitszustand,health_body,A2,der,noun,state of health; information about whether someone is healthy or ill
+Behandlung,health_body,A2,die,noun,"medical treatment, therapy, or care by doctors"
+Reha (Rehabilitation),health_body,A2,die,noun,"rehabilitation therapy after illness, injury, or surgery"
+Gänsehaut,health_body,A2,die,noun,"goosebumps caused by fear, cold, or strong emotion"
+Skigebiet,travel_transport,A2,das,noun,ski resort area; mountain region where people ski
+Skipass,travel_transport,A2,der,noun,ski pass; ticket needed to use lifts in a ski area
+Vollkaskoversicherung,travel_transport,A2,die,noun,"fully comprehensive insurance, especially for a rental car"
+Kaution,travel_transport,A2,die,noun,deposit paid as security and usually returned later
+Eigenbeteiligung,travel_transport,A2,die,noun,deductible or excess; the part of damage costs you pay yourself
+Hut,clothing_appearance,A2,der,noun,hat; firm headwear
+Strickpullover,clothing_appearance,A2,der,noun,"knitted sweater, usually made of wool"
+Lippenstift,clothing_appearance,A2,der,noun,lipstick; cosmetic color for the lips
+Haarsträhne / Strähnchen,clothing_appearance,A2,die,noun,strand of hair; highlighted or dyed streaks of hair
+Stöckelschuh,clothing_appearance,A2,der,noun,high-heeled shoe with a thin heel
+figurbetont,clothing_appearance,A2,,adjective,figure-hugging; cut close to the shape of the body
+Streichholz / Zündholz,kitchen_utensils,A2,das,noun,match; small wooden stick used to light a fire
+Feuerzeug,kitchen_utensils,A2,das,noun,lighter; small device used to make a flame
+Packung,kitchen_utensils,A2,die,noun,package or small cardboard box containing items
+Becher,kitchen_utensils,A2,der,noun,"cup or tumbler, usually without a handle"
+düster,weather_seasons,A2,,adjective,"gloomy, dark, pessimistic, or sad"
+in den Bergen / auf dem Berg,weather_seasons,A2,,phrase,in the mountains; on top of a mountain
+Silvester,weather_seasons,A2,,noun,"New Year's Eve, December 31"
+im Durchschnitt,hotel_accommodation_reception,B1,,phrase,on average; the statistical middle or normal value
+Geschäftsstelle,hotel_accommodation_reception,B1,die,noun,"local office, branch, or official office of an organization"
+MINT-Beruf,work_career,B1,der,noun,"STEM profession in mathematics, IT, natural sciences, or technology"
+Bauingenieur,work_career,B1,der,noun,civil engineer who plans and builds infrastructure or buildings
+Geschäftspartnerin,work_career,B1,die,noun,female business partner from another company
+Bruttogehalt,work_career,B1,das,noun,gross salary before taxes and insurance deductions
+Arbeitgeber / Arbeitnehmer,work_career,B1,der,noun,employer and employee
+Doktorarbeit,education_studies,B1,die,noun,doctoral thesis or dissertation at a university
+Gymnasium,education_studies,B1,das,noun,German secondary school preparing students for university
+Elternabend,education_studies,B1,der,noun,parents' evening or school meeting for parents and teachers
+Sprachtandem,education_studies,B1,das,noun,language exchange where two people practise each other's languages
+kennenlernen,relationships_living_together,B1,,verb,to meet or get to know someone for the first time
+mitversichert sein,relationships_living_together,B1,,verb / adjective,to be covered under another family member's insurance
+sich näherkommen,relationships_living_together,B1,,verb,to grow closer or build a closer relationship
+Betreffzeile,media_technology,B1,die,noun,subject line in an email header
+Signatur,media_technology,B1,die,noun,email signature with contact or company details
+Abkürzung,media_technology,B1,die,noun,abbreviation; shortened letter form of a word
+Rechtschreibprogramm,media_technology,B1,das,noun,spell-checking software for grammar and spelling
+Migrationsabkommen,economy_consumption,B2,das,noun,migration agreement between governments
+Umsatz,economy_consumption,B2,der,noun,revenue or sales turnover over a period of time
+Leistungsgesellschaft,economy_consumption,B2,die,noun,achievement-oriented society where work and success are highly valued
+Beitragserhöhung,economy_consumption,B2,die,noun,increase in a regular contribution or monthly fee
+Zukunftsangst,psychology_personality,B2,die,noun,fear or anxiety about the future
+Grundbedürfnis,psychology_personality,B2,das,noun,basic need; something essential a person needs physically or psychologically
+Selbstbestimmung,psychology_personality,B2,die,noun,self-determination; freedom to decide about one's own life
+Selbstwert,psychology_personality,B2,der,noun,self-worth; feeling that one is valuable and stable as a person
+süchtig machen / süchtig sein,psychology_personality,B2,,verb / adjective,to make addicted; to be addicted
+Torschlusspanik,psychology_personality,B2,die,noun,fear of missing out on an important life chance because time is running out
+Angsthase / Schisser,psychology_personality,B2,der,noun,coward or scaredy-cat; colloquial term for someone easily afraid
+Bewusstsein,psychology_personality,B2,das,noun,"consciousness; awareness of reality, thoughts, and one's senses"
