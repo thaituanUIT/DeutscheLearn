@@ -306,34 +306,6 @@ button {
   font-size: 1.08rem;
 }
 
-.topic-option {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  cursor: default;
-}
-
-.topic-main {
-  display: grid;
-  gap: 10px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.topic-main:hover strong {
-  color: #33658a;
-}
-
-.topic-quiz-button {
-  min-height: 38px;
-  padding: 0 12px;
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
 .flashcard {
   min-height: 280px;
   display: grid;

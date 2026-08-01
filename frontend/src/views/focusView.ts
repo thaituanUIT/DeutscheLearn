@@ -54,13 +54,7 @@ async function renderTopics(
 
     const grid = el("div", "focus-grid topics-grid");
     for (const topic of topics) {
-      grid.append(
-        topicCard(
-          topic,
-          () => renderFlashcards(section, level, topic, options),
-          () => renderRevision(section, level, topic, options),
-        ),
-      );
+      grid.append(topicCard(topic, () => renderFlashcards(section, level, topic, options)));
     }
 
     section.replaceChildren(intro, grid);
@@ -79,7 +73,7 @@ async function renderFlashcards(
   section.replaceChildren(el("p", "prompt", "Loading flashcards..."));
   try {
     const cards = await getFocusCards(level, topic.topic);
-    renderFlashcard(section, cards, 0);
+    renderFlashcard(section, cards, 0, level, topic, options);
   } catch (error) {
     options.onError(error instanceof Error ? error.message : "Could not load flashcards");
   }
@@ -91,7 +85,7 @@ async function renderRevision(
   topic: FocusTopic,
   options: FocusViewOptions,
 ): Promise<void> {
-  options.onBackChange(() => renderTopics(section, level, options));
+  options.onBackChange(() => renderFlashcards(section, level, topic, options));
   section.replaceChildren(el("p", "prompt", "Loading revision quiz..."));
   try {
     const questions = await getFocusRevision(level, topic.topic);
@@ -193,6 +187,9 @@ function renderFlashcard(
   section: HTMLElement,
   cards: FocusCard[],
   index: number,
+  level: FocusLevel["level"],
+  topic: FocusTopic,
+  options: FocusViewOptions,
 ): void {
   section.replaceChildren();
   if (cards.length === 0) {
@@ -213,12 +210,14 @@ function renderFlashcard(
 
   const previous = button("Previous", "button");
   previous.disabled = index === 0;
-  previous.addEventListener("click", () => renderFlashcard(section, cards, index - 1));
+  previous.addEventListener("click", () => renderFlashcard(section, cards, index - 1, level, topic, options));
+  const quiz = button("Quiz", "button");
+  quiz.addEventListener("click", () => renderRevision(section, level, topic, options));
   const next = button("Next", "button primary");
   next.disabled = index === cards.length - 1;
-  next.addEventListener("click", () => renderFlashcard(section, cards, index + 1));
+  next.addEventListener("click", () => renderFlashcard(section, cards, index + 1, level, topic, options));
 
-  section.append(content, cardActions(previous, next));
+  section.append(content, cardActions(previous, quiz, next));
 }
 
 function levelCard(level: FocusLevel, onClick: () => void): HTMLButtonElement {
@@ -232,21 +231,13 @@ function levelCard(level: FocusLevel, onClick: () => void): HTMLButtonElement {
   return card;
 }
 
-function topicCard(
-  topic: FocusTopic,
-  onFlashcards: () => void,
-  onRevision: () => void,
-): HTMLElement {
-  const card = el("div", "focus-option topic-option");
-  const flashcards = button("", "topic-main");
-  flashcards.setAttribute("aria-label", `Study ${topic.label} flashcards`);
-  flashcards.addEventListener("click", onFlashcards);
-  flashcards.append(el("strong", "", topic.label), el("span", "", `${topic.word_count} words`));
-
-  const quiz = button("Quiz", "button topic-quiz-button");
-  quiz.setAttribute("aria-label", `Start ${topic.label} revision quiz`);
-  quiz.addEventListener("click", onRevision);
-  card.append(flashcards, quiz);
+function topicCard(topic: FocusTopic, onClick: () => void): HTMLButtonElement {
+  const card = button("", "focus-option topic-option");
+  card.addEventListener("click", onClick);
+  card.append(
+    el("strong", "", topic.label),
+    el("span", "", `${topic.word_count} words`),
+  );
   return card;
 }
 
