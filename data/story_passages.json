@@ -1,0 +1,93 @@
+[
+  {
+    "level": "A1",
+    "topic": "daily_life",
+    "title": "Lena am Morgen",
+    "passage_text": "Lena steht um sieben Uhr auf. Sie trinkt Wasser und isst ein Brot mit Käse. Danach nimmt sie den Bus zur Schule. Der Bus kommt um halb acht.",
+    "order_index": 1,
+    "questions": [
+      {
+        "prompt": "Wann steht Lena auf?",
+        "explanation": "The passage says Lena gets up at seven o'clock.",
+        "order_index": 0,
+        "answers": [
+          { "answer_text": "Um sieben Uhr", "is_correct": true, "order_index": 0 },
+          { "answer_text": "Um halb acht", "is_correct": false, "order_index": 1 },
+          { "answer_text": "Am Abend", "is_correct": false, "order_index": 2 },
+          { "answer_text": "Um sechs Uhr", "is_correct": false, "order_index": 3 }
+        ]
+      },
+      {
+        "prompt": "Wie fährt Lena zur Schule?",
+        "explanation": "The passage says she takes the bus to school.",
+        "order_index": 1,
+        "answers": [
+          { "answer_text": "Mit dem Bus", "is_correct": true, "order_index": 0 },
+          { "answer_text": "Mit dem Fahrrad", "is_correct": false, "order_index": 1 },
+          { "answer_text": "Mit dem Zug", "is_correct": false, "order_index": 2 },
+          { "answer_text": "Zu Fuß", "is_correct": false, "order_index": 3 }
+        ]
+      }
+    ]
+  },
+  {
+    "level": "A2",
+    "topic": "travel_transport",
+    "title": "Ein Wochenende in Hamburg",
+    "passage_text": "Am Freitag fährt Jonas mit dem Zug nach Hamburg. Er besucht seine Tante und bleibt zwei Nächte bei ihr. Am Samstag gehen sie an den Hafen und essen Fisch. Am Sonntag fährt Jonas am Nachmittag zurück.",
+    "order_index": 1,
+    "questions": [
+      {
+        "prompt": "Wie lange bleibt Jonas in Hamburg?",
+        "explanation": "The passage says he stays for two nights.",
+        "order_index": 0,
+        "answers": [
+          { "answer_text": "Zwei Nächte", "is_correct": true, "order_index": 0 },
+          { "answer_text": "Eine Woche", "is_correct": false, "order_index": 1 },
+          { "answer_text": "Nur einen Nachmittag", "is_correct": false, "order_index": 2 },
+          { "answer_text": "Vier Tage", "is_correct": false, "order_index": 3 }
+        ]
+      }
+    ]
+  },
+  {
+    "level": "B1",
+    "topic": "work_career",
+    "title": "Der neue Arbeitsplatz",
+    "passage_text": "Mara hat seit einem Monat eine neue Stelle in einer kleinen Firma. Am Anfang war sie nervös, weil viele Programme neu für sie waren. Ihre Kolleginnen erklärten ihr die wichtigsten Aufgaben. Jetzt arbeitet Mara selbstständiger und fühlt sich im Team wohler.",
+    "order_index": 1,
+    "questions": [
+      {
+        "prompt": "Warum war Mara am Anfang nervös?",
+        "explanation": "Many programs were new for her.",
+        "order_index": 0,
+        "answers": [
+          { "answer_text": "Viele Programme waren neu für sie.", "is_correct": true, "order_index": 0 },
+          { "answer_text": "Sie kannte niemanden in der Stadt.", "is_correct": false, "order_index": 1 },
+          { "answer_text": "Die Firma war sehr groß.", "is_correct": false, "order_index": 2 },
+          { "answer_text": "Sie musste sofort reisen.", "is_correct": false, "order_index": 3 }
+        ]
+      }
+    ]
+  },
+  {
+    "level": "B2",
+    "topic": "media_technology",
+    "title": "Digitale Gewohnheiten",
+    "passage_text": "Viele Menschen prüfen ihre Nachrichten direkt nach dem Aufstehen. Das spart manchmal Zeit, kann aber auch Stress auslösen, bevor der Tag richtig beginnt. Einige Expertinnen empfehlen deshalb, das Handy morgens erst nach dem Frühstück zu benutzen und feste Zeiten für Nachrichten einzuplanen.",
+    "order_index": 1,
+    "questions": [
+      {
+        "prompt": "Welche Empfehlung wird im Text genannt?",
+        "explanation": "The passage recommends using the phone only after breakfast and planning fixed times for messages.",
+        "order_index": 0,
+        "answers": [
+          { "answer_text": "Das Handy morgens erst nach dem Frühstück benutzen.", "is_correct": true, "order_index": 0 },
+          { "answer_text": "Alle Nachrichten sofort beantworten.", "is_correct": false, "order_index": 1 },
+          { "answer_text": "Das Handy den ganzen Tag ausschalten.", "is_correct": false, "order_index": 2 },
+          { "answer_text": "Nachrichten nur am Wochenende lesen.", "is_correct": false, "order_index": 3 }
+        ]
+      }
+    ]
+  }
+]

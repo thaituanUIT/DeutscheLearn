@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = "German Word Quiz"
     database_url: str = "sqlite:///./quiz.db"
@@ -15,9 +15,12 @@ class Settings(BaseSettings):
     cookie_max_age_seconds: int = 60 * 60 * 24 * 365
     seed_on_startup: bool = True
     admin_token: str | None = None
+    admin_key: str | None = None
 
     @model_validator(mode="after")
     def require_persistent_database_in_production(self) -> "Settings":
+        if not self.admin_token and self.admin_key:
+            self.admin_token = self.admin_key
         if self.environment == "production" and self.database_url.startswith("sqlite"):
             raise ValueError("DATABASE_URL must point to a persistent database in production")
         return self

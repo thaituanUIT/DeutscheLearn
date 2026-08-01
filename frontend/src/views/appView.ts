@@ -7,6 +7,7 @@ import { focusView } from "./focusView";
 import { homeView, type HomeMode } from "./homeView";
 import { leaderboardView, wordOfDayView } from "./leaderboardView";
 import { quizView } from "./quizView";
+import { storyView } from "./storyView";
 
 export async function renderApp(root: HTMLElement): Promise<void> {
   clear(root);
@@ -71,6 +72,17 @@ function draw(
     if (mode === "focus") {
       mainHost.replaceChildren(
         focusView({
+          onBack: showHome,
+          onBackChange: renderHeaderBack,
+          onError: showError,
+        }),
+      );
+      return;
+    }
+
+    if (mode === "story") {
+      mainHost.replaceChildren(
+        storyView({
           onBack: showHome,
           onBackChange: renderHeaderBack,
           onError: showError,

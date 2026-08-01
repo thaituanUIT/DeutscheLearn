@@ -12,6 +12,10 @@ import type {
   Player,
   PracticeAnswer,
   PracticeStart,
+  StoryAnswer,
+  StoryLevel,
+  StoryPassage,
+  StoryPassageSummary,
   TimedAnswer,
   TimedStart,
   WordOfDay,
@@ -160,6 +164,28 @@ export function getFocusCards(level: string, topic: string): Promise<FocusCard[]
 export function getFocusRevision(level: string, topic: string): Promise<FocusRevisionQuestion[]> {
   const params = new URLSearchParams({ level, topic });
   return request<FocusRevisionQuestion[]>(`/api/focus/revision?${params.toString()}`);
+}
+
+export function getStoryLevels(): Promise<StoryLevel[]> {
+  return request<StoryLevel[]>("/api/story/levels");
+}
+
+export function getStoryPassages(level: string): Promise<StoryPassageSummary[]> {
+  return request<StoryPassageSummary[]>(`/api/story/passages?level=${encodeURIComponent(level)}`);
+}
+
+export function getStoryPassage(passageId: string): Promise<StoryPassage> {
+  return request<StoryPassage>(`/api/story/passages/${encodeURIComponent(passageId)}`);
+}
+
+export function submitStoryAnswer(questionId: string, answerId: string): Promise<StoryAnswer> {
+  return request<StoryAnswer>("/api/story/answer", {
+    method: "POST",
+    body: JSON.stringify({
+      question_id: questionId,
+      answer_id: answerId,
+    }),
+  });
 }
 
 export function getAdminWords(

@@ -2,7 +2,7 @@ import { button } from "../components/button";
 import { el } from "../utils/dom";
 import type { QuizMode } from "./quizView";
 
-export type HomeMode = QuizMode | "focus";
+export type HomeMode = QuizMode | "focus" | "story";
 
 type HomeViewOptions = {
   onSelectMode: (mode: HomeMode) => void;
@@ -42,6 +42,13 @@ const modes: Array<{
     meta: "Flashcards",
     description: "Pick a level and topic, then review with flash vocabulary cards.",
     action: "Study words",
+  },
+  {
+    mode: "story",
+    title: "Story",
+    meta: "Reading",
+    description: "Read short German passages, then answer comprehension questions.",
+    action: "Read stories",
   },
 ];
 

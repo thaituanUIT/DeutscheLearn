@@ -40,6 +40,13 @@ from app.schemas import (
     PlayerOut,
     PracticeAnswerOut,
     PracticeStartOut,
+    StoryAnswerChoiceOut,
+    StoryAnswerIn,
+    StoryAnswerOut,
+    StoryLevelOut,
+    StoryPassageOut,
+    StoryPassageSummaryOut,
+    StoryQuestionOut,
     TimedAnswerOut,
     TimedStartOut,
     WordOfDayOut,
@@ -51,6 +58,13 @@ from app.services.focus import (
     get_focus_topics,
 )
 from app.services.quiz import create_question
+from app.services.story import (
+    get_correct_story_answer,
+    get_story_answer,
+    get_story_levels,
+    get_story_passage,
+    get_story_passages,
+)
 from app.services.words import get_meaning_overview, get_word_of_day
 
 router = APIRouter(prefix="/api")
@@ -128,6 +142,43 @@ def focus_revision(
         FocusRevisionQuestionOut(**question)
         for question in get_focus_revision_questions(db, level, topic)
     ]
+
+
+@router.get("/story/levels", response_model=list[StoryLevelOut])
+def story_levels(db: Session = Depends(get_db)) -> list[StoryLevelOut]:
+    return [StoryLevelOut(**level) for level in get_story_levels(db)]
+
+
+@router.get("/story/passages", response_model=list[StoryPassageSummaryOut])
+def story_passages(
+    level: str = Query(pattern="^(A1|A2|B1|B2)$"),
+    db: Session = Depends(get_db),
+) -> list[StoryPassageSummaryOut]:
+    return [StoryPassageSummaryOut(**passage) for passage in get_story_passages(db, level)]
+
+
+@router.get("/story/passages/{passage_id}", response_model=StoryPassageOut)
+def story_passage(passage_id: str, db: Session = Depends(get_db)) -> StoryPassageOut:
+    passage = get_story_passage(db, passage_id)
+    if passage is None:
+        raise HTTPException(status_code=404, detail="Story passage not found")
+    return _story_passage_out(passage)
+
+
+@router.post("/story/answer", response_model=StoryAnswerOut)
+def story_answer(payload: StoryAnswerIn, db: Session = Depends(get_db)) -> StoryAnswerOut:
+    selected = get_story_answer(db, payload.question_id, payload.answer_id)
+    if selected is None:
+        raise HTTPException(status_code=404, detail="Story answer not found")
+    correct = get_correct_story_answer(db, payload.question_id)
+    if correct is None:
+        raise HTTPException(status_code=409, detail="Story question has no correct answer")
+    return StoryAnswerOut(
+        correct=selected.id == correct.id,
+        correct_answer_id=correct.id,
+        correct_answer_text=correct.answer_text,
+        explanation=selected.question.explanation,
+    )
 
 
 @router.get(
@@ -604,6 +655,33 @@ def _leaderboard_entry(
         duration_seconds=duration,
         ended_at=attempt.ended_at.isoformat() if attempt.ended_at else None,
         is_current_player=is_current_player,
+    )
+
+
+def _story_passage_out(passage: ReadingPassage) -> StoryPassageOut:
+    return StoryPassageOut(
+        id=passage.id,
+        level=passage.level,
+        topic=passage.topic,
+        title=passage.title,
+        passage_text=passage.passage_text,
+        order_index=passage.order_index,
+        questions=[
+            StoryQuestionOut(
+                id=question.id,
+                prompt=question.prompt,
+                order_index=question.order_index,
+                answers=[
+                    StoryAnswerChoiceOut(
+                        id=answer.id,
+                        answer_text=answer.answer_text,
+                        order_index=answer.order_index,
+                    )
+                    for answer in question.answers
+                ],
+            )
+            for question in passage.questions
+        ],
     )
 
 

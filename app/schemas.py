@@ -112,6 +112,56 @@ class FocusRevisionQuestionOut(BaseModel):
     correct_answer: str
 
 
+class StoryLevelOut(BaseModel):
+    level: str
+    passage_count: int
+    question_count: int
+
+
+class StoryPassageSummaryOut(BaseModel):
+    id: str
+    level: str
+    topic: str | None
+    title: str
+    order_index: int
+    question_count: int
+
+
+class StoryAnswerChoiceOut(BaseModel):
+    id: str
+    answer_text: str
+    order_index: int
+
+
+class StoryQuestionOut(BaseModel):
+    id: str
+    prompt: str
+    order_index: int
+    answers: list[StoryAnswerChoiceOut]
+
+
+class StoryPassageOut(BaseModel):
+    id: str
+    level: str
+    topic: str | None
+    title: str
+    passage_text: str
+    order_index: int
+    questions: list[StoryQuestionOut]
+
+
+class StoryAnswerIn(BaseModel):
+    question_id: str = Field(min_length=1)
+    answer_id: str = Field(min_length=1)
+
+
+class StoryAnswerOut(BaseModel):
+    correct: bool
+    correct_answer_id: str
+    correct_answer_text: str
+    explanation: str | None
+
+
 class AdminFocusEntryIn(BaseModel):
     level: str = Field(pattern="^(A1|A2|B1|B2)$")
     topic: str = Field(min_length=1, max_length=80)

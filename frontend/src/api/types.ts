@@ -96,6 +96,51 @@ export type FocusRevisionQuestion = FocusCard & {
   correct_answer: string;
 };
 
+export type StoryLevel = {
+  level: "A1" | "A2" | "B1" | "B2";
+  passage_count: number;
+  question_count: number;
+};
+
+export type StoryPassageSummary = {
+  id: string;
+  level: "A1" | "A2" | "B1" | "B2";
+  topic: string | null;
+  title: string;
+  order_index: number;
+  question_count: number;
+};
+
+export type StoryAnswerChoice = {
+  id: string;
+  answer_text: string;
+  order_index: number;
+};
+
+export type StoryQuestion = {
+  id: string;
+  prompt: string;
+  order_index: number;
+  answers: StoryAnswerChoice[];
+};
+
+export type StoryPassage = {
+  id: string;
+  level: "A1" | "A2" | "B1" | "B2";
+  topic: string | null;
+  title: string;
+  passage_text: string;
+  order_index: number;
+  questions: StoryQuestion[];
+};
+
+export type StoryAnswer = {
+  correct: boolean;
+  correct_answer_id: string;
+  correct_answer_text: string;
+  explanation: string | null;
+};
+
 export type AdminFocusEntry = {
   id?: string;
   level: "A1" | "A2" | "B1" | "B2";

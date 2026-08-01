@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.db.models import Base
 from app.db.session import SessionLocal, engine
 from app.services.focus import import_focus_words
+from app.services.story import import_story_passages
 from app.services.words import seed_words
 
 
@@ -23,6 +24,7 @@ async def lifespan(api: FastAPI) -> AsyncIterator[None]:
         try:
             seed_words(db)
             import_focus_words(db)
+            import_story_passages(db)
         finally:
             db.close()
     yield

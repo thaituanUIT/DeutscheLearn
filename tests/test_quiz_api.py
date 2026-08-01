@@ -7,7 +7,15 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings
 from app.core.time import utc_now
-from app.db.models import AnonymousPlayer, CachedWord, QuizAttempt, QuizAttemptQuestion
+from app.db.models import (
+    AnonymousPlayer,
+    CachedWord,
+    QuizAttempt,
+    QuizAttemptQuestion,
+    ReadingAnswer,
+    ReadingPassage,
+    ReadingQuestion,
+)
 from app.db.session import SessionLocal
 from app.main import app
 from app.services.quiz import question_to_schema
@@ -130,6 +138,87 @@ def test_admin_reading_passage_crud(monkeypatch: pytest.MonkeyPatch) -> None:
 
         deleted = client.delete(f"/api/admin/reading/passages/{passage_id}", headers=headers)
         assert deleted.status_code == 204
+
+
+def test_story_mode_lists_passages_without_exposing_correct_answers() -> None:
+    passage_title = f"Story Passage {uuid4()}"
+    db = SessionLocal()
+    try:
+        passage = ReadingPassage(
+            level="A1",
+            topic="daily_life",
+            title=passage_title,
+            passage_text="Tom kauft heute Brot.",
+            questions=[
+                ReadingQuestion(
+                    prompt="Was kauft Tom?",
+                    answers=[
+                        ReadingAnswer(answer_text="Brot", is_correct=True, order_index=0),
+                        ReadingAnswer(answer_text="Milch", is_correct=False, order_index=1),
+                    ],
+                )
+            ],
+        )
+        db.add(passage)
+        db.commit()
+        passage_id = passage.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        listed = client.get("/api/story/passages?level=A1")
+        assert listed.status_code == 200
+        assert any(item["id"] == passage_id for item in listed.json())
+
+        detail = client.get(f"/api/story/passages/{passage_id}")
+        assert detail.status_code == 200
+        body = detail.json()
+        assert body["title"] == passage_title
+        assert "is_correct" not in body["questions"][0]["answers"][0]
+
+
+def test_story_answer_is_checked_server_side() -> None:
+    db = SessionLocal()
+    try:
+        passage = ReadingPassage(
+            level="A2",
+            topic="food_drink",
+            title=f"Story Answer {uuid4()}",
+            passage_text="Nina trinkt Tee.",
+            questions=[
+                ReadingQuestion(
+                    prompt="Was trinkt Nina?",
+                    explanation="The story says Nina drinks tea.",
+                    answers=[
+                        ReadingAnswer(answer_text="Tee", is_correct=True, order_index=0),
+                        ReadingAnswer(answer_text="Kaffee", is_correct=False, order_index=1),
+                    ],
+                )
+            ],
+        )
+        db.add(passage)
+        db.commit()
+        question = passage.questions[0]
+        correct = next(answer for answer in question.answers if answer.is_correct)
+        wrong = next(answer for answer in question.answers if not answer.is_correct)
+        question_id = question.id
+        correct_id = correct.id
+        wrong_id = wrong.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        answered = client.post(
+            "/api/story/answer",
+            json={"question_id": question_id, "answer_id": wrong_id},
+        )
+
+        assert answered.status_code == 200
+        body = answered.json()
+        assert body["correct"] is False
+        assert body["correct_answer_id"] == correct_id
+        assert body["correct_answer_text"] == "Tee"
+        assert body["explanation"] == "The story says Nina drinks tea."
 
 
 def test_endless_attempt_finishes_on_wrong_answer() -> None:
