@@ -6,10 +6,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.time import utc_now
-from app.db.models import AnonymousPlayer, QuizAttempt, QuizAttemptQuestion
+from app.db.models import AnonymousPlayer, CachedWord, QuizAttempt, QuizAttemptQuestion
 from app.db.session import SessionLocal
 from app.main import app
 from app.services.quiz import question_to_schema
+from app.services.words import get_meaning_overview
 
 
 @pytest.fixture(autouse=True)
@@ -66,12 +67,12 @@ def test_endless_attempt_finishes_on_wrong_answer() -> None:
         assert answered.json()["attempt_finished"] is True
 
 
-def test_endless_answer_returns_duden_meaning_overview(
+def test_endless_answer_returns_cached_meaning_overview(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         "app.services.words._get_duden_meaning_overview",
-        lambda word: "Gebäude, das Menschen zum Wohnen dient.",
+        lambda word: "Duden should not be called for cached quiz words.",
     )
 
     with TestClient(app) as client:
@@ -87,6 +88,9 @@ def test_endless_answer_returns_duden_meaning_overview(
             assert stored_question is not None
             correct_answer = stored_question.correct_answer
             answered_word = stored_question.word
+            cached_word = db.get(CachedWord, answered_word)
+            assert cached_word is not None
+            expected_meaning = cached_word.meaning
         finally:
             db.close()
 
@@ -103,7 +107,23 @@ def test_endless_answer_returns_duden_meaning_overview(
         body = answered.json()
         assert body["correct"] is True
         assert body["answered_word"] == answered_word
-        assert body["meaning_overview"] == "Gebäude, das Menschen zum Wohnen dient."
+        assert body["meaning_overview"] == expected_meaning
+
+
+def test_meaning_overview_falls_back_to_duden_for_uncached_word(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.words._get_duden_meaning_overview",
+        lambda word: "Duden fallback meaning.",
+    )
+
+    db = SessionLocal()
+    try:
+        assert db.get(CachedWord, "NichtImCache") is None
+        assert get_meaning_overview(db, "NichtImCache") == "Duden fallback meaning."
+    finally:
+        db.close()
 
 
 def test_endless_answer_handles_missing_duden_meaning_overview() -> None:
@@ -137,7 +157,13 @@ def test_endless_answer_handles_missing_duden_meaning_overview() -> None:
         body = answered.json()
         assert body["correct"] is False
         assert body["attempt_finished"] is True
-        assert body["meaning_overview"] == "No Duden meaning overview is available yet."
+        db = SessionLocal()
+        try:
+            cached_word = db.get(CachedWord, body["answered_word"])
+            assert cached_word is not None
+            assert body["meaning_overview"] == cached_word.meaning
+        finally:
+            db.close()
 
 
 def test_leaderboard_endpoint_returns_list() -> None:

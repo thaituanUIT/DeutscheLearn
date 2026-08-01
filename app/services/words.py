@@ -105,6 +105,13 @@ def get_duden_meaning_overview(word: str) -> str:
     return "No Duden meaning overview is available yet."
 
 
+def get_meaning_overview(db: Session, word: str) -> str:
+    cached_word = db.get(CachedWord, word)
+    if cached_word is not None:
+        return cached_word.meaning
+    return get_duden_meaning_overview(word)
+
+
 @lru_cache(maxsize=256)
 def _get_duden_meaning_overview(word: str) -> str | None:
     try:

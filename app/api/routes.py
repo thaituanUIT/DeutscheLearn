@@ -25,7 +25,7 @@ from app.schemas import (
 )
 from app.services.focus import get_focus_cards, get_focus_levels, get_focus_topics
 from app.services.quiz import create_question
-from app.services.words import get_duden_meaning_overview, get_word_of_day
+from app.services.words import get_meaning_overview, get_word_of_day
 
 router = APIRouter(prefix="/api")
 TIMED_DURATION_SECONDS = 60
@@ -176,7 +176,7 @@ def answer_endless(
         score=attempt.score,
         correct_answer=question.correct_answer,
         answered_word=question.word,
-        meaning_overview=get_duden_meaning_overview(question.word),
+        meaning_overview=get_meaning_overview(db, question.word),
         attempt_finished=not correct,
         next_question=next_question,
     )
