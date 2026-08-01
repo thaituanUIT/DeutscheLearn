@@ -1,5 +1,5 @@
-import { getFocusCards, getFocusLevels, getFocusTopics } from "../api/client";
-import type { FocusCard, FocusLevel, FocusTopic } from "../api/types";
+import { getFocusCards, getFocusLevels, getFocusRevision, getFocusTopics } from "../api/client";
+import type { FocusCard, FocusLevel, FocusRevisionQuestion, FocusTopic } from "../api/types";
 import { button } from "../components/button";
 import { el } from "../utils/dom";
 
@@ -54,7 +54,13 @@ async function renderTopics(
 
     const grid = el("div", "focus-grid topics-grid");
     for (const topic of topics) {
-      grid.append(topicCard(topic, () => renderFlashcards(section, level, topic, options)));
+      grid.append(
+        topicCard(
+          topic,
+          () => renderFlashcards(section, level, topic, options),
+          () => renderRevision(section, level, topic, options),
+        ),
+      );
     }
 
     section.replaceChildren(intro, grid);
@@ -77,6 +83,110 @@ async function renderFlashcards(
   } catch (error) {
     options.onError(error instanceof Error ? error.message : "Could not load flashcards");
   }
+}
+
+async function renderRevision(
+  section: HTMLElement,
+  level: FocusLevel["level"],
+  topic: FocusTopic,
+  options: FocusViewOptions,
+): Promise<void> {
+  options.onBackChange(() => renderTopics(section, level, options));
+  section.replaceChildren(el("p", "prompt", "Loading revision quiz..."));
+  try {
+    const questions = await getFocusRevision(level, topic.topic);
+    renderRevisionQuestion(section, questions, 0, 0, () =>
+      renderRevision(section, level, topic, options),
+    );
+  } catch (error) {
+    options.onError(error instanceof Error ? error.message : "Could not load revision quiz");
+  }
+}
+
+function renderRevisionQuestion(
+  section: HTMLElement,
+  questions: FocusRevisionQuestion[],
+  index: number,
+  score: number,
+  onRetry: () => void,
+): void {
+  section.replaceChildren();
+  if (questions.length === 0) {
+    section.append(el("p", "prompt", "No quiz words available for this topic yet."));
+    return;
+  }
+
+  if (index >= questions.length) {
+    const result = el("div", "result revision-result");
+    result.append(
+      el("div", "question-type", "Revision complete"),
+      el("h2", "", `${score} / ${questions.length}`),
+      el("p", "prompt", "Review this topic again whenever you want."),
+    );
+    const retry = button("Try again", "button primary");
+    retry.addEventListener("click", onRetry);
+    section.append(result, cardActions(retry));
+    return;
+  }
+
+  const question = questions[index];
+  const shownWord = question.article ? `${question.article} ${question.word}` : question.word;
+  const content = el("div", "flashcard revision-card");
+  content.append(
+    el("div", "question-type", `${question.level} · ${question.topic_label}`),
+    el("div", "flashcard-count", `${index + 1} / ${questions.length} · ${score} correct`),
+    el("h2", "flashcard-word", shownWord),
+    el("p", "word-meta", question.part_of_speech),
+    el("p", "prompt", "Choose the English meaning."),
+  );
+
+  const answers = el("div", "answers revision-answers");
+  for (const choice of question.choices) {
+    const option = button(choice, "answer-option");
+    option.addEventListener("click", () => {
+      const correct = choice === question.correct_answer;
+      renderRevisionFeedback(
+        section,
+        questions,
+        index,
+        score + (correct ? 1 : 0),
+        choice,
+        onRetry,
+      );
+    });
+    answers.append(option);
+  }
+
+  section.append(content, answers);
+}
+
+function renderRevisionFeedback(
+  section: HTMLElement,
+  questions: FocusRevisionQuestion[],
+  index: number,
+  score: number,
+  selectedAnswer: string,
+  onRetry: () => void,
+): void {
+  section.replaceChildren();
+  const question = questions[index];
+  const correct = selectedAnswer === question.correct_answer;
+  const content = el("div", "flashcard revision-card");
+  content.append(
+    el("div", "question-type", correct ? "Correct" : "Review"),
+    el("h2", "flashcard-word", question.word),
+    el("p", "meaning-overview", question.correct_answer),
+  );
+
+  if (!correct) {
+    content.append(el("p", "prompt", `You chose: ${selectedAnswer}`));
+  }
+
+  const next = button(index === questions.length - 1 ? "Finish" : "Next", "button primary");
+  next.addEventListener("click", () =>
+    renderRevisionQuestion(section, questions, index + 1, score, onRetry),
+  );
+  section.append(content, cardActions(next));
 }
 
 function renderFlashcard(
@@ -122,13 +232,21 @@ function levelCard(level: FocusLevel, onClick: () => void): HTMLButtonElement {
   return card;
 }
 
-function topicCard(topic: FocusTopic, onClick: () => void): HTMLButtonElement {
-  const card = button("", "focus-option topic-option");
-  card.addEventListener("click", onClick);
-  card.append(
-    el("strong", "", topic.label),
-    el("span", "", `${topic.word_count} words`),
-  );
+function topicCard(
+  topic: FocusTopic,
+  onFlashcards: () => void,
+  onRevision: () => void,
+): HTMLElement {
+  const card = el("div", "focus-option topic-option");
+  const flashcards = button("", "topic-main");
+  flashcards.setAttribute("aria-label", `Study ${topic.label} flashcards`);
+  flashcards.addEventListener("click", onFlashcards);
+  flashcards.append(el("strong", "", topic.label), el("span", "", `${topic.word_count} words`));
+
+  const quiz = button("Quiz", "button topic-quiz-button");
+  quiz.setAttribute("aria-label", `Start ${topic.label} revision quiz`);
+  quiz.addEventListener("click", onRevision);
+  card.append(flashcards, quiz);
   return card;
 }
 

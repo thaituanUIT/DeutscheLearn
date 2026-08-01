@@ -91,6 +91,11 @@ export type FocusCard = {
   level: "A1" | "A2" | "B1" | "B2";
 };
 
+export type FocusRevisionQuestion = FocusCard & {
+  choices: string[];
+  correct_answer: string;
+};
+
 export type LeaderboardEntry = {
   rank: number;
   display_name: string;

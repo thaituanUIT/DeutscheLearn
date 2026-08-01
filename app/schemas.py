@@ -100,6 +100,18 @@ class FocusCardOut(BaseModel):
     level: str
 
 
+class FocusRevisionQuestionOut(BaseModel):
+    word: str
+    article: str | None
+    part_of_speech: str
+    meaning_overview: str
+    topic: str
+    topic_label: str
+    level: str
+    choices: list[str]
+    correct_answer: str
+
+
 class LeaderboardEntry(BaseModel):
     rank: int
     display_name: str

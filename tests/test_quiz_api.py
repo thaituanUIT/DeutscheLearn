@@ -326,6 +326,34 @@ def test_focus_cards_are_filtered_by_level_and_topic() -> None:
         assert studentenfutter["meaning_overview"] == "trail mix made from nuts and dried fruit"
 
 
+def test_focus_revision_returns_stateless_topic_quiz() -> None:
+    db = SessionLocal()
+    try:
+        before_attempts = len(db.query(QuizAttempt).all())
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        response = client.get("/api/focus/revision?level=A1&topic=food_drink")
+
+        assert response.status_code == 200
+        questions = response.json()
+        assert len(questions) == 5
+        assert {question["topic"] for question in questions} == {"food_drink"}
+        assert {question["level"] for question in questions} == {"A1"}
+        for question in questions:
+            assert len(question["choices"]) == 3
+            assert question["correct_answer"] in question["choices"]
+            assert question["meaning_overview"] == question["correct_answer"]
+
+    db = SessionLocal()
+    try:
+        after_attempts = len(db.query(QuizAttempt).all())
+    finally:
+        db.close()
+    assert after_attempts == before_attempts
+
+
 def test_leaderboard_question_count_matches_best_streak_not_final_miss() -> None:
     with TestClient(app) as client:
         player = client.get("/api/players/me").json()

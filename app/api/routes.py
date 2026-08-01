@@ -14,6 +14,7 @@ from app.schemas import (
     EndlessStartOut,
     FocusCardOut,
     FocusLevelOut,
+    FocusRevisionQuestionOut,
     FocusTopicOut,
     LeaderboardEntry,
     PlayerOut,
@@ -23,7 +24,12 @@ from app.schemas import (
     TimedStartOut,
     WordOfDayOut,
 )
-from app.services.focus import get_focus_cards, get_focus_levels, get_focus_topics
+from app.services.focus import (
+    get_focus_cards,
+    get_focus_levels,
+    get_focus_revision_questions,
+    get_focus_topics,
+)
 from app.services.quiz import create_question
 from app.services.words import get_meaning_overview, get_word_of_day
 
@@ -78,6 +84,18 @@ def focus_cards(
     db: Session = Depends(get_db),
 ) -> list[FocusCardOut]:
     return [FocusCardOut(**card) for card in get_focus_cards(db, level, topic)]
+
+
+@router.get("/focus/revision", response_model=list[FocusRevisionQuestionOut])
+def focus_revision(
+    level: str = Query(pattern="^(A1|A2|B1|B2)$"),
+    topic: str = Query(min_length=1, max_length=80),
+    db: Session = Depends(get_db),
+) -> list[FocusRevisionQuestionOut]:
+    return [
+        FocusRevisionQuestionOut(**question)
+        for question in get_focus_revision_questions(db, level, topic)
+    ]
 
 
 @router.post("/quiz/endless/start", response_model=EndlessStartOut)

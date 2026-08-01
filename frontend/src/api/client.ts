@@ -3,6 +3,7 @@ import type {
   EndlessStart,
   FocusCard,
   FocusLevel,
+  FocusRevisionQuestion,
   FocusTopic,
   LeaderboardEntry,
   Player,
@@ -117,4 +118,9 @@ export function getFocusTopics(level: string): Promise<FocusTopic[]> {
 export function getFocusCards(level: string, topic: string): Promise<FocusCard[]> {
   const params = new URLSearchParams({ level, topic });
   return request<FocusCard[]>(`/api/focus/cards?${params.toString()}`);
+}
+
+export function getFocusRevision(level: string, topic: string): Promise<FocusRevisionQuestion[]> {
+  const params = new URLSearchParams({ level, topic });
+  return request<FocusRevisionQuestion[]>(`/api/focus/revision?${params.toString()}`);
 }

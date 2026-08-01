@@ -1,4 +1,5 @@
 import csv
+import random
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -127,6 +128,53 @@ def get_focus_cards(db: Session, level: str, topic: str) -> list[dict[str, str |
         }
         for entry, word in rows
     ]
+
+
+def get_focus_revision_questions(
+    db: Session,
+    level: str,
+    topic: str,
+    *,
+    limit: int = 5,
+) -> list[dict[str, str | list[str] | None]]:
+    topic_rows = db.execute(
+        select(FocusWordEntry, CachedWord)
+        .join(CachedWord, CachedWord.word == FocusWordEntry.word)
+        .where(FocusWordEntry.level == level, FocusWordEntry.topic == topic)
+    ).all()
+    if not topic_rows:
+        return []
+
+    selected_rows = random.sample(topic_rows, k=min(limit, len(topic_rows)))
+    global_meanings = list(
+        dict.fromkeys(
+            meaning
+            for meaning in db.scalars(select(CachedWord.meaning)).all()
+            if meaning.strip()
+        )
+    )
+
+    questions = []
+    for entry, word in selected_rows:
+        correct_answer = word.meaning
+        distractors = [meaning for meaning in global_meanings if meaning != correct_answer]
+        choices = random.sample(distractors, k=min(2, len(distractors)))
+        choices.append(correct_answer)
+        random.shuffle(choices)
+        questions.append(
+            {
+                "word": word.word,
+                "article": word.article,
+                "part_of_speech": word.part_of_speech,
+                "meaning_overview": word.meaning,
+                "topic": entry.topic,
+                "topic_label": TOPIC_LABELS.get(entry.topic, _topic_to_label(entry.topic)),
+                "level": entry.level,
+                "choices": choices,
+                "correct_answer": correct_answer,
+            }
+        )
+    return questions
 
 
 def _read_focus_rows(csv_path: Path) -> list[FocusCsvRow]:
