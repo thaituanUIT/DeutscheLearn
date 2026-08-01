@@ -12,6 +12,7 @@ import {
 import type {
   AdminFocusEntry,
   AdminReadingPassage,
+  AdminReadingQuestion,
   AdminReadingPassageSummary,
   AdminWord,
 } from "../api/types";
@@ -298,7 +299,23 @@ function renderPassageEditor(
   const title = input("Title", state.selected.title);
   const order = input("Order", String(state.selected.order_index), "number");
   const passage = textarea("Passage text", state.selected.passage_text, 10);
-  const questions = textarea("Questions JSON", JSON.stringify(state.selected.questions, null, 2), 16);
+  const questions = el("div", "admin-question-list");
+  const questionControls = state.selected.questions.map((question) => questionBlock(question));
+  const renderQuestions = (): void => {
+    questions.replaceChildren(
+      ...questionControls.map((control, index) => {
+        control.title.textContent = `Question ${index + 1}`;
+        control.prompt.placeholder = `Question ${index + 1}: main text`;
+        control.remove.disabled = questionControls.length === 1;
+        control.remove.onclick = () => {
+          questionControls.splice(index, 1);
+          renderQuestions();
+        };
+        return control.node;
+      }),
+    );
+  };
+  renderQuestions();
   const status = el("p", "prompt");
 
   const save = button(state.isNew ? "Create passage" : "Save passage", "button primary");
@@ -311,7 +328,7 @@ function renderPassageEditor(
         title: title.value.trim(),
         passage_text: passage.value.trim(),
         order_index: Number(order.value) || 0,
-        questions: JSON.parse(questions.value) as AdminReadingPassage["questions"],
+        questions: collectQuestions(questionControls),
       };
       state.selected = state.isNew
         ? await createAdminReadingPassage(token, payload)
@@ -324,11 +341,10 @@ function renderPassageEditor(
     }
   });
 
-  const addTemplate = button("Insert question template", "button");
+  const addTemplate = button("+ Add question", "button");
   addTemplate.addEventListener("click", () => {
-    const current = JSON.parse(questions.value || "[]") as AdminReadingPassage["questions"];
-    current.push(emptyQuestion(current.length));
-    questions.value = JSON.stringify(current, null, 2);
+    questionControls.push(questionBlock(emptyQuestion(questionControls.length)));
+    renderQuestions();
   });
 
   const remove = button("Delete", "button danger-button");
@@ -354,10 +370,86 @@ function renderPassageEditor(
     wordField(title),
     wordField(order),
     wordField(passage),
-    wordField(questions),
+    questionSection(questions),
     actions,
     status,
   );
+}
+
+type QuestionBlock = {
+  node: HTMLElement;
+  title: HTMLElement;
+  prompt: HTMLTextAreaElement;
+  explanation: HTMLInputElement;
+  correct: HTMLInputElement;
+  incorrect: HTMLTextAreaElement;
+  remove: HTMLButtonElement;
+};
+
+function questionBlock(question: AdminReadingQuestion): QuestionBlock {
+  const correctAnswer = question.answers.find((answer) => answer.is_correct);
+  const incorrectAnswers = question.answers
+    .filter((answer) => !answer.is_correct)
+    .sort((first, second) => first.order_index - second.order_index)
+    .map((answer) => answer.answer_text)
+    .join("\n");
+
+  const node = el("div", "admin-question-block");
+  const title = el("h3", "admin-question-title", "Question");
+  const prompt = textarea("Question: main text", question.prompt, 3);
+  const correct = input("Correct answer", correctAnswer?.answer_text ?? "");
+  const incorrect = textarea("Incorrect answers, one per line", incorrectAnswers, 4);
+  const explanation = input("Explanation after answer", question.explanation ?? "");
+  const remove = button("Remove question", "button danger-button");
+
+  node.append(
+    title,
+    wordField(prompt),
+    wordField(correct),
+    wordField(incorrect),
+    wordField(explanation),
+    remove,
+  );
+  return { node, title, prompt, explanation, correct, incorrect, remove };
+}
+
+function questionSection(questions: HTMLElement): HTMLElement {
+  const wrap = el("section", "admin-question-section");
+  wrap.append(el("h3", "admin-section-title", "Questions"), questions);
+  return wrap;
+}
+
+function collectQuestions(blocks: QuestionBlock[]): AdminReadingQuestion[] {
+  return blocks
+    .map((block, index) => {
+      const correct = block.correct.value.trim();
+      const incorrect = block.incorrect.value
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (!block.prompt.value.trim()) {
+        throw new Error(`Question ${index + 1} needs main text.`);
+      }
+      if (!correct) {
+        throw new Error(`Question ${index + 1} needs a correct answer.`);
+      }
+      if (incorrect.length === 0) {
+        throw new Error(`Question ${index + 1} needs at least one incorrect answer.`);
+      }
+      return {
+        prompt: block.prompt.value.trim(),
+        explanation: block.explanation.value.trim() || null,
+        order_index: index,
+        answers: [
+          { answer_text: correct, is_correct: true, order_index: 0 },
+          ...incorrect.map((answer, answerIndex) => ({
+            answer_text: answer,
+            is_correct: false,
+            order_index: answerIndex + 1,
+          })),
+        ],
+      };
+    });
 }
 
 function emptyWord(): AdminWord {

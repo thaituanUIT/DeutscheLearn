@@ -607,6 +607,38 @@ button {
   line-height: 1.45;
 }
 
+.admin-question-section {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-section-title,
+.admin-question-title {
+  margin: 0;
+  color: #202124;
+  font-size: 1rem;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.admin-question-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-question-block {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e0e2dc;
+  border-radius: 8px;
+  background: #fbfbf8;
+}
+
+.admin-question-block .danger-button {
+  justify-self: start;
+}
+
 .button:disabled:hover {
   border-color: #cfd6d8;
   background: #ffffff;
