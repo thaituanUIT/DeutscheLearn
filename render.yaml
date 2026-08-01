@@ -14,6 +14,8 @@ services:
         value: lax
       - key: SEED_ON_STARTUP
         value: "true"
+      - key: ADMIN_TOKEN
+        sync: false
       - key: DATABASE_URL
         fromDatabase:
           name: german-word-quiz-db
