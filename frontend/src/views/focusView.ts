@@ -130,7 +130,6 @@ function renderRevisionQuestion(
     el("div", "question-type", `${question.level} · ${question.topic_label}`),
     el("div", "flashcard-count", `${index + 1} / ${questions.length} · ${score} correct`),
     el("h2", "flashcard-word", shownWord),
-    el("p", "word-meta", question.part_of_speech),
     el("p", "prompt", "Choose the English meaning."),
   );
 
@@ -242,15 +241,13 @@ function topicCard(topic: FocusTopic, onClick: () => void): HTMLButtonElement {
 }
 
 function cardActions(...nodes: HTMLElement[]): HTMLElement {
-  const wrap = el("div", "actions");
+  const wrap = el("div", nodes.length === 1 ? "actions centered-actions" : "actions");
   wrap.append(...nodes);
   return wrap;
 }
 
 function flashcardActions(previous: HTMLElement, next: HTMLElement, quiz: HTMLElement): HTMLElement {
   const wrap = el("div", "actions flashcard-actions");
-  const navigation = el("div", "flashcard-navigation");
-  navigation.append(previous, next);
-  wrap.append(navigation, quiz);
+  wrap.append(previous, next, quiz);
   return wrap;
 }

@@ -412,15 +412,18 @@ button {
   gap: 12px;
 }
 
+.centered-actions {
+  justify-content: center;
+}
+
 .flashcard-actions {
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
 }
 
-.flashcard-navigation {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+.flashcard-actions > :last-child {
+  justify-self: end;
 }
 
 .answer-option,
