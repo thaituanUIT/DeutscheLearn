@@ -452,6 +452,89 @@ button {
   cursor: not-allowed;
 }
 
+.danger-button {
+  border-color: #c95b4d;
+  color: #8e2d23;
+}
+
+.admin-shell {
+  max-width: 1180px;
+}
+
+.admin-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.8fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.admin-list,
+.admin-editor {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.admin-items {
+  max-height: 70vh;
+  display: grid;
+  gap: 8px;
+  overflow: auto;
+}
+
+.admin-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e0e2dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #202124;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-item span {
+  color: #687078;
+  font-size: 0.88rem;
+}
+
+.admin-field {
+  display: grid;
+  gap: 6px;
+  color: #4d555e;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.admin-input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #cfd6d8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #202124;
+  font: inherit;
+}
+
+.admin-textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+
 .button:disabled:hover {
   border-color: #cfd6d8;
   background: #ffffff;
@@ -622,5 +705,13 @@ button {
 
   .answers {
     grid-template-columns: 1fr;
+  }
+
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-items {
+    max-height: none;
   }
 }
