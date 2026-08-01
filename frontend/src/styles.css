@@ -307,7 +307,7 @@ button {
 }
 
 .flashcard {
-  min-height: 280px;
+  min-height: 340px;
   display: grid;
   align-content: center;
   gap: 12px;
@@ -321,10 +321,14 @@ button {
 }
 
 .flashcard-word {
+  min-height: 2.45em;
+  display: grid;
+  place-items: center;
   margin: 0;
-  font-size: clamp(2rem, 8vw, 4.6rem);
-  line-height: 1;
+  font-size: clamp(2rem, 5vw, 3.8rem);
+  line-height: 1.12;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .stats {
@@ -403,6 +407,17 @@ button {
 }
 
 .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.flashcard-actions {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flashcard-navigation {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;

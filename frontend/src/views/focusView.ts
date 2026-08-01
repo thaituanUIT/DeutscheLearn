@@ -217,7 +217,7 @@ function renderFlashcard(
   next.disabled = index === cards.length - 1;
   next.addEventListener("click", () => renderFlashcard(section, cards, index + 1, level, topic, options));
 
-  section.append(content, cardActions(previous, quiz, next));
+  section.append(content, flashcardActions(previous, next, quiz));
 }
 
 function levelCard(level: FocusLevel, onClick: () => void): HTMLButtonElement {
@@ -244,5 +244,13 @@ function topicCard(topic: FocusTopic, onClick: () => void): HTMLButtonElement {
 function cardActions(...nodes: HTMLElement[]): HTMLElement {
   const wrap = el("div", "actions");
   wrap.append(...nodes);
+  return wrap;
+}
+
+function flashcardActions(previous: HTMLElement, next: HTMLElement, quiz: HTMLElement): HTMLElement {
+  const wrap = el("div", "actions flashcard-actions");
+  const navigation = el("div", "flashcard-navigation");
+  navigation.append(previous, next);
+  wrap.append(navigation, quiz);
   return wrap;
 }
