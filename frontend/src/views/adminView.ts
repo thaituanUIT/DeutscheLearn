@@ -6,6 +6,7 @@ import {
   getAdminReadingPassage,
   getAdminReadingPassages,
   getAdminWords,
+  getFocusTopicAliases,
   updateAdminReadingPassage,
   updateAdminWord,
 } from "../api/client";
@@ -15,6 +16,7 @@ import type {
   AdminReadingQuestion,
   AdminReadingPassageSummary,
   AdminWord,
+  FocusTopicAlias,
 } from "../api/types";
 import { button } from "../components/button";
 import { clear, el } from "../utils/dom";
@@ -213,7 +215,7 @@ function renderWordEditor(
     wordField(article),
     wordField(partOfSpeech),
     wordField(meaning),
-    wordField(focusEntries),
+    focusEntriesField(focusEntries),
     actions,
     status,
   );
@@ -532,6 +534,60 @@ function wordField(control: HTMLElement): HTMLElement {
   const label = control.getAttribute("placeholder") ?? "Level";
   wrap.append(el("span", "", label), control);
   return wrap;
+}
+
+function focusEntriesField(control: HTMLTextAreaElement): HTMLElement {
+  const wrap = el("label", "admin-field");
+  const header = el("span", "admin-field-header");
+  const topics = button("Topics", "button compact-button");
+  topics.type = "button";
+  topics.addEventListener("click", async (event) => {
+    event.preventDefault();
+    const modal = topicAliasModal();
+    document.body.append(modal.overlay);
+    try {
+      modal.render(await getFocusTopicAliases());
+    } catch (error) {
+      modal.body.replaceChildren(adminError(error));
+    }
+  });
+  header.append(el("span", "", control.getAttribute("placeholder") ?? "Focus entries"), topics);
+  wrap.append(header, control);
+  return wrap;
+}
+
+function topicAliasModal(): {
+  overlay: HTMLElement;
+  body: HTMLElement;
+  render: (topics: FocusTopicAlias[]) => void;
+} {
+  const overlay = el("div", "modal-overlay");
+  const dialog = el("section", "modal-dialog topic-modal");
+  const body = el("div", "topic-alias-list");
+  body.append(el("p", "prompt", "Loading topics..."));
+  const close = button("Close", "button");
+  close.type = "button";
+  const dismiss = (): void => overlay.remove();
+  close.addEventListener("click", dismiss);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) dismiss();
+  });
+
+  const render = (topics: FocusTopicAlias[]): void => {
+    body.replaceChildren(
+      ...topics.map((topic) => {
+        const row = el("div", "topic-alias-row");
+        row.append(el("strong", "", topic.label), el("code", "", topic.topic));
+        return row;
+      }),
+    );
+  };
+
+  const header = el("div", "modal-header");
+  header.append(el("h3", "admin-section-title", "Current topics"), close);
+  dialog.append(header, body);
+  overlay.append(dialog);
+  return { overlay, body, render };
 }
 
 function parseFocusEntries(value: string): AdminFocusEntry[] {

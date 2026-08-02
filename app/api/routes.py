@@ -34,6 +34,7 @@ from app.schemas import (
     EndlessStartOut,
     FocusCardOut,
     FocusLevelOut,
+    FocusTopicAliasOut,
     FocusRevisionQuestionOut,
     FocusTopicOut,
     LeaderboardEntry,
@@ -122,6 +123,14 @@ def focus_topics(
     db: Session = Depends(get_db),
 ) -> list[FocusTopicOut]:
     return [FocusTopicOut(**topic) for topic in get_focus_topics(db, level)]
+
+
+@router.get("/focus/topic-aliases", response_model=list[FocusTopicAliasOut])
+def focus_topic_aliases() -> list[FocusTopicAliasOut]:
+    return [
+        FocusTopicAliasOut(topic=topic, label=label)
+        for topic, label in sorted(TOPIC_LABELS.items())
+    ]
 
 
 @router.get("/focus/cards", response_model=list[FocusCardOut])

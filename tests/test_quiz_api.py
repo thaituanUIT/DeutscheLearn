@@ -569,6 +569,17 @@ def test_focus_topics_are_filtered_by_level() -> None:
         assert {"topic": "work_career", "label": "Work & Career", "word_count": 10} not in topics
 
 
+def test_focus_topic_aliases_return_allowed_topic_keys() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/focus/topic-aliases")
+
+        assert response.status_code == 200
+        topics = response.json()
+        assert {"topic": "food_drink", "label": "Food & Drink"} in topics
+        assert {"topic": "travel_transport", "label": "Travel & Transport"} in topics
+        assert all("word_count" not in topic for topic in topics)
+
+
 def test_focus_cards_are_filtered_by_level_and_topic() -> None:
     with TestClient(app) as client:
         response = client.get("/api/focus/cards?level=A1&topic=food_drink")

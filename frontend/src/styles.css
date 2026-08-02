@@ -653,6 +653,12 @@ button {
   cursor: not-allowed;
 }
 
+.compact-button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.86rem;
+}
+
 .danger-button {
   border-color: #c95b4d;
   color: #8e2d23;
@@ -718,6 +724,13 @@ button {
   color: #4d555e;
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.admin-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .admin-input {
@@ -793,6 +806,66 @@ button {
 
 .admin-question-block .danger-button {
   justify-self: start;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(32, 33, 36, 0.42);
+}
+
+.modal-dialog {
+  width: min(560px, 100%);
+  max-height: min(720px, calc(100vh - 36px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #d8ded8;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(32, 33, 36, 0.22);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.topic-alias-list {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.topic-alias-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf0ec;
+}
+
+.topic-alias-row:last-child {
+  border-bottom: 0;
+}
+
+.topic-alias-row code {
+  justify-self: end;
+  padding: 4px 7px;
+  border: 1px solid #dde4e2;
+  border-radius: 6px;
+  background: #f6f7f4;
+  color: #244d43;
+  font-size: 0.88rem;
 }
 
 .button:disabled:hover {

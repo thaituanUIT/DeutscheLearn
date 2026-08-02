@@ -81,6 +81,11 @@ export type FocusTopic = {
   word_count: number;
 };
 
+export type FocusTopicAlias = {
+  topic: string;
+  label: string;
+};
+
 export type FocusCard = {
   word: string;
   article: string | null;

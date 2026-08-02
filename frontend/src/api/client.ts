@@ -8,6 +8,7 @@ import type {
   FocusLevel,
   FocusRevisionQuestion,
   FocusTopic,
+  FocusTopicAlias,
   LeaderboardEntry,
   Player,
   PracticeAnswer,
@@ -154,6 +155,10 @@ export function getFocusLevels(): Promise<FocusLevel[]> {
 
 export function getFocusTopics(level: string): Promise<FocusTopic[]> {
   return request<FocusTopic[]>(`/api/focus/topics?level=${encodeURIComponent(level)}`);
+}
+
+export function getFocusTopicAliases(): Promise<FocusTopicAlias[]> {
+  return request<FocusTopicAlias[]>("/api/focus/topic-aliases");
 }
 
 export function getFocusCards(level: string, topic: string): Promise<FocusCard[]> {

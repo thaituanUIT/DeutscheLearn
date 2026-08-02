@@ -90,6 +90,11 @@ class FocusTopicOut(BaseModel):
     word_count: int
 
 
+class FocusTopicAliasOut(BaseModel):
+    topic: str
+    label: str
+
+
 class FocusCardOut(BaseModel):
     word: str
     article: str | None
