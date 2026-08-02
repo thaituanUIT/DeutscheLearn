@@ -26,6 +26,7 @@ export function storyView(options: StoryViewOptions): HTMLElement {
 }
 
 async function renderStoryLevels(section: HTMLElement, options: StoryViewOptions): Promise<void> {
+  section.className = "panel story-card";
   options.onBackChange(options.onBack);
   section.replaceChildren(el("p", "prompt", "Loading story levels..."));
   try {
@@ -52,6 +53,7 @@ async function renderStoryPassages(
   level: StoryLevel["level"],
   options: StoryViewOptions,
 ): Promise<void> {
+  section.className = "panel story-card";
   options.onBackChange(() => renderStoryLevels(section, options));
   section.replaceChildren(el("p", "prompt", "Loading stories..."));
   try {
@@ -83,6 +85,7 @@ async function renderStoryReader(
   level: StoryLevel["level"],
   options: StoryViewOptions,
 ): Promise<void> {
+  section.className = "panel story-card story-reader-card";
   options.onBackChange(() => renderStoryPassages(section, level, options));
   section.replaceChildren(el("p", "prompt", "Loading story..."));
   try {

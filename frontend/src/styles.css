@@ -257,12 +257,17 @@ button {
 }
 
 .story-card {
+  min-height: 410px;
+  display: grid;
+  align-content: start;
+  gap: 20px;
+}
+
+.story-reader-card {
   height: calc(100vh - 132px);
   min-height: 520px;
-  display: grid;
   grid-template-rows: minmax(0, 1fr);
   align-content: stretch;
-  gap: 20px;
 }
 
 .focus-title {
@@ -387,16 +392,9 @@ button {
 .story-practice-layout .story-passage {
   min-width: 0;
   max-height: 100%;
+  grid-template-rows: auto auto minmax(0, 1fr);
   padding-right: 4px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.story-practice-layout .story-passage::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  overflow: hidden;
 }
 
 .story-practice-layout .story-title {
@@ -405,6 +403,16 @@ button {
 
 .story-practice-layout .story-text {
   max-width: none;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.story-practice-layout .story-text::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .story-question-panel {
@@ -929,7 +937,7 @@ button {
     min-height: 380px;
   }
 
-  .story-card {
+  .story-reader-card {
     height: auto;
     min-height: 410px;
   }
@@ -962,6 +970,10 @@ button {
 
   .story-practice-layout .story-passage {
     max-height: none;
+    overflow: visible;
+  }
+
+  .story-practice-layout .story-text {
     overflow: visible;
   }
 
