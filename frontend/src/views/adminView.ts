@@ -362,7 +362,7 @@ function renderPassageEditor(
   });
 
   const actions = el("div", "actions");
-  actions.append(save, addTemplate, remove);
+  actions.append(save, remove);
   host.replaceChildren(
     el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title),
     wordField(level),
@@ -370,7 +370,7 @@ function renderPassageEditor(
     wordField(title),
     wordField(order),
     wordField(passage),
-    questionSection(questions),
+    questionSection(questions, addTemplate),
     actions,
     status,
   );
@@ -396,7 +396,7 @@ function questionBlock(question: AdminReadingQuestion): QuestionBlock {
 
   const node = el("div", "admin-question-block");
   const title = el("h3", "admin-question-title", "Question");
-  const prompt = textarea("Question: main text", question.prompt, 3);
+  const prompt = textarea("Main text", question.prompt, 3);
   const correct = input("Correct answer", correctAnswer?.answer_text ?? "");
   const incorrect = textarea("Incorrect answers, one per line", incorrectAnswers, 4);
   const explanation = input("Explanation after answer", question.explanation ?? "");
@@ -413,9 +413,11 @@ function questionBlock(question: AdminReadingQuestion): QuestionBlock {
   return { node, title, prompt, explanation, correct, incorrect, remove };
 }
 
-function questionSection(questions: HTMLElement): HTMLElement {
+function questionSection(questions: HTMLElement, addButton: HTMLButtonElement): HTMLElement {
   const wrap = el("section", "admin-question-section");
-  wrap.append(el("h3", "admin-section-title", "Questions"), questions);
+  const header = el("div", "admin-question-header");
+  header.append(el("h3", "admin-section-title", "Questions"), addButton);
+  wrap.append(header, questions);
   return wrap;
 }
 

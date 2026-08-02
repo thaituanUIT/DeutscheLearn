@@ -370,6 +370,7 @@ button {
   color: #202124;
   font-size: 1.16rem;
   line-height: 1.72;
+  white-space: pre-wrap;
 }
 
 .story-question {
@@ -609,6 +610,13 @@ button {
 
 .admin-question-section {
   display: grid;
+  gap: 12px;
+}
+
+.admin-question-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
