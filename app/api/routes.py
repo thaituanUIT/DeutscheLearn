@@ -52,6 +52,7 @@ from app.schemas import (
     WordOfDayOut,
 )
 from app.services.focus import (
+    TOPIC_LABELS,
     get_focus_cards,
     get_focus_levels,
     get_focus_revision_questions,
@@ -215,6 +216,7 @@ def admin_create_word(payload: AdminWordIn, db: Session = Depends(get_db)) -> Ad
     word_key = payload.word.strip()
     if db.get(CachedWord, word_key) is not None:
         raise HTTPException(status_code=409, detail="Word already exists")
+    _validate_focus_entries(payload.focus_entries)
     word = CachedWord(
         word=word_key,
         article=_clean_optional_text(payload.article),
@@ -242,6 +244,7 @@ def admin_update_word(
     word = db.get(CachedWord, word_key)
     if word is None:
         raise HTTPException(status_code=404, detail="Word not found")
+    _validate_focus_entries(payload.focus_entries)
     word.article = _clean_optional_text(payload.article)
     word.part_of_speech = payload.part_of_speech.strip()
     word.meaning = payload.meaning.strip()
@@ -715,6 +718,18 @@ def _replace_focus_entries(
             continue
         seen.add(key)
         db.add(FocusWordEntry(word=word, level=entry.level, topic=key[1]))
+
+
+def _validate_focus_entries(entries: list) -> None:
+    valid_topics = set(TOPIC_LABELS)
+    invalid_topics = sorted(
+        {entry.topic.strip() for entry in entries if entry.topic.strip() not in valid_topics}
+    )
+    if invalid_topics:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown focus topic: {', '.join(invalid_topics)}",
+        )
 
 
 def _get_reading_passage(db: Session, passage_id: str) -> ReadingPassage:

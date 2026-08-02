@@ -45,7 +45,7 @@ function draw(
   const header = el("header", "topbar");
   const headerStart = el("div", "header-start");
   const playerNode = el("div", "player");
-  playerNode.append(el("span", "muted", "Anonymous player"), el("strong", "", player.display_name));
+  playerNode.append(el("span", "muted", "Anonymous learner"), el("strong", "", player.display_name));
   header.append(headerStart, playerNode);
 
   const layout = el("div", "layout");

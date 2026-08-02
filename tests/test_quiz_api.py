@@ -10,6 +10,7 @@ from app.core.time import utc_now
 from app.db.models import (
     AnonymousPlayer,
     CachedWord,
+    FocusWordEntry,
     QuizAttempt,
     QuizAttemptQuestion,
     ReadingAnswer,
@@ -70,11 +71,11 @@ def test_admin_word_crud(monkeypatch: pytest.MonkeyPatch) -> None:
                 "article": "das",
                 "part_of_speech": "noun",
                 "meaning": "A word managed from the admin interface.",
-                "focus_entries": [{"level": "A1", "topic": "admin_topic"}],
+                "focus_entries": [{"level": "A1", "topic": "food_drink"}],
             },
         )
         assert created.status_code == 200
-        assert created.json()["focus_entries"][0]["topic"] == "admin_topic"
+        assert created.json()["focus_entries"][0]["topic"] == "food_drink"
 
         updated = client.patch(
             f"/api/admin/words/{word}",
@@ -83,7 +84,7 @@ def test_admin_word_crud(monkeypatch: pytest.MonkeyPatch) -> None:
                 "article": None,
                 "part_of_speech": "verb",
                 "meaning": "Updated meaning.",
-                "focus_entries": [{"level": "A2", "topic": "updated_topic"}],
+                "focus_entries": [{"level": "A2", "topic": "travel_transport"}],
             },
         )
         assert updated.status_code == 200
@@ -92,6 +93,82 @@ def test_admin_word_crud(monkeypatch: pytest.MonkeyPatch) -> None:
 
         deleted = client.delete(f"/api/admin/words/{word}", headers=headers)
         assert deleted.status_code == 204
+
+
+def test_admin_word_rejects_unknown_focus_topic(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    word = f"InvalidTopic-{uuid4()}"
+    headers = {"Authorization": "Bearer secret"}
+
+    with TestClient(app) as client:
+        rejected = client.post(
+            "/api/admin/words",
+            headers=headers,
+            json={
+                "word": word,
+                "article": "das",
+                "part_of_speech": "noun",
+                "meaning": "A word with an invalid focus topic.",
+                "focus_entries": [{"level": "A1", "topic": "food_drinks"}],
+            },
+        )
+
+        assert rejected.status_code == 422
+        assert "Unknown focus topic: food_drinks" in rejected.json()["detail"]
+
+    db = SessionLocal()
+    try:
+        assert db.get(CachedWord, word) is None
+        assert (
+            db.query(FocusWordEntry)
+            .filter(FocusWordEntry.word == word, FocusWordEntry.topic == "food_drinks")
+            .first()
+            is None
+        )
+    finally:
+        db.close()
+
+
+def test_admin_word_rejects_unknown_focus_topic_without_replacing_existing_entries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    word = f"PreserveTopic-{uuid4()}"
+    headers = {"Authorization": "Bearer secret"}
+
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/admin/words",
+            headers=headers,
+            json={
+                "word": word,
+                "article": "das",
+                "part_of_speech": "noun",
+                "meaning": "A word with a valid existing focus topic.",
+                "focus_entries": [{"level": "A1", "topic": "food_drink"}],
+            },
+        )
+        assert created.status_code == 200
+
+        rejected = client.patch(
+            f"/api/admin/words/{word}",
+            headers=headers,
+            json={
+                "article": "das",
+                "part_of_speech": "noun",
+                "meaning": "This update should be rejected.",
+                "focus_entries": [{"level": "A1", "topic": "food_drinks"}],
+            },
+        )
+
+        assert rejected.status_code == 422
+
+    db = SessionLocal()
+    try:
+        entries = db.query(FocusWordEntry).filter(FocusWordEntry.word == word).all()
+        assert [(entry.level, entry.topic) for entry in entries] == [("A1", "food_drink")]
+    finally:
+        db.close()
 
 
 def test_admin_reading_passage_crud(monkeypatch: pytest.MonkeyPatch) -> None:
