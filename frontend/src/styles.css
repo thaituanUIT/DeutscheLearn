@@ -386,6 +386,13 @@ button {
   padding-right: 4px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.story-practice-layout .story-passage::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .story-practice-layout .story-title {
@@ -401,6 +408,13 @@ button {
   display: grid;
   gap: 16px;
   align-content: start;
+}
+
+.story-question-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .story-question {
@@ -420,6 +434,29 @@ button {
 .story-explanation {
   max-width: 64ch;
   font-weight: 600;
+}
+
+.story-feedback {
+  display: grid;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.answer-option.selected-answer {
+  border-color: #33658a;
+  background: #eaf3f6;
+}
+
+.answer-option.correct-answer,
+.answer-option.correct-answer:disabled:hover {
+  border-color: #2f6f5e;
+  background: #edf7f3;
+}
+
+.answer-option.wrong-answer,
+.answer-option.wrong-answer:disabled:hover {
+  border-color: #c95b4d;
+  background: #fff1ed;
 }
 
 .stats {
@@ -868,6 +905,10 @@ button {
   .story-practice-layout .story-passage {
     max-height: none;
     overflow: visible;
+  }
+
+  .story-question-controls {
+    grid-template-columns: 1fr;
   }
 
   .focus-option {
