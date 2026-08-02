@@ -13,7 +13,6 @@ import type {
   QuizQuestion,
   TimedStart,
 } from "../api/types";
-import { answerOption } from "../components/answerOption";
 import { button } from "../components/button";
 import { scoreBadge } from "../components/scoreBadge";
 import { advanceQuestion, finishAttempt, getQuizState, startAttempt } from "../state/quizStore";
@@ -86,11 +85,11 @@ function renderQuestion(
 
   const answers = el("div", "answers");
   for (const choice of question.choices) {
-    answers.append(
-      answerOption(choice, async () => {
-        await handleAnswer(choice, section, options);
-      }),
-    );
+    const option = button(choice, "answer-option");
+    option.addEventListener("click", async () => {
+      await handleAnswer(choice, section, options);
+    });
+    answers.append(option);
   }
 
   section.append(stats(options), questionBlock, answers);

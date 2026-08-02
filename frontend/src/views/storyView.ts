@@ -120,7 +120,6 @@ function renderStoryPractice(
 
   const content = el("div", "story-question");
   content.append(
-    el("div", "question-type", `${session.passage.level} · ${session.index + 1} / ${session.passage.questions.length}`),
     el("h2", "focus-title", question.prompt),
     el(
       "p",

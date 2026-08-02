@@ -56,7 +56,6 @@ export function homeView(options: HomeViewOptions): HTMLElement {
   const section = el("section", "home");
   const intro = el("div", "home-intro");
   intro.append(
-    el("div", "question-type", "Choose mode"),
     el("h2", "", "What do you want to do?"),
     el("p", "prompt", "Pick a quiz mode or study by topic."),
   );
