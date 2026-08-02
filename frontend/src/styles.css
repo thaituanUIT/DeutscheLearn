@@ -257,9 +257,11 @@ button {
 }
 
 .story-card {
-  min-height: 410px;
+  height: calc(100vh - 132px);
+  min-height: 520px;
   display: grid;
-  align-content: start;
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
   gap: 20px;
 }
 
@@ -374,6 +376,8 @@ button {
 }
 
 .story-practice-layout {
+  min-height: 0;
+  height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.92fr);
   gap: 22px;
@@ -382,7 +386,7 @@ button {
 
 .story-practice-layout .story-passage {
   min-width: 0;
-  max-height: min(66vh, 720px);
+  max-height: 100%;
   padding-right: 4px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -405,10 +409,25 @@ button {
 
 .story-question-panel {
   min-width: 0;
-  max-height: min(66vh, 720px);
+  max-height: 100%;
   display: grid;
-  gap: 18px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
   align-content: start;
+  overflow: hidden;
+}
+
+.story-question-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.story-question-list {
+  min-height: 0;
+  display: grid;
+  gap: 12px;
   padding-right: 4px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -416,16 +435,9 @@ button {
   -ms-overflow-style: none;
 }
 
-.story-question-panel::-webkit-scrollbar {
+.story-question-list::-webkit-scrollbar {
   width: 0;
   height: 0;
-}
-
-.story-question-controls {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-bottom: 2px;
 }
 
 .story-question-summary,
@@ -917,6 +929,11 @@ button {
     min-height: 380px;
   }
 
+  .story-card {
+    height: auto;
+    min-height: 410px;
+  }
+
   .mode-grid {
     grid-template-columns: 1fr;
   }
@@ -950,6 +967,10 @@ button {
 
   .story-question-panel {
     max-height: none;
+    overflow: visible;
+  }
+
+  .story-question-list {
     overflow: visible;
   }
 
