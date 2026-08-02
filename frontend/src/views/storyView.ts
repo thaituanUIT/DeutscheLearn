@@ -131,7 +131,9 @@ function renderStoryQuestion(
     answers.append(option);
   }
 
-  section.replaceChildren(storyContent(session.passage), content, answers);
+  const panel = el("div", "story-question-panel");
+  panel.append(content, answers);
+  section.replaceChildren(storyPracticeLayout(session.passage, panel));
 }
 
 function renderStoryFeedback(
@@ -160,7 +162,9 @@ function renderStoryFeedback(
 
   const next = button(nextSession.index >= session.passage.questions.length ? "Finish" : "Next", "button primary");
   next.addEventListener("click", () => renderStoryQuestion(section, nextSession, options));
-  section.replaceChildren(storyContent(session.passage), content, centeredActions(next));
+  const panel = el("div", "story-question-panel");
+  panel.append(content, centeredActions(next));
+  section.replaceChildren(storyPracticeLayout(session.passage, panel));
 }
 
 function renderStoryResult(
@@ -191,6 +195,12 @@ function storyContent(passage: StoryPassage): HTMLElement {
     el("p", "story-text", passage.passage_text),
   );
   return content;
+}
+
+function storyPracticeLayout(passage: StoryPassage, questionPanel: HTMLElement): HTMLElement {
+  const layout = el("div", "story-practice-layout");
+  layout.append(storyContent(passage), questionPanel);
+  return layout;
 }
 
 function levelCard(level: StoryLevel, onClick: () => void): HTMLButtonElement {
