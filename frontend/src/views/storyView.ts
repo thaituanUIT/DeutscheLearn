@@ -11,7 +11,6 @@ type StoryViewOptions = {
 
 type StorySession = {
   passage: StoryPassage;
-  index: number;
   selections: Record<string, string>;
   results: Record<string, StoryQuestionResult> | null;
 };
@@ -88,7 +87,7 @@ async function renderStoryReader(
   section.replaceChildren(el("p", "prompt", "Loading story..."));
   try {
     const passage = await getStoryPassage(passageId);
-    renderStoryPractice(section, { passage, index: 0, selections: {}, results: null }, options);
+    renderStoryPractice(section, { passage, selections: {}, results: null }, options);
   } catch (error) {
     options.onError(error instanceof Error ? error.message : "Could not load story");
   }
@@ -99,8 +98,7 @@ function renderStoryPractice(
   session: StorySession,
   options: StoryViewOptions,
 ): void {
-  const question = session.passage.questions[session.index];
-  if (!question) {
+  if (session.passage.questions.length === 0) {
     const empty = el("div", "story-question-panel");
     empty.append(
       el("div", "question-type", "Reading"),
@@ -112,15 +110,15 @@ function renderStoryPractice(
   }
 
   const isReviewed = session.results !== null;
-  const selectedAnswerId = session.selections[question.id];
   const answeredCount = Object.keys(session.selections).length;
   const score = session.results
     ? Object.values(session.results).filter((result) => result.correct).length
     : 0;
 
-  const content = el("div", "story-question");
-  content.append(
-    el("h2", "focus-title", question.prompt),
+  const panel = el("div", "story-question-panel");
+  const summary = el("div", "story-question-summary");
+  summary.append(
+    el("h2", "focus-title", "Questions"),
     el(
       "p",
       "story-score",
@@ -129,57 +127,54 @@ function renderStoryPractice(
         : `${answeredCount} / ${session.passage.questions.length} answered`,
     ),
   );
+  panel.append(summary);
 
-  const answers = el("div", "answers revision-answers");
-  for (const answer of question.answers) {
+  const questions = el("div", "story-question-list");
+  for (const [index, question] of session.passage.questions.entries()) {
+    const selectedAnswerId = session.selections[question.id];
     const result = session.results?.[question.id];
-    const classes = ["answer-option"];
-    if (answer.id === selectedAnswerId) classes.push("selected-answer");
-    if (result && answer.id === result.correct_answer_id) classes.push("correct-answer");
-    if (result && answer.id === result.selected_answer_id && !result.correct) classes.push("wrong-answer");
-    const option = button(answer.answer_text, classes.join(" "));
-    option.disabled = isReviewed;
-    option.addEventListener("click", () => {
-      session.selections[question.id] = answer.id;
-      renderStoryPractice(section, session, options);
-    });
-    answers.append(option);
-  }
-
-  const result = session.results?.[question.id];
-  if (result) {
-    const feedback = el("div", "story-feedback");
-    feedback.append(
-      el("div", "question-type", result.correct ? "Correct" : "Review"),
-      el("p", "meaning-overview", result.correct_answer_text),
+    const block = el("div", "story-question-block");
+    block.append(
+      el("div", "question-type", `Question ${index + 1}`),
+      el("h3", "story-question-title", question.prompt),
     );
-    if (result.explanation) {
-      feedback.append(el("p", "story-explanation", result.explanation));
+
+    const answers = el("div", "story-answer-list");
+    for (const answer of question.answers) {
+      const classes = ["answer-option"];
+      if (answer.id === selectedAnswerId) classes.push("selected-answer");
+      if (result && answer.id === result.correct_answer_id) classes.push("correct-answer");
+      if (result && answer.id === result.selected_answer_id && !result.correct) classes.push("wrong-answer");
+      const option = button(answer.answer_text, classes.join(" "));
+      option.disabled = isReviewed;
+      option.addEventListener("click", () => {
+        session.selections[question.id] = answer.id;
+        renderStoryPractice(section, session, options);
+      });
+      answers.append(option);
     }
-    content.append(feedback);
+    block.append(answers);
+
+    if (result) {
+      const feedback = el("div", "story-feedback");
+      feedback.append(
+        el("div", "question-type", result.correct ? "Correct" : "Review"),
+        el("p", "story-review-answer", result.correct_answer_text),
+      );
+      block.append(feedback);
+      if (result.explanation) {
+        block.append(el("p", "story-explanation", result.explanation));
+      }
+    }
+    questions.append(block);
   }
-
-  const previous = button("Previous", "button");
-  previous.disabled = session.index === 0;
-  previous.addEventListener("click", () => {
-    session.index -= 1;
-    renderStoryPractice(section, session, options);
-  });
-
-  const next = button("Next", "button");
-  next.disabled = session.index >= session.passage.questions.length - 1;
-  next.addEventListener("click", () => {
-    session.index += 1;
-    renderStoryPractice(section, session, options);
-  });
+  panel.append(questions);
 
   const controls = el("div", "story-question-controls");
-  controls.append(previous, next);
-
   if (isReviewed) {
     const retry = button("Try again", "button primary");
     retry.addEventListener("click", () =>
-      renderStoryPractice(section, { passage: session.passage, index: 0, selections: {}, results: null }, options),
+      renderStoryPractice(section, { passage: session.passage, selections: {}, results: null }, options),
     );
     controls.append(retry);
   } else {
@@ -206,9 +201,7 @@ function renderStoryPractice(
     });
     controls.append(submit);
   }
-
-  const panel = el("div", "story-question-panel");
-  panel.append(content, answers, controls);
+  panel.append(controls);
   section.replaceChildren(storyPracticeLayout(session.passage, panel));
 }
 

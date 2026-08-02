@@ -405,22 +405,55 @@ button {
 
 .story-question-panel {
   min-width: 0;
+  max-height: min(66vh, 720px);
   display: grid;
-  gap: 16px;
+  gap: 18px;
   align-content: start;
+  padding-right: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.story-question-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .story-question-controls {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  display: flex;
+  justify-content: flex-end;
   gap: 10px;
-  align-items: center;
+  padding-bottom: 2px;
 }
 
-.story-question {
+.story-question-summary,
+.story-question-block {
+  display: grid;
+  gap: 12px;
+}
+
+.story-question-block {
+  padding-bottom: 18px;
+  border-bottom: 1px solid #edf0ec;
+}
+
+.story-question-block:last-child {
+  border-bottom: 0;
+}
+
+.story-question-title {
+  margin: 0;
+  color: #202124;
+  font-size: 1.08rem;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.story-answer-list {
   display: grid;
   gap: 10px;
-  padding-top: 4px;
 }
 
 .story-score,
@@ -440,6 +473,14 @@ button {
   display: grid;
   gap: 8px;
   padding-top: 6px;
+}
+
+.story-review-answer {
+  margin: 0;
+  color: #202124;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  font-weight: 800;
 }
 
 .answer-option.selected-answer {
@@ -907,8 +948,13 @@ button {
     overflow: visible;
   }
 
-  .story-question-controls {
-    grid-template-columns: 1fr;
+  .story-question-panel {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .story-question-controls .button {
+    width: 100%;
   }
 
   .focus-option {
