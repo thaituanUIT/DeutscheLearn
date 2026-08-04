@@ -9,6 +9,10 @@ import { leaderboardView, wordOfDayView } from "./leaderboardView";
 import { quizView } from "./quizView";
 import { storyView } from "./storyView";
 
+type AppRoute = HomeMode | "home";
+
+const appRoutes = new Set<AppRoute>(["home", "endless", "practice", "timed", "focus", "story"]);
+
 export async function renderApp(root: HTMLElement): Promise<void> {
   clear(root);
   root.append(el("div", "shell", "Loading..."));
@@ -56,7 +60,8 @@ function draw(
     leaderboardHost.replaceChildren(leaderboardView(leaderboard));
   };
 
-  const showHome = (): void => {
+  const showHome = (syncRoute = true): void => {
+    if (syncRoute) writeRoute("home");
     headerStart.replaceChildren(el("h1", "brand", "German Word Quiz"));
     mainHost.replaceChildren(homeView({ onSelectMode: showMode }));
   };
@@ -67,7 +72,8 @@ function draw(
     headerStart.replaceChildren(back);
   };
 
-  const showMode = (mode: HomeMode): void => {
+  const showMode = (mode: HomeMode, syncRoute = true): void => {
+    if (syncRoute) writeRoute(mode);
     renderHeaderBack(showHome);
     if (mode === "focus") {
       mainHost.replaceChildren(
@@ -115,10 +121,34 @@ function draw(
   };
 
   renderLeaderboard();
-  showHome();
+  const renderRoute = (): void => {
+    const route = readRoute();
+    if (route === "home") {
+      showHome(false);
+      return;
+    }
+    showMode(route, false);
+  };
+
+  window.addEventListener("hashchange", renderRoute);
+  window.addEventListener("popstate", renderRoute);
+  renderRoute();
   sidebar.replaceChildren(wordOfDayView(wordOfDay), leaderboardHost);
   layout.replaceChildren(mainHost, sidebar);
   shell.replaceChildren(header, layout);
   clear(root);
   root.append(shell);
+}
+
+function readRoute(): AppRoute {
+  const hashRoute = window.location.hash.replace(/^#/, "");
+  if (appRoutes.has(hashRoute as AppRoute)) return hashRoute as AppRoute;
+  return "home";
+}
+
+function writeRoute(route: AppRoute): void {
+  const nextHash = route === "home" ? "" : `#${route}`;
+  const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`;
+  if (window.location.hash === nextHash) return;
+  window.history.pushState({}, "", nextUrl);
 }
