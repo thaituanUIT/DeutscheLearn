@@ -19,6 +19,7 @@ from app.db.models import (
 )
 from app.db.session import SessionLocal
 from app.main import app
+from app.services.focus import import_focus_words
 from app.services.quiz import question_to_schema
 from app.services.words import get_meaning_overview
 
@@ -167,6 +168,46 @@ def test_admin_word_rejects_unknown_focus_topic_without_replacing_existing_entri
     try:
         entries = db.query(FocusWordEntry).filter(FocusWordEntry.word == word).all()
         assert [(entry.level, entry.topic) for entry in entries] == [("A1", "food_drink")]
+    finally:
+        db.close()
+
+
+def test_focus_seed_import_preserves_admin_focus_entries(tmp_path) -> None:
+    admin_word = f"AdminSeed-{uuid4()}"
+    csv_word = f"CsvSeed-{uuid4()}"
+    csv_path = tmp_path / "focus_words.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "word,topic,level,article,part_of_speech,meaning",
+                f"{csv_word},food_drink,A1,das,noun,A word from the seed file.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    db = SessionLocal()
+    try:
+        db.add(
+            CachedWord(
+                word=admin_word,
+                article="das",
+                part_of_speech="noun",
+                meaning="A word created through the admin interface.",
+            )
+        )
+        db.flush()
+        db.add(FocusWordEntry(word=admin_word, level="A2", topic="travel_transport"))
+        db.commit()
+
+        import_focus_words(db, csv_path)
+
+        admin_entries = db.query(FocusWordEntry).filter(FocusWordEntry.word == admin_word).all()
+        csv_entries = db.query(FocusWordEntry).filter(FocusWordEntry.word == csv_word).all()
+        assert [(entry.level, entry.topic) for entry in admin_entries] == [
+            ("A2", "travel_transport")
+        ]
+        assert [(entry.level, entry.topic) for entry in csv_entries] == [("A1", "food_drink")]
     finally:
         db.close()
 
@@ -551,12 +592,15 @@ def test_focus_levels_are_loaded_from_csv() -> None:
 
         assert response.status_code == 200
         body = response.json()
-        assert body == [
-            {"level": "A1", "word_count": 82, "topic_count": 6},
-            {"level": "A2", "word_count": 72, "topic_count": 5},
-            {"level": "B1", "word_count": 68, "topic_count": 5},
-            {"level": "B2", "word_count": 32, "topic_count": 2},
-        ]
+        counts_by_level = {level["level"]: level for level in body}
+        assert counts_by_level["A1"]["word_count"] >= 82
+        assert counts_by_level["A1"]["topic_count"] >= 6
+        assert counts_by_level["A2"]["word_count"] >= 72
+        assert counts_by_level["A2"]["topic_count"] >= 5
+        assert counts_by_level["B1"]["word_count"] >= 68
+        assert counts_by_level["B1"]["topic_count"] >= 5
+        assert counts_by_level["B2"]["word_count"] >= 32
+        assert counts_by_level["B2"]["topic_count"] >= 2
 
 
 def test_focus_topics_are_filtered_by_level() -> None:
@@ -565,8 +609,10 @@ def test_focus_topics_are_filtered_by_level() -> None:
 
         assert response.status_code == 200
         topics = response.json()
-        assert {"topic": "food_drink", "label": "Food & Drink", "word_count": 14} in topics
-        assert {"topic": "work_career", "label": "Work & Career", "word_count": 10} not in topics
+        topics_by_key = {topic["topic"]: topic for topic in topics}
+        assert topics_by_key["food_drink"]["label"] == "Food & Drink"
+        assert topics_by_key["food_drink"]["word_count"] >= 14
+        assert "work_career" not in topics_by_key
 
 
 def test_focus_topic_aliases_return_allowed_topic_keys() -> None:
@@ -586,7 +632,7 @@ def test_focus_cards_are_filtered_by_level_and_topic() -> None:
 
         assert response.status_code == 200
         cards = response.json()
-        assert len(cards) == 14
+        assert len(cards) >= 14
         assert {card["topic"] for card in cards} == {"food_drink"}
         assert {card["level"] for card in cards} == {"A1"}
         bread = next(card for card in cards if card["word"] == "Brot")

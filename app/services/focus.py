@@ -3,7 +3,7 @@ import random
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import CachedWord, FocusWordEntry
@@ -50,22 +50,24 @@ def import_focus_words(db: Session, csv_path: Path = FOCUS_CSV_PATH) -> None:
     for row in _unique_word_rows(rows):
         word = db.get(CachedWord, row.word)
         if word is None:
-            word = CachedWord(
-                word=row.word,
-                article=row.article,
-                part_of_speech=row.part_of_speech,
-                meaning=row.meaning,
+            db.add(
+                CachedWord(
+                    word=row.word,
+                    article=row.article,
+                    part_of_speech=row.part_of_speech,
+                    meaning=row.meaning,
+                )
             )
-            db.add(word)
-        else:
-            word.article = row.article
-            word.part_of_speech = row.part_of_speech
-            word.meaning = row.meaning
 
-    db.execute(delete(FocusWordEntry))
-    db.flush()
+    existing_entries = set(
+        db.execute(select(FocusWordEntry.word, FocusWordEntry.topic, FocusWordEntry.level))
+    )
     for row in rows:
+        key = (row.word, row.topic, row.level)
+        if key in existing_entries:
+            continue
         db.add(FocusWordEntry(word=row.word, topic=row.topic, level=row.level))
+        existing_entries.add(key)
     db.commit()
 
 
