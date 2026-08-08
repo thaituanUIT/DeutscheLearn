@@ -317,3 +317,27 @@ Spülbürste,kitchen_utensils,A2,die,noun,dish brush
 Spülmittel,kitchen_utensils,A2,das,noun,dish soap
 Lappen,kitchen_utensils,A2,der,noun,cleaning cloth
 Küchenrolle,kitchen_utensils,A2,die,noun,paper towels
+Aufenthalt,hotel_accommodation_reception,B1,der,noun,stay or period spent at a hotel
+Aufzug,hotel_accommodation_reception,B1,der,noun,elevator or lift
+auschecken,hotel_accommodation_reception,B1,,verb,to check out of a hotel
+Balkon,hotel_accommodation_reception,B1,der,noun,balcony
+Badezimmer,hotel_accommodation_reception,B1,das,noun,bathroom
+Bett,hotel_accommodation_reception,B1,das,noun,bed
+besetzt,hotel_accommodation_reception,B1,,adjective,occupied or not available
+Buchung,hotel_accommodation_reception,B1,die,noun,booking
+Doppelzimmer,hotel_accommodation_reception,B1,das,noun,double room
+einchecken,hotel_accommodation_reception,B1,,verb,to check in at a hotel
+Einzelzimmer,hotel_accommodation_reception,B1,das,noun,single room
+Fernseher,hotel_accommodation_reception,B1,der,noun,television
+frei / verfügbar,hotel_accommodation_reception,B1,,adjective,available or vacant
+Frühstücksraum,hotel_accommodation_reception,B1,der,noun,breakfast room
+Gast,hotel_accommodation_reception,B1,der,noun,guest
+Gepäck,hotel_accommodation_reception,B1,das,noun,luggage
+Hostel,hotel_accommodation_reception,B1,das,noun,hostel
+Klimaanlage,hotel_accommodation_reception,B1,die,noun,air conditioning
+Kreditkarte,hotel_accommodation_reception,B1,die,noun,credit card
+Rechnung,hotel_accommodation_reception,B1,die,noun,bill or invoice
+Safe,hotel_accommodation_reception,B1,der,noun,safe for valuables
+Service,hotel_accommodation_reception,B1,der,noun,service
+Übernachtung,hotel_accommodation_reception,B1,die,noun,overnight stay
+Zimmerservice,hotel_accommodation_reception,B1,der,noun,room service
