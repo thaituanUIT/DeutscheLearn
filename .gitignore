@@ -25,6 +25,12 @@ env/
 *.sqlite
 *.sqlite3
 quiz.db
+*.dump
+*.sql
+*.sql.gz
+*.backup
+*.bak
+alembic/*.log
 
 # Node / Vite
 node_modules/

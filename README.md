@@ -57,6 +57,26 @@ manually provision a Render Postgres database and set the web service `DATABASE_
 variable to that database connection string. The app refuses to start in `ENVIRONMENT=production`
 when `DATABASE_URL` still points to SQLite.
 
+## Database Migrations
+
+Schema changes are managed with Alembic:
+
+```bash
+uv run alembic upgrade head
+uv run alembic revision --autogenerate -m "describe schema change"
+```
+
+For a fresh Supabase database, set `DATABASE_URL` to the Supabase Postgres connection string
+with SSL enabled, then run:
+
+```bash
+DATABASE_URL="postgresql://..." uv run alembic upgrade head
+```
+
+The app still creates missing tables on startup for local development, but production database
+schema changes should be applied with Alembic before deploying application code that depends on
+them.
+
 ## GitHub Actions and Render
 
 The workflow in `.github/workflows/render-deploy.yml` runs backend linting, backend tests,
