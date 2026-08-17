@@ -95,6 +95,7 @@ function renderWordsAdmin(host: HTMLElement, token: string): void {
     words: [] as AdminWord[],
     selected: emptyWord(),
     isNew: true,
+    search: "",
   };
 
   const wrap = el("div", "admin-grid");
@@ -106,8 +107,8 @@ function renderWordsAdmin(host: HTMLElement, token: string): void {
   const reload = async (): Promise<void> => {
     listPanel.replaceChildren(el("p", "prompt", "Loading words..."));
     try {
-      state.words = await getAdminWords(token);
-      renderWordList(listPanel, state, renderEditor);
+      state.words = await getAdminWords(token, { search: state.search.trim() });
+      renderWordList(listPanel, state, renderEditor, reload);
     } catch (error) {
       listPanel.replaceChildren(adminError(error));
     }
@@ -126,15 +127,39 @@ function renderWordsAdmin(host: HTMLElement, token: string): void {
 
 function renderWordList(
   host: HTMLElement,
-  state: { words: AdminWord[]; selected: AdminWord; isNew: boolean },
+  state: { words: AdminWord[]; selected: AdminWord; isNew: boolean; search: string },
   onSelect: () => void,
+  onSearch: () => Promise<void>,
 ): void {
+  let searchTimer: number | undefined;
   const newButton = button("New word", "button primary");
   newButton.addEventListener("click", () => {
     state.selected = emptyWord();
     state.isNew = true;
     onSelect();
   });
+
+  const search = input("Search words", state.search);
+  search.autocomplete = "off";
+  search.addEventListener("input", () => {
+    state.search = search.value;
+    if (searchTimer !== undefined) {
+      window.clearTimeout(searchTimer);
+    }
+    searchTimer = window.setTimeout(() => {
+      void onSearch();
+    }, 250);
+  });
+
+  const clearSearch = button("Clear", "button compact-button");
+  clearSearch.disabled = !state.search.trim();
+  clearSearch.addEventListener("click", () => {
+    state.search = "";
+    void onSearch();
+  });
+
+  const controls = el("div", "admin-list-controls");
+  controls.append(search, clearSearch);
 
   const list = el("div", "admin-items");
   for (const word of state.words) {
@@ -151,7 +176,13 @@ function renderWordList(
     list.append(item);
   }
 
-  host.replaceChildren(el("h2", "focus-title", "Vocabulary"), newButton, list);
+  if (state.words.length === 0) {
+    list.append(el("p", "prompt", state.search.trim() ? "No matching words." : "No words yet."));
+  }
+
+  const header = el("div", "admin-list-header");
+  header.append(el("h2", "focus-title", "Vocabulary"), newButton);
+  host.replaceChildren(header, controls, list);
 }
 
 function renderWordEditor(

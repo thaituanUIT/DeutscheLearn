@@ -693,6 +693,26 @@ button {
   gap: 14px;
 }
 
+.admin-list-header,
+.admin-list-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-list-header {
+  justify-content: space-between;
+}
+
+.admin-list-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-list-controls .compact-button {
+  min-width: 68px;
+}
+
 .admin-items {
   max-height: 70vh;
   display: grid;
