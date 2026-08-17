@@ -341,3 +341,33 @@ Safe,hotel_accommodation_reception,B1,der,noun,safe for valuables
 Service,hotel_accommodation_reception,B1,der,noun,service
 Übernachtung,hotel_accommodation_reception,B1,die,noun,overnight stay
 Zimmerservice,hotel_accommodation_reception,B1,der,noun,room service
+Farbe,colors_materials,A1,die,noun,color
+rot,colors_materials,A1,,adjective,red
+blau,colors_materials,A1,,adjective,blue
+gelb,colors_materials,A1,,adjective,yellow
+grün,colors_materials,A1,,adjective,green
+schwarz,colors_materials,A1,,adjective,black
+weiß,colors_materials,A1,,adjective,white
+grau,colors_materials,A1,,adjective,gray
+braun,colors_materials,A1,,adjective,brown
+orange,colors_materials,A1,,adjective,orange
+rosa,colors_materials,A1,,adjective,pink
+lila,colors_materials,A1,,adjective,purple
+dunkel,colors_materials,A1,,adjective,dark
+hell,colors_materials,A1,,adjective,light or bright
+Material,colors_materials,A1,das,noun,material
+Holz,colors_materials,A1,das,noun,wood
+Metall,colors_materials,A1,das,noun,metal
+Glas,colors_materials,A1,das,noun,glass
+Papier,colors_materials,A1,das,noun,paper
+Plastik,colors_materials,A1,das,noun,plastic
+Stoff,colors_materials,A1,der,noun,fabric or cloth
+Leder,colors_materials,A1,das,noun,leather
+Wolle,colors_materials,A1,die,noun,wool
+Baumwolle,colors_materials,A1,die,noun,cotton
+Stein,colors_materials,A1,der,noun,stone
+golden,colors_materials,A1,,adjective,golden
+silbern,colors_materials,A1,,adjective,silver-colored
+weich,colors_materials,A1,,adjective,soft
+hart,colors_materials,A1,,adjective,hard
+glatt,colors_materials,A1,,adjective,smooth

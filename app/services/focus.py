@@ -13,6 +13,7 @@ FOCUS_LEVELS = ["A1", "A2", "B1", "B2"]
 TOPIC_LABELS = {
     "art_painting": "Art & Painting",
     "clothing_appearance": "Clothing & Appearance",
+    "colors_materials": "Colors & Materials",
     "daily_routine": "Daily Routine",
     "economy_consumption": "Economy & Consumption",
     "education_studies": "Education & Studies",
