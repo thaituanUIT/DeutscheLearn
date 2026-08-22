@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import CachedWord, FocusWordEntry
+from app.db.models import Topic, Word, WordFocus
 
 FOCUS_CSV_PATH = Path("data/focus_words.csv")
 FOCUS_LEVELS = ["A1", "A2", "B1", "B2"]
@@ -49,25 +49,38 @@ def import_focus_words(db: Session, csv_path: Path = FOCUS_CSV_PATH) -> None:
 
     rows = _read_focus_rows(csv_path)
     for row in _unique_word_rows(rows):
-        word = db.get(CachedWord, row.word)
+        word = db.scalar(select(Word).where(Word.lemma == row.word))
         if word is None:
             db.add(
-                CachedWord(
-                    word=row.word,
-                    article=row.article,
-                    part_of_speech=row.part_of_speech,
+                Word(
+                    lemma=row.word,
+                    article=row.article if _normalize_part_of_speech(row.part_of_speech) == "noun" else None,
+                    part_of_speech=_normalize_part_of_speech(row.part_of_speech),
                     meaning=row.meaning,
                 )
             )
+    db.flush()
+
+    topics = {topic.slug: topic for topic in db.scalars(select(Topic)).all()}
+    for row in rows:
+        if row.topic in topics:
+            continue
+        topic = Topic(slug=row.topic, name=TOPIC_LABELS.get(row.topic, _topic_to_label(row.topic)))
+        db.add(topic)
+        db.flush()
+        topics[row.topic] = topic
 
     existing_entries = set(
-        db.execute(select(FocusWordEntry.word, FocusWordEntry.topic, FocusWordEntry.level))
+        db.execute(select(Word.lemma, Topic.slug, WordFocus.level).join(Word).join(Topic))
     )
     for row in rows:
         key = (row.word, row.topic, row.level)
         if key in existing_entries:
             continue
-        db.add(FocusWordEntry(word=row.word, topic=row.topic, level=row.level))
+        word = db.scalar(select(Word).where(Word.lemma == row.word))
+        if word is None:
+            continue
+        db.add(WordFocus(word_id=word.id, topic_id=topics[row.topic].id, level=row.level))
         existing_entries.add(key)
     db.commit()
 
@@ -75,14 +88,14 @@ def import_focus_words(db: Session, csv_path: Path = FOCUS_CSV_PATH) -> None:
 def get_focus_levels(db: Session) -> list[dict[str, int | str]]:
     counts = dict(
         db.execute(
-            select(FocusWordEntry.level, func.count(FocusWordEntry.id))
-            .group_by(FocusWordEntry.level)
+            select(WordFocus.level, func.count(WordFocus.id))
+            .group_by(WordFocus.level)
         ).all()
     )
     topic_counts = dict(
         db.execute(
-            select(FocusWordEntry.level, func.count(func.distinct(FocusWordEntry.topic)))
-            .group_by(FocusWordEntry.level)
+            select(WordFocus.level, func.count(func.distinct(WordFocus.topic_id)))
+            .group_by(WordFocus.level)
         ).all()
     )
     return [
@@ -97,27 +110,29 @@ def get_focus_levels(db: Session) -> list[dict[str, int | str]]:
 
 def get_focus_topics(db: Session, level: str) -> list[dict[str, int | str]]:
     rows = db.execute(
-        select(FocusWordEntry.topic, func.count(FocusWordEntry.id))
-        .where(FocusWordEntry.level == level)
-        .group_by(FocusWordEntry.topic)
-        .order_by(FocusWordEntry.topic)
+        select(Topic.slug, Topic.name, func.count(WordFocus.id))
+        .join(WordFocus, WordFocus.topic_id == Topic.id)
+        .where(WordFocus.level == level)
+        .group_by(Topic.slug, Topic.name)
+        .order_by(Topic.slug)
     ).all()
     return [
         {
             "topic": topic,
-            "label": TOPIC_LABELS.get(topic, _topic_to_label(topic)),
+            "label": label,
             "word_count": count,
         }
-        for topic, count in rows
+        for topic, label, count in rows
     ]
 
 
 def get_focus_cards(db: Session, level: str, topic: str) -> list[dict[str, str | None]]:
     rows = db.execute(
-        select(FocusWordEntry, CachedWord)
-        .join(CachedWord, CachedWord.word == FocusWordEntry.word)
-        .where(FocusWordEntry.level == level, FocusWordEntry.topic == topic)
-        .order_by(FocusWordEntry.word)
+        select(WordFocus, Word, Topic)
+        .join(Word, Word.id == WordFocus.word_id)
+        .join(Topic, Topic.id == WordFocus.topic_id)
+        .where(WordFocus.level == level, Topic.slug == topic)
+        .order_by(Word.lemma)
     ).all()
     return [
         {
@@ -125,11 +140,11 @@ def get_focus_cards(db: Session, level: str, topic: str) -> list[dict[str, str |
             "article": word.article,
             "part_of_speech": word.part_of_speech,
             "meaning_overview": word.meaning,
-            "topic": entry.topic,
-            "topic_label": TOPIC_LABELS.get(entry.topic, _topic_to_label(entry.topic)),
+            "topic": topic_row.slug,
+            "topic_label": topic_row.name,
             "level": entry.level,
         }
-        for entry, word in rows
+        for entry, word, topic_row in rows
     ]
 
 
@@ -141,9 +156,10 @@ def get_focus_revision_questions(
     limit: int = 5,
 ) -> list[dict[str, str | list[str] | None]]:
     topic_rows = db.execute(
-        select(FocusWordEntry, CachedWord)
-        .join(CachedWord, CachedWord.word == FocusWordEntry.word)
-        .where(FocusWordEntry.level == level, FocusWordEntry.topic == topic)
+        select(WordFocus, Word, Topic)
+        .join(Word, Word.id == WordFocus.word_id)
+        .join(Topic, Topic.id == WordFocus.topic_id)
+        .where(WordFocus.level == level, Topic.slug == topic)
     ).all()
     if not topic_rows:
         return []
@@ -152,13 +168,13 @@ def get_focus_revision_questions(
     global_meanings = list(
         dict.fromkeys(
             meaning
-            for meaning in db.scalars(select(CachedWord.meaning)).all()
+            for meaning in db.scalars(select(Word.meaning)).all()
             if meaning.strip()
         )
     )
 
     questions = []
-    for entry, word in selected_rows:
+    for entry, word, topic_row in selected_rows:
         correct_answer = word.meaning
         distractors = [meaning for meaning in global_meanings if meaning != correct_answer]
         choices = random.sample(distractors, k=min(2, len(distractors)))
@@ -170,8 +186,8 @@ def get_focus_revision_questions(
                 "article": word.article,
                 "part_of_speech": word.part_of_speech,
                 "meaning_overview": word.meaning,
-                "topic": entry.topic,
-                "topic_label": TOPIC_LABELS.get(entry.topic, _topic_to_label(entry.topic)),
+                "topic": topic_row.slug,
+                "topic_label": topic_row.name,
                 "level": entry.level,
                 "choices": choices,
                 "correct_answer": correct_answer,
@@ -211,6 +227,19 @@ def _unique_word_rows(rows: list[FocusCsvRow]) -> list[FocusCsvRow]:
 def _clean_optional_csv_value(value: str) -> str | None:
     text = value.strip()
     return text or None
+
+
+def _normalize_part_of_speech(value: str) -> str:
+    lowered = value.strip().casefold()
+    if lowered in {"noun", "verb", "adjective", "adverb", "preposition", "conjunction", "pronoun", "phrase"}:
+        return lowered
+    if "substantiv" in lowered:
+        return "noun"
+    if "verb" in lowered:
+        return "verb"
+    if "adjektiv" in lowered:
+        return "adjective"
+    return "phrase"
 
 
 def _topic_to_label(topic: str) -> str:

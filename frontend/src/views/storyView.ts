@@ -311,13 +311,13 @@ function storyContent(passage: StoryPassage): HTMLElement {
 
 function sourceChoiceContent(passage: StoryPassage): HTMLElement {
   const content = el("article", "story-passage goethe-exercise source-choice-exercise");
-  const data = asRecord(passage.content);
-  const prompt = stringValue(data.prompt) || passage.passage_text;
-  const sources = arrayValue(data.sources).map(asRecord).filter(Boolean);
+  const sources = passage.questions[0]?.answers
+    .map((answer) => answer.ref_stimulus)
+    .filter((source) => source !== null) ?? [];
   content.append(
     el("div", "question-type", `${passage.level} · ${partLabel(passage.part ?? "teil_2")}`),
     el("h2", "story-title", passage.title),
-    el("p", "goethe-task-prompt", prompt),
+    el("p", "goethe-task-prompt", passage.passage_text),
   );
 
   const grid = el("div", "source-card-grid");
@@ -325,15 +325,13 @@ function sourceChoiceContent(passage: StoryPassage): HTMLElement {
     const card = el("section", "source-card");
     const header = el("div", "source-card-header");
     header.append(
-      el("span", "source-pill", stringValue(source.id) || String.fromCharCode(97 + index)),
-      el("strong", "", stringValue(source.title) || `Option ${index + 1}`),
+      el("span", "source-pill", String.fromCharCode(97 + index)),
+      el("strong", "", source.title || `Option ${index + 1}`),
     );
-    const details = arrayValue(source.details)
-      .map((item) => stringValue(item))
-      .filter(Boolean);
+    const details = source.body.split("\n").map((item) => item.trim()).filter(Boolean);
     card.append(
       header,
-      el("p", "source-subtitle", stringValue(source.subtitle)),
+      el("p", "source-subtitle", source.context_label ?? ""),
       detailList(details),
     );
     grid.append(card);
@@ -348,14 +346,18 @@ function sourceChoiceContent(passage: StoryPassage): HTMLElement {
 
 function noticeContent(passage: StoryPassage): HTMLElement {
   const content = el("article", "story-passage goethe-exercise notice-exercise");
-  const data = asRecord(passage.content);
-  const notice = asRecord(data.notice);
-  const tone = stringValue(notice.tone) || "info";
-  const card = el("section", `notice-card notice-${tone}`);
+  const card = el("section", "notice-card notice-info");
+  if (passage.image_url) {
+    const image = document.createElement("img");
+    image.className = "notice-image";
+    image.src = passage.image_url;
+    image.alt = passage.title;
+    card.append(image);
+  }
   card.append(
-    el("div", "notice-bar", stringValue(notice.label) || "Hinweis"),
-    el("h3", "", stringValue(notice.headline) || passage.title),
-    el("p", "", stringValue(notice.body) || passage.passage_text),
+    el("div", "notice-bar", passage.context_label ?? "Hinweis"),
+    el("h3", "", passage.title),
+    el("p", "", passage.passage_text),
   );
   content.append(
     el("div", "question-type", `${passage.level} · ${partLabel(passage.part ?? "teil_3")}`),
@@ -444,18 +446,6 @@ function itemLabel(group: StoryGroup["group"]): string {
 
 function partLabel(part: StoryPart["part"]): string {
   return part.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-}
-
-function arrayValue(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function stringValue(value: unknown): string {
-  return typeof value === "string" ? value : "";
 }
 
 function topicLabel(topic: string): string {

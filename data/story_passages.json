@@ -89,5 +89,112 @@
         ]
       }
     ]
+  },
+  {
+    "group": "goethe",
+    "level": "A1",
+    "part": "teil_1",
+    "kind": "text",
+    "title": "Nachricht von Tom",
+    "passage_text": "Hallo Sara, ich bin heute bis 16 Uhr im Deutschkurs. Danach kaufe ich Brot und Käse. Kommst du um 18 Uhr zu mir? Wir können zusammen Abendessen machen. Viele Grüße, Tom",
+    "order_index": 1,
+    "questions": [
+      {
+        "prompt": "Tom ist am Nachmittag im Deutschkurs.",
+        "explanation": "Im Text steht, dass Tom heute bis 16 Uhr im Deutschkurs ist.",
+        "order_index": 0,
+        "answers": [
+          { "answer_text": "Richtig", "is_correct": true, "order_index": 0 },
+          { "answer_text": "Falsch", "is_correct": false, "order_index": 1 }
+        ]
+      },
+      {
+        "prompt": "Sara soll um 16 Uhr kommen.",
+        "explanation": "Tom fragt, ob Sara um 18 Uhr kommen kann.",
+        "order_index": 1,
+        "answers": [
+          { "answer_text": "Richtig", "is_correct": false, "order_index": 0 },
+          { "answer_text": "Falsch", "is_correct": true, "order_index": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "group": "goethe",
+    "level": "A1",
+    "part": "teil_2",
+    "kind": "text",
+    "title": "Ein Buch kaufen",
+    "passage_text": "Lesen Sie die Aufgabe und die zwei Anzeigen. Welche Anzeige passt?",
+    "order_index": 2,
+    "ad_stimuli": [
+      {
+        "key": "a",
+        "title": "Buchhandlung am Markt",
+        "body": "Neue und gebrauchte Bücher: Romane, Kinderbücher und Ratgeber für Garten und Balkon. Heute bis 19 Uhr geöffnet.",
+        "order_index": 0
+      },
+      {
+        "key": "b",
+        "title": "Blumenhaus Weber",
+        "body": "Zimmerpflanzen, Rosen und frische Blumen. Wir liefern Blumensträuße in der Stadt. Montag geschlossen.",
+        "order_index": 1
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "Sie möchten ein Buch über Gartenarbeit kaufen.",
+        "explanation": "Anzeige a ist eine Buchhandlung und nennt Ratgeber für Garten und Balkon.",
+        "order_index": 0,
+        "answers": [
+          { "answer_text": "a) Buchhandlung am Markt", "is_correct": true, "order_index": 0 },
+          { "answer_text": "b) Blumenhaus Weber", "is_correct": false, "order_index": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "group": "goethe",
+    "level": "A1",
+    "part": "teil_3",
+    "kind": "sign",
+    "title": "Hinweis im Supermarkt",
+    "context_label": "Im Supermarkt",
+    "image_url": "https://dummyimage.com/900x520/f6f7f4/244d43.png&text=Kasse+2+heute+geschlossen",
+    "passage_text": "Kasse 2 heute geschlossen. Bitte benutzen Sie Kasse 1 oder 3.",
+    "order_index": 3,
+    "questions": [
+      {
+        "prompt": "Man kann heute an Kasse 2 bezahlen.",
+        "explanation": "Auf dem Schild steht, dass Kasse 2 heute geschlossen ist.",
+        "order_index": 0,
+        "answers": [
+          { "answer_text": "Richtig", "is_correct": false, "order_index": 0 },
+          { "answer_text": "Falsch", "is_correct": true, "order_index": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "group": "goethe",
+    "level": "B1",
+    "part": "teil_1",
+    "kind": "text",
+    "title": "E-Mail an die Hausverwaltung",
+    "passage_text": "Sehr geehrte Damen und Herren, seit Montag funktioniert die Heizung in meiner Wohnung nicht richtig. Besonders abends ist es sehr kalt. Ich habe bereits versucht, den Regler zu prüfen, aber das Problem bleibt. Bitte schicken Sie diese Woche eine Technikerin oder einen Techniker. Mit freundlichen Grüßen, Anna Keller",
+    "order_index": 1,
+    "questions": [
+      {
+        "prompt": "Warum schreibt Anna Keller die E-Mail?",
+        "explanation": "Sie schreibt, weil die Heizung in ihrer Wohnung nicht richtig funktioniert.",
+        "order_index": 0,
+        "answers": [
+          { "answer_text": "Die Heizung funktioniert nicht richtig.", "is_correct": true, "order_index": 0 },
+          { "answer_text": "Sie möchte eine neue Wohnung mieten.", "is_correct": false, "order_index": 1 },
+          { "answer_text": "Sie beschwert sich über Lärm.", "is_correct": false, "order_index": 2 },
+          { "answer_text": "Sie hat ihren Schlüssel verloren.", "is_correct": false, "order_index": 3 }
+        ]
+      }
+    ]
   }
 ]

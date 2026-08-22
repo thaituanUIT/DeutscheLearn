@@ -17,10 +17,12 @@ from app.db.models import (
     ReadingAnswer,
     ReadingPassage,
     ReadingQuestion,
+    Topic,
 )
 from app.db.session import get_db
 from app.schemas import (
     AdminFocusEntryOut,
+    AdminReadingAdOut,
     AdminReadingAnswerOut,
     AdminReadingPassageIn,
     AdminReadingPassageOut,
@@ -46,6 +48,7 @@ from app.schemas import (
     StoryAnswerOut,
     StoryGroupOut,
     StoryLevelOut,
+    StoryOptionStimulusOut,
     StoryPartOut,
     StoryPassageOut,
     StoryPassageSummaryOut,
@@ -227,16 +230,18 @@ def admin_words(
     topic: str | None = Query(default=None, max_length=80),
     db: Session = Depends(get_db),
 ) -> list[AdminWordOut]:
-    query = select(CachedWord).options(selectinload(CachedWord.focus_entries))
+    query = select(CachedWord).options(
+        selectinload(CachedWord.focus_entries).selectinload(FocusWordEntry.topic)
+    )
     if search.strip():
-        query = query.where(CachedWord.word.ilike(f"%{search.strip()}%"))
+        query = query.where(CachedWord.lemma.ilike(f"%{search.strip()}%"))
     if level or topic:
         query = query.join(FocusWordEntry)
         if level:
             query = query.where(FocusWordEntry.level == level)
         if topic:
-            query = query.where(FocusWordEntry.topic == topic)
-    query = query.order_by(CachedWord.word).limit(200)
+            query = query.join(Topic).where(Topic.slug == topic)
+    query = query.order_by(CachedWord.lemma).limit(200)
     words = db.scalars(query).unique().all()
     return [_admin_word_out(word) for word in words]
 
@@ -248,11 +253,11 @@ def admin_words(
 )
 def admin_create_word(payload: AdminWordIn, db: Session = Depends(get_db)) -> AdminWordOut:
     word_key = payload.word.strip()
-    if db.get(CachedWord, word_key) is not None:
+    if db.scalar(select(CachedWord).where(CachedWord.lemma == word_key)) is not None:
         raise HTTPException(status_code=409, detail="Word already exists")
     _validate_focus_entries(payload.focus_entries)
     word = CachedWord(
-        word=word_key,
+        lemma=word_key,
         article=_clean_optional_text(payload.article),
         part_of_speech=payload.part_of_speech.strip(),
         meaning=payload.meaning.strip(),
@@ -275,7 +280,7 @@ def admin_update_word(
     payload: AdminWordPatchIn,
     db: Session = Depends(get_db),
 ) -> AdminWordOut:
-    word = db.get(CachedWord, word_key)
+    word = db.scalar(select(CachedWord).where(CachedWord.lemma == word_key))
     if word is None:
         raise HTTPException(status_code=404, detail="Word not found")
     _validate_focus_entries(payload.focus_entries)
@@ -294,7 +299,7 @@ def admin_update_word(
     dependencies=[Depends(require_admin)],
 )
 def admin_delete_word(word_key: str, db: Session = Depends(get_db)) -> None:
-    word = db.get(CachedWord, word_key)
+    word = db.scalar(select(CachedWord).where(CachedWord.lemma == word_key))
     if word is None:
         raise HTTPException(status_code=404, detail="Word not found")
     for entry in list(word.focus_entries):
@@ -314,17 +319,18 @@ def admin_reading_passages(
     db: Session = Depends(get_db),
 ) -> list[AdminReadingPassageSummaryOut]:
     question_counts = (
-        select(ReadingQuestion.passage_id, func.count(ReadingQuestion.id).label("question_count"))
-        .group_by(ReadingQuestion.passage_id)
+        select(ReadingQuestion.stimulus_id, func.count(ReadingQuestion.id).label("question_count"))
+        .group_by(ReadingQuestion.stimulus_id)
         .subquery()
     )
     query = (
         select(ReadingPassage, func.coalesce(question_counts.c.question_count, 0))
-        .outerjoin(question_counts, question_counts.c.passage_id == ReadingPassage.id)
-        .order_by(ReadingPassage.level, ReadingPassage.order_index, ReadingPassage.title)
+        .outerjoin(question_counts, question_counts.c.stimulus_id == ReadingPassage.id)
+        .where(ReadingPassage.kind != "ad")
+        .order_by(ReadingPassage.level, ReadingPassage.sort_order, ReadingPassage.title)
     )
     if group:
-        query = query.where(ReadingPassage.group == group)
+        query = query.where(ReadingPassage.collection == group)
     if level:
         query = query.where(ReadingPassage.level == level)
     rows = db.execute(query).all()
@@ -334,7 +340,7 @@ def admin_reading_passages(
             group=passage.group,
             level=passage.level,
             part=passage.part,
-            exercise_type=passage.exercise_type,
+            exercise_type=_exercise_type(passage),
             topic=passage.topic,
             title=passage.title,
             order_index=passage.order_index,
@@ -707,11 +713,12 @@ def _story_passage_out(passage: ReadingPassage) -> StoryPassageOut:
         group=passage.group,
         level=passage.level,
         part=passage.part,
-        exercise_type=passage.exercise_type,
+        exercise_type=_exercise_type(passage),
         topic=passage.topic,
         title=passage.title,
         passage_text=passage.passage_text,
-        content=_reading_content(passage.content_json),
+        image_url=passage.image_url,
+        context_label=passage.context_label,
         order_index=passage.order_index,
         questions=[
             StoryQuestionOut(
@@ -723,6 +730,16 @@ def _story_passage_out(passage: ReadingPassage) -> StoryPassageOut:
                         id=answer.id,
                         answer_text=answer.answer_text,
                         order_index=answer.order_index,
+                        ref_stimulus=(
+                            StoryOptionStimulusOut(
+                                id=answer.ref_stimulus.id,
+                                title=answer.ref_stimulus.title,
+                                body=answer.ref_stimulus.body,
+                                context_label=answer.ref_stimulus.context_label,
+                            )
+                            if answer.ref_stimulus
+                            else None
+                        ),
                     )
                     for answer in question.answers
                 ],
@@ -739,8 +756,8 @@ def _admin_word_out(word: CachedWord) -> AdminWordOut:
         part_of_speech=word.part_of_speech,
         meaning=word.meaning,
         focus_entries=[
-            AdminFocusEntryOut(id=entry.id, level=entry.level, topic=entry.topic)
-            for entry in sorted(word.focus_entries, key=lambda item: (item.level, item.topic))
+            AdminFocusEntryOut(id=entry.id, level=entry.level, topic=entry.topic.slug)
+            for entry in sorted(word.focus_entries, key=lambda item: (item.level, item.topic.slug))
         ],
     )
 
@@ -750,7 +767,10 @@ def _replace_focus_entries(
     word: str,
     entries: list,
 ) -> None:
-    existing = db.scalars(select(FocusWordEntry).where(FocusWordEntry.word == word)).all()
+    word_row = db.scalar(select(CachedWord).where(CachedWord.lemma == word))
+    if word_row is None:
+        return
+    existing = db.scalars(select(FocusWordEntry).where(FocusWordEntry.word_id == word_row.id)).all()
     for entry in existing:
         db.delete(entry)
     db.flush()
@@ -761,7 +781,8 @@ def _replace_focus_entries(
         if key in seen:
             continue
         seen.add(key)
-        db.add(FocusWordEntry(word=word, level=entry.level, topic=key[1]))
+        topic = _get_or_create_topic(db, key[1])
+        db.add(FocusWordEntry(word_id=word_row.id, level=entry.level, topic_id=topic.id))
 
 
 def _validate_focus_entries(entries: list) -> None:
@@ -776,10 +797,24 @@ def _validate_focus_entries(entries: list) -> None:
         )
 
 
+def _get_or_create_topic(db: Session, slug: str) -> Topic:
+    topic = db.scalar(select(Topic).where(Topic.slug == slug))
+    if topic is not None:
+        return topic
+    topic = Topic(slug=slug, name=TOPIC_LABELS.get(slug, " ".join(piece.capitalize() for piece in slug.split("_"))))
+    db.add(topic)
+    db.flush()
+    return topic
+
+
 def _get_reading_passage(db: Session, passage_id: str) -> ReadingPassage:
     passage = db.scalar(
         select(ReadingPassage)
-        .options(selectinload(ReadingPassage.questions).selectinload(ReadingQuestion.answers))
+        .options(
+            selectinload(ReadingPassage.items)
+            .selectinload(ReadingQuestion.options)
+            .selectinload(ReadingAnswer.ref_stimulus)
+        )
         .where(ReadingPassage.id == passage_id)
     )
     if passage is None:
@@ -788,46 +823,38 @@ def _get_reading_passage(db: Session, passage_id: str) -> ReadingPassage:
 
 
 def _apply_reading_payload(passage: ReadingPassage, payload: AdminReadingPassageIn) -> None:
-    passage.group = payload.group
+    passage.collection = payload.group
     passage.level = payload.level
-    passage.part = payload.part if payload.group == "goethe" else None
-    passage.exercise_type = _clean_optional_text(payload.exercise_type)
-    passage.topic = _clean_optional_text(payload.topic)
+    passage.teil = payload.part if payload.group == "goethe" else None
+    passage.kind = _stimulus_kind(payload.group, payload.part)
     passage.title = payload.title.strip()
-    passage.passage_text = payload.passage_text.strip()
-    passage.content_json = _clean_content_json(payload.content_json)
-    passage.order_index = payload.order_index
+    passage.body = payload.passage_text.strip()
+    passage.image_url = _clean_optional_text(payload.image_url)
+    passage.context_label = _clean_optional_text(payload.context_label)
+    passage.sort_order = payload.order_index
     passage.updated_at = utc_now()
-    passage.questions = [
-        ReadingQuestion(
-            prompt=question.prompt.strip(),
-            explanation=_clean_optional_text(question.explanation),
-            order_index=question.order_index,
-            answers=[
-                ReadingAnswer(
-                    answer_text=answer.answer_text.strip(),
-                    is_correct=answer.is_correct,
-                    order_index=answer.order_index,
-                )
-                for answer in question.answers
-            ],
-        )
-        for question in payload.questions
+    ad_rows = _reading_ad_stimuli_from_payload(payload) if payload.group == "goethe" and payload.part == "teil_2" else []
+    passage.items = [
+        _reading_item_from_payload(question, ad_rows if index == 0 else [])
+        for index, question in enumerate(payload.questions)
     ]
 
 
 def _admin_reading_passage_out(passage: ReadingPassage) -> AdminReadingPassageOut:
+    ad_stimuli = _admin_ad_stimuli_out(passage)
     return AdminReadingPassageOut(
         id=passage.id,
         group=passage.group,
         level=passage.level,
         part=passage.part,
-        exercise_type=passage.exercise_type,
+        exercise_type=_exercise_type(passage),
         topic=passage.topic,
         title=passage.title,
         passage_text=passage.passage_text,
-        content_json=passage.content_json,
+        image_url=passage.image_url,
+        context_label=passage.context_label,
         order_index=passage.order_index,
+        ad_stimuli=ad_stimuli,
         questions=[
             AdminReadingQuestionOut(
                 id=question.id,
@@ -849,6 +876,95 @@ def _admin_reading_passage_out(passage: ReadingPassage) -> AdminReadingPassageOu
     )
 
 
+def _reading_item_from_payload(question, ad_rows: list[ReadingPassage] | None = None) -> ReadingQuestion:
+    item = ReadingQuestion(
+        prompt=question.prompt.strip(),
+        explanation=_clean_optional_text(question.explanation),
+        answer_type="choice" if ad_rows else ("true_false" if _is_true_false_answers(question.answers) else "choice"),
+        sort_order=question.order_index,
+    )
+    correct_option = None
+    answer_rows = question.answers
+    if ad_rows:
+        answer_rows = [
+            _AdAnswerPayload(order_index=index, answer_text=ad.title, is_correct=False)
+            for index, ad in enumerate(ad_rows)
+        ]
+        correct_index = next(
+            (
+                answer.order_index
+                for answer in question.answers
+                if answer.is_correct and 0 <= answer.order_index < len(answer_rows)
+            ),
+            0,
+        )
+        answer_rows[correct_index].is_correct = True
+    for index, answer in enumerate(answer_rows):
+        option = ReadingAnswer(
+            key=str(answer.order_index),
+            label=answer.answer_text.strip(),
+            sort_order=answer.order_index,
+            ref_stimulus=ad_rows[index] if ad_rows and index < len(ad_rows) else None,
+        )
+        item.options.append(option)
+        if answer.is_correct:
+            correct_option = option
+    item.correct_option = correct_option
+    return item
+
+
+def _reading_ad_stimuli_from_payload(payload: AdminReadingPassageIn) -> list[ReadingPassage]:
+    ads = sorted(payload.ad_stimuli, key=lambda ad: ad.order_index)
+    rows: list[ReadingPassage] = []
+    for index, ad in enumerate(ads[:2]):
+        kwargs = {"id": ad.id} if ad.id else {}
+        rows.append(
+            ReadingPassage(
+                **kwargs,
+                collection="goethe",
+                level=payload.level,
+                teil=payload.part,
+                kind="ad",
+                title=f"{ad.key}) {ad.title.strip()}",
+                body=ad.body.strip(),
+                context_label=_clean_optional_text(ad.context_label),
+                sort_order=index,
+            )
+        )
+    return rows
+
+
+class _AdAnswerPayload:
+    def __init__(self, *, order_index: int, answer_text: str, is_correct: bool) -> None:
+        self.order_index = order_index
+        self.answer_text = answer_text
+        self.is_correct = is_correct
+
+
+def _admin_ad_stimuli_out(passage: ReadingPassage) -> list[AdminReadingAdOut]:
+    ads: dict[str, ReadingPassage] = {}
+    for question in passage.questions:
+        for answer in question.answers:
+            if answer.ref_stimulus is not None:
+                ads[answer.ref_stimulus.id] = answer.ref_stimulus
+    return [
+        AdminReadingAdOut(
+            id=ad.id,
+            key="a" if index == 0 else "b",
+            title=ad.title.removeprefix("a) ").removeprefix("b) "),
+            body=ad.body,
+            context_label=ad.context_label,
+            order_index=index,
+        )
+        for index, ad in enumerate(sorted(ads.values(), key=lambda row: row.sort_order)[:2])
+    ]
+
+
+def _is_true_false_answers(answers) -> bool:
+    labels = {answer.answer_text.casefold() for answer in answers}
+    return labels <= {"richtig", "falsch", "true", "false"} and len(labels) == 2
+
+
 def _clean_optional_text(value: str | None) -> str | None:
     if value is None:
         return None
@@ -856,23 +972,17 @@ def _clean_optional_text(value: str | None) -> str | None:
     return text or None
 
 
-def _clean_content_json(value: str | None) -> str | None:
-    if value is None or not value.strip():
+def _exercise_type(passage: ReadingPassage) -> str | None:
+    if passage.group != "goethe":
         return None
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError as error:
-        raise HTTPException(status_code=422, detail=f"Invalid content JSON: {error.msg}") from error
-    if not isinstance(parsed, dict):
-        raise HTTPException(status_code=422, detail="Content JSON must be an object")
-    return json.dumps(parsed, ensure_ascii=False)
+    if passage.part == "teil_2":
+        return "source_choice"
+    if passage.part == "teil_3":
+        return "true_false_notice"
+    return "standard"
 
 
-def _reading_content(value: str | None) -> dict | None:
-    if not value:
-        return None
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError:
-        return None
-    return parsed if isinstance(parsed, dict) else None
+def _stimulus_kind(group: str, part: str | None) -> str:
+    if group == "goethe" and part == "teil_3":
+        return "sign"
+    return "text"

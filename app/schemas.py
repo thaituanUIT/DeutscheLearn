@@ -1,5 +1,3 @@
-from typing import Any
-
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -151,10 +149,18 @@ class StoryPassageSummaryOut(BaseModel):
     question_count: int
 
 
+class StoryOptionStimulusOut(BaseModel):
+    id: str
+    title: str
+    body: str
+    context_label: str | None
+
+
 class StoryAnswerChoiceOut(BaseModel):
     id: str
     answer_text: str
     order_index: int
+    ref_stimulus: StoryOptionStimulusOut | None = None
 
 
 class StoryQuestionOut(BaseModel):
@@ -173,7 +179,8 @@ class StoryPassageOut(BaseModel):
     topic: str | None
     title: str
     passage_text: str
-    content: dict[str, Any] | None
+    image_url: str | None
+    context_label: str | None
     order_index: int
     questions: list[StoryQuestionOut]
 
@@ -253,17 +260,41 @@ class AdminReadingQuestionOut(BaseModel):
     answers: list[AdminReadingAnswerOut]
 
 
+class AdminReadingAdIn(BaseModel):
+    id: str | None = None
+    key: str = Field(pattern="^[ab]$")
+    title: str = Field(min_length=1, max_length=160)
+    body: str = Field(min_length=1)
+    context_label: str | None = Field(default=None, max_length=160)
+    order_index: int = Field(default=0, ge=0)
+
+
+class AdminReadingAdOut(AdminReadingAdIn):
+    id: str
+
+
 class AdminReadingPassageIn(BaseModel):
     group: str = Field(default="general", pattern="^(general|goethe)$")
     level: str = Field(pattern="^(A1|A2|B1|B2)$")
     part: str | None = Field(default=None, pattern="^teil_[1-5]$")
-    exercise_type: str | None = Field(default=None, max_length=80)
     topic: str | None = Field(default=None, max_length=80)
     title: str = Field(min_length=1, max_length=160)
     passage_text: str = Field(min_length=1)
-    content_json: str | None = None
+    image_url: str | None = Field(default=None, max_length=500)
+    context_label: str | None = Field(default=None, max_length=160)
     order_index: int = Field(default=0, ge=0)
     questions: list[AdminReadingQuestionIn] = Field(default_factory=list)
+    ad_stimuli: list[AdminReadingAdIn] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_goethe_shape(self) -> "AdminReadingPassageIn":
+        if self.group != "goethe":
+            self.part = None
+            self.ad_stimuli = []
+            return self
+        if self.part == "teil_2" and len(self.ad_stimuli) != 2:
+            raise ValueError("Goethe Teil 2 needs exactly two adverts.")
+        return self
 
 
 class AdminReadingPassageSummaryOut(BaseModel):
@@ -287,8 +318,10 @@ class AdminReadingPassageOut(BaseModel):
     topic: str | None
     title: str
     passage_text: str
-    content_json: str | None
+    image_url: str | None
+    context_label: str | None
     order_index: int
+    ad_stimuli: list[AdminReadingAdOut]
     questions: list[AdminReadingQuestionOut]
 
 

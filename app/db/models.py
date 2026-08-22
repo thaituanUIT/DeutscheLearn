@@ -1,7 +1,17 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.time import utc_now
@@ -25,46 +35,21 @@ class AnonymousPlayer(Base):
     attempts: Mapped[list["QuizAttempt"]] = relationship(back_populates="player")
 
 
-class CachedWord(Base):
-    __tablename__ = "cached_words"
-
-    word: Mapped[str] = mapped_column(String(120), primary_key=True)
-    article: Mapped[str | None] = mapped_column(String(8))
-    part_of_speech: Mapped[str] = mapped_column(String(80), nullable=False)
-    meaning: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
-
-    focus_entries: Mapped[list["FocusWordEntry"]] = relationship(back_populates="cached_word")
-
-
-class FocusWordEntry(Base):
-    __tablename__ = "focus_word_entries"
+class Word(Base):
+    __tablename__ = "word"
     __table_args__ = (
-        UniqueConstraint("word", "topic", "level", name="uq_focus_word_topic_level"),
+        CheckConstraint("article in ('der', 'die', 'das') or article is null", name="ck_word_article"),
+        CheckConstraint(
+            "article is null or part_of_speech = 'noun'",
+            name="ck_word_article_only_for_noun",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
-    word: Mapped[str] = mapped_column(ForeignKey("cached_words.word"), nullable=False)
-    topic: Mapped[str] = mapped_column(String(80), nullable=False)
-    level: Mapped[str] = mapped_column(String(8), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
-
-    cached_word: Mapped[CachedWord] = relationship(back_populates="focus_entries")
-
-
-class ReadingPassage(Base):
-    __tablename__ = "reading_passages"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
-    group: Mapped[str] = mapped_column(String(40), default="general", nullable=False)
-    level: Mapped[str] = mapped_column(String(8), nullable=False)
-    part: Mapped[str | None] = mapped_column(String(40))
-    exercise_type: Mapped[str | None] = mapped_column(String(80))
-    topic: Mapped[str | None] = mapped_column(String(80))
-    title: Mapped[str] = mapped_column(String(160), nullable=False)
-    passage_text: Mapped[str] = mapped_column(Text, nullable=False)
-    content_json: Mapped[str | None] = mapped_column(Text)
-    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lemma: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    article: Mapped[str | None] = mapped_column(String(8))
+    part_of_speech: Mapped[str] = mapped_column(String(80), nullable=False)
+    meaning: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -73,40 +58,247 @@ class ReadingPassage(Base):
         nullable=False,
     )
 
-    questions: Mapped[list["ReadingQuestion"]] = relationship(
-        back_populates="passage",
+    focus_entries: Mapped[list["WordFocus"]] = relationship(
+        back_populates="word",
         cascade="all, delete-orphan",
-        order_by="ReadingQuestion.order_index",
     )
 
+    def __init__(self, lemma: str | None = None, word: str | None = None, **kwargs) -> None:
+        super().__init__(lemma=lemma or word, **kwargs)
 
-class ReadingQuestion(Base):
-    __tablename__ = "reading_questions"
+    @property
+    def word(self) -> str:
+        return self.lemma
+
+
+class Topic(Base):
+    __tablename__ = "topic"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
-    passage_id: Mapped[str] = mapped_column(ForeignKey("reading_passages.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+
+    focus_entries: Mapped[list["WordFocus"]] = relationship(back_populates="topic")
+
+
+class WordFocus(Base):
+    __tablename__ = "word_focus"
+    __table_args__ = (
+        UniqueConstraint("word_id", "level", "topic_id", name="uq_word_focus_word_level_topic"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    word_id: Mapped[str] = mapped_column(ForeignKey("word.id"), nullable=False, index=True)
+    level: Mapped[str] = mapped_column(String(8), nullable=False)
+    topic_id: Mapped[str] = mapped_column(ForeignKey("topic.id"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+    word: Mapped[Word] = relationship(back_populates="focus_entries")
+    topic: Mapped[Topic] = relationship(back_populates="focus_entries")
+
+
+class Stimulus(Base):
+    __tablename__ = "stimulus"
+    __table_args__ = (
+        CheckConstraint("collection in ('general', 'goethe')", name="ck_stimulus_collection"),
+        CheckConstraint("level in ('A1', 'A2', 'B1', 'B2')", name="ck_stimulus_level"),
+        CheckConstraint("teil in ('teil_1', 'teil_2', 'teil_3', 'teil_4', 'teil_5') or teil is null", name="ck_stimulus_teil"),
+        CheckConstraint("kind in ('text', 'ad', 'sign')", name="ck_stimulus_kind"),
+        CheckConstraint("collection <> 'goethe' or teil is not null", name="ck_goethe_stimulus_has_teil"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    collection: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    level: Mapped[str] = mapped_column(String(8), nullable=False)
+    teil: Mapped[str | None] = mapped_column(String(40), index=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String(500))
+    audio_url: Mapped[str | None] = mapped_column(String(500))
+    context_label: Mapped[str | None] = mapped_column(String(160))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+    items: Mapped[list["Item"]] = relationship(
+        back_populates="stimulus",
+        cascade="all, delete-orphan",
+        foreign_keys="Item.stimulus_id",
+        order_by="Item.sort_order",
+    )
+    referenced_by_options: Mapped[list["ItemOption"]] = relationship(
+        back_populates="ref_stimulus",
+        foreign_keys="ItemOption.ref_stimulus_id",
+    )
+
+    def __init__(
+        self,
+        collection: str | None = None,
+        group: str | None = None,
+        teil: str | None = None,
+        part: str | None = None,
+        kind: str = "text",
+        body: str | None = None,
+        passage_text: str | None = None,
+        sort_order: int | None = None,
+        order_index: int | None = None,
+        questions: list["Item"] | None = None,
+        items: list["Item"] | None = None,
+        **kwargs,
+    ) -> None:
+        kwargs.pop("topic", None)
+        super().__init__(
+            collection=collection or group or "general",
+            teil=teil or part,
+            kind=kind,
+            body=body if body is not None else passage_text,
+            sort_order=sort_order if sort_order is not None else (order_index or 0),
+            items=items if items is not None else (questions or []),
+            **kwargs,
+        )
+
+    @property
+    def group(self) -> str:
+        return self.collection
+
+    @property
+    def part(self) -> str | None:
+        return self.teil
+
+    @property
+    def topic(self) -> None:
+        return None
+
+    @property
+    def passage_text(self) -> str:
+        return self.body
+
+    @property
+    def order_index(self) -> int:
+        return self.sort_order
+
+    @property
+    def questions(self) -> list["Item"]:
+        return self.items
+
+
+class Item(Base):
+    __tablename__ = "item"
+    __table_args__ = (
+        CheckConstraint("answer_type in ('true_false', 'choice')", name="ck_item_answer_type"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    stimulus_id: Mapped[str] = mapped_column(ForeignKey("stimulus.id"), nullable=False, index=True)
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text)
-    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    answer_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    correct_option_id: Mapped[str | None] = mapped_column(ForeignKey("item_option.id", use_alter=True))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    passage: Mapped[ReadingPassage] = relationship(back_populates="questions")
-    answers: Mapped[list["ReadingAnswer"]] = relationship(
-        back_populates="question",
+    stimulus: Mapped[Stimulus] = relationship(back_populates="items", foreign_keys=[stimulus_id])
+    options: Mapped[list["ItemOption"]] = relationship(
+        back_populates="item",
         cascade="all, delete-orphan",
-        order_by="ReadingAnswer.order_index",
+        foreign_keys="ItemOption.item_id",
+        order_by="ItemOption.sort_order",
     )
+    correct_option: Mapped["ItemOption | None"] = relationship(foreign_keys=[correct_option_id], post_update=True)
+
+    def __init__(
+        self,
+        answers: list["ItemOption"] | None = None,
+        options: list["ItemOption"] | None = None,
+        order_index: int | None = None,
+        sort_order: int | None = None,
+        answer_type: str | None = None,
+        **kwargs,
+    ) -> None:
+        option_rows = options if options is not None else (answers or [])
+        super().__init__(
+            options=option_rows,
+            sort_order=sort_order if sort_order is not None else (order_index or 0),
+            answer_type=answer_type or ("true_false" if _options_look_true_false(option_rows) else "choice"),
+            **kwargs,
+        )
+        self.correct_option = next((option for option in option_rows if option.is_correct), None)
+
+    @property
+    def order_index(self) -> int:
+        return self.sort_order
+
+    @property
+    def answers(self) -> list["ItemOption"]:
+        return self.options
 
 
-class ReadingAnswer(Base):
-    __tablename__ = "reading_answers"
+class ItemOption(Base):
+    __tablename__ = "item_option"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
-    question_id: Mapped[str] = mapped_column(ForeignKey("reading_questions.id"), nullable=False)
-    answer_text: Mapped[str] = mapped_column(Text, nullable=False)
-    is_correct: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    item_id: Mapped[str] = mapped_column(ForeignKey("item.id"), nullable=False, index=True)
+    key: Mapped[str] = mapped_column(String(20), nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    ref_stimulus_id: Mapped[str | None] = mapped_column(ForeignKey("stimulus.id"), index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    question: Mapped[ReadingQuestion] = relationship(back_populates="answers")
+    item: Mapped[Item] = relationship(back_populates="options", foreign_keys=[item_id])
+    ref_stimulus: Mapped[Stimulus | None] = relationship(back_populates="referenced_by_options", foreign_keys=[ref_stimulus_id])
+
+    _legacy_is_correct: bool = False
+
+    def __init__(
+        self,
+        label: str | None = None,
+        answer_text: str | None = None,
+        sort_order: int | None = None,
+        order_index: int | None = None,
+        is_correct: bool = False,
+        **kwargs,
+    ) -> None:
+        key = kwargs.pop("key", None)
+        resolved_order = sort_order if sort_order is not None else (order_index or 0)
+        super().__init__(
+            label=label if label is not None else answer_text,
+            sort_order=resolved_order,
+            key=str(key if key is not None else resolved_order),
+            **kwargs,
+        )
+        self._legacy_is_correct = is_correct
+
+    @property
+    def answer_text(self) -> str:
+        return self.label
+
+    @property
+    def is_correct(self) -> bool:
+        return self._legacy_is_correct or (self.item is not None and self.item.correct_option_id == self.id)
+
+    @property
+    def order_index(self) -> int:
+        return self.sort_order
+
+    @property
+    def question(self) -> Item:
+        return self.item
+
+
+CachedWord = Word
+FocusWordEntry = WordFocus
+ReadingPassage = Stimulus
+ReadingQuestion = Item
+ReadingAnswer = ItemOption
+
+
+def _options_look_true_false(options: list[ItemOption]) -> bool:
+    labels = {option.label.casefold() for option in options}
+    return labels <= {"richtig", "falsch", "true", "false"} and len(labels) == 2
 
 
 class QuizAttempt(Base):

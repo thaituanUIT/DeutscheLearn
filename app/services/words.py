@@ -9,7 +9,7 @@ from requests import RequestException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import CachedWord
+from app.db.models import Word
 
 
 @dataclass(frozen=True)
@@ -40,13 +40,13 @@ SEED_WORDS = [
 
 
 def seed_words(db: Session) -> None:
-    existing = set(db.scalars(select(CachedWord.word)).all())
+    existing = set(db.scalars(select(Word.lemma)).all())
     for item in SEED_WORDS:
         if item.word in existing:
             continue
         db.add(
-            CachedWord(
-                word=item.word,
+            Word(
+                lemma=item.word,
                 article=item.article,
                 part_of_speech=item.part_of_speech,
                 meaning=item.meaning,
@@ -55,10 +55,10 @@ def seed_words(db: Session) -> None:
     db.commit()
 
 
-def get_words(db: Session, *, require_article: bool = False) -> list[CachedWord]:
-    query = select(CachedWord)
+def get_words(db: Session, *, require_article: bool = False) -> list[Word]:
+    query = select(Word)
     if require_article:
-        query = query.where(CachedWord.article.is_not(None))
+        query = query.where(Word.article.is_not(None))
     words = list(db.scalars(query).all())
     if not words:
         seed_words(db)
@@ -66,7 +66,7 @@ def get_words(db: Session, *, require_article: bool = False) -> list[CachedWord]
     return words
 
 
-def get_random_word(db: Session, *, require_article: bool = False) -> CachedWord:
+def get_random_word(db: Session, *, require_article: bool = False) -> Word:
     words = get_words(db, require_article=require_article)
     return random.choice(words)
 
@@ -106,7 +106,7 @@ def get_duden_meaning_overview(word: str) -> str:
 
 
 def get_meaning_overview(db: Session, word: str) -> str:
-    cached_word = db.get(CachedWord, word)
+    cached_word = db.scalar(select(Word).where(Word.lemma == word))
     if cached_word is not None:
         return cached_word.meaning
     return get_duden_meaning_overview(word)

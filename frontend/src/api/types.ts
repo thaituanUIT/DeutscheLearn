@@ -137,6 +137,12 @@ export type StoryAnswerChoice = {
   id: string;
   answer_text: string;
   order_index: number;
+  ref_stimulus: {
+    id: string;
+    title: string;
+    body: string;
+    context_label: string | null;
+  } | null;
 };
 
 export type StoryQuestion = {
@@ -155,7 +161,8 @@ export type StoryPassage = {
   topic: string | null;
   title: string;
   passage_text: string;
-  content: Record<string, unknown> | null;
+  image_url: string | null;
+  context_label: string | null;
   order_index: number;
   questions: StoryQuestion[];
 };
@@ -196,6 +203,15 @@ export type AdminReadingQuestion = {
   answers: AdminReadingAnswer[];
 };
 
+export type AdminReadingAdStimulus = {
+  id?: string;
+  key: "a" | "b";
+  title: string;
+  body: string;
+  context_label: string | null;
+  order_index: number;
+};
+
 export type AdminReadingPassageSummary = {
   id: string;
   group: "general" | "goethe";
@@ -213,12 +229,13 @@ export type AdminReadingPassage = {
   group: "general" | "goethe";
   level: "A1" | "A2" | "B1" | "B2";
   part: StoryPart["part"] | null;
-  exercise_type: string | null;
   topic: string | null;
   title: string;
   passage_text: string;
-  content_json: string | null;
+  image_url: string | null;
+  context_label: string | null;
   order_index: number;
+  ad_stimuli: AdminReadingAdStimulus[];
   questions: AdminReadingQuestion[];
 };
 

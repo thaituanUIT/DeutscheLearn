@@ -12,6 +12,7 @@ import {
 } from "../api/client";
 import type {
   AdminFocusEntry,
+  AdminReadingAdStimulus,
   AdminReadingPassage,
   AdminReadingQuestion,
   AdminReadingPassageSummary,
@@ -25,7 +26,6 @@ const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
 const READING_GROUPS = ["general", "goethe"] as const;
 const GOETHE_PARTS = ["teil_1", "teil_2", "teil_3", "teil_4", "teil_5"] as const;
-const EXERCISE_TYPES = ["", "source_choice", "true_false_notice"] as const;
 
 type AdminLevel = (typeof LEVELS)[number];
 type AdminReadingGroup = (typeof READING_GROUPS)[number];
@@ -72,18 +72,25 @@ function adminMissingToken(): HTMLElement {
 function adminWorkspace(token: string): HTMLElement {
   const panel = el("section", "panel admin-panel");
   const tabs = el("div", "admin-tabs");
+  tabs.setAttribute("role", "tablist");
   const host = el("div", "admin-host");
   const wordsTab = button("Vocabulary", "button primary");
   const readingTab = button("Reading", "button");
+  wordsTab.setAttribute("role", "tab");
+  readingTab.setAttribute("role", "tab");
 
   const showWords = (): void => {
     wordsTab.className = "button primary";
     readingTab.className = "button";
+    wordsTab.setAttribute("aria-selected", "true");
+    readingTab.setAttribute("aria-selected", "false");
     renderWordsAdmin(host, token);
   };
   const showReading = (): void => {
     readingTab.className = "button primary";
     wordsTab.className = "button";
+    readingTab.setAttribute("aria-selected", "true");
+    wordsTab.setAttribute("aria-selected", "false");
     renderReadingAdmin(host, token);
   };
 
@@ -359,15 +366,22 @@ function renderPassageEditor(
 ): void {
   const level = selectLevel(state.selected.level);
   const part = selectGoethePart(state.selected.part ?? "teil_1");
-  const exerciseType = selectExerciseType(state.selected.exercise_type ?? "");
   const topic = input("Topic", state.selected.topic ?? "");
+  const contextLabel = input("Context label", state.selected.context_label ?? "");
+  const imageUrl = input("Image URL", state.selected.image_url ?? "");
   const title = input("Title", state.selected.title);
-  const order = input("Order", String(state.selected.order_index), "number");
   const passage = textarea("Passage text", state.selected.passage_text, 10);
-  const contentJson = textarea("Structured content JSON", state.selected.content_json ?? "", 8);
-  contentJson.spellcheck = false;
   const questions = el("div", "admin-question-list");
   const questionControls = state.selected.questions.map((question) => questionBlock(question));
+  const firstQuestion = state.selected.questions[0] ?? emptyQuestion(0);
+  const sourceSituation = textarea("Situation", firstQuestion.prompt, 3);
+  const sourceExplanation = textarea("Explanation after answer", firstQuestion.explanation ?? "", 3);
+  const correctSource = selectSourceAnswer(firstQuestion);
+  const adControls = (["a", "b"] as const).map((key, index) =>
+    adStimulusBlock(state.selected.ad_stimuli?.[index] ?? emptyAdStimulus(key, index), key),
+  );
+  const sourceChoicePanel = sourceChoiceSection(sourceSituation, sourceExplanation, correctSource, adControls);
+  const preview = el("section", "admin-reading-preview");
   const renderQuestions = (): void => {
     questions.replaceChildren(
       ...questionControls.map((control, index) => {
@@ -386,19 +400,74 @@ function renderPassageEditor(
   const status = el("p", "prompt");
   const metaGrid = el("div", "admin-reading-meta-grid");
   const partField = wordField(part);
-  const exerciseTypeField = wordField(exerciseType);
-  const contentJsonField = wordField(contentJson);
+  const resolvedType = el("div", "admin-resolved-type", resolvedExerciseLabel(state.activeGroup, level.value, part.value));
+  const resolvedTypeField = wordField(resolvedType, "Resolved type");
+  const contextLabelField = wordField(contextLabel);
+  const imageUrlField = wordField(imageUrl);
   const isGoethe = state.activeGroup === "goethe";
+  const isSourceChoice = (): boolean => state.activeGroup === "goethe" && part.value === "teil_2";
+  const isNotice = (): boolean => state.activeGroup === "goethe" && part.value === "teil_3";
+  let questionSectionNode: HTMLElement;
   toggleField(partField, isGoethe);
-  toggleField(exerciseTypeField, isGoethe);
-  toggleField(contentJsonField, isGoethe);
+  toggleField(resolvedTypeField, isGoethe);
+  toggleField(contextLabelField, isNotice());
+  toggleField(imageUrlField, isNotice());
+  const updateResolvedType = (): void => {
+    resolvedType.textContent = resolvedExerciseLabel(state.activeGroup, level.value, part.value);
+    toggleField(contextLabelField, isNotice());
+    toggleField(imageUrlField, isNotice());
+    sourceChoicePanel.hidden = !isSourceChoice();
+    questionSectionNode.hidden = isSourceChoice();
+    const sourceQuestions = (): AdminReadingQuestion[] => {
+      try {
+        return collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource);
+      } catch {
+        return [
+          {
+            prompt: sourceSituation.value,
+            explanation: sourceExplanation.value || null,
+            order_index: 0,
+            answers: [
+              { answer_text: "a)", is_correct: correctSource.value === "0", order_index: 0 },
+              { answer_text: "b)", is_correct: correctSource.value === "1", order_index: 1 },
+            ],
+          },
+        ];
+      }
+    };
+    renderReadingPreview(preview, {
+      group: state.activeGroup,
+      level: level.value as AdminLevel,
+      part: isGoethe ? (part.value as AdminGoethePart) : null,
+      title: title.value,
+      passage_text: passage.value,
+      context_label: contextLabel.value || null,
+      image_url: imageUrl.value || null,
+      topic: topic.value || null,
+      order_index: state.selected.order_index,
+      questions: isSourceChoice() ? sourceQuestions() : collectQuestionsSafely(questionControls),
+      ad_stimuli: collectAdStimuliSafely(adControls),
+    });
+  };
+  level.addEventListener("change", updateResolvedType);
+  part.addEventListener("change", updateResolvedType);
+  for (const control of [title, passage, topic, contextLabel, imageUrl, sourceSituation, sourceExplanation]) {
+    control.addEventListener("input", updateResolvedType);
+  }
+  correctSource.addEventListener("change", updateResolvedType);
+  for (const control of adControls) {
+    control.title.addEventListener("input", updateResolvedType);
+    control.body.addEventListener("input", updateResolvedType);
+    control.contextLabel.addEventListener("input", updateResolvedType);
+  }
 
   metaGrid.append(
     wordField(level),
     partField,
-    exerciseTypeField,
+    resolvedTypeField,
     wordField(topic),
-    wordField(order),
+    contextLabelField,
+    imageUrlField,
   );
 
   const save = button(state.isNew ? "Create passage" : "Save passage", "button primary");
@@ -409,13 +478,16 @@ function renderPassageEditor(
         group: state.activeGroup,
         level: level.value as AdminLevel,
         part: isGoethe ? (part.value as AdminGoethePart) : null,
-        exercise_type: exerciseType.value.trim() || null,
         topic: topic.value.trim() || null,
         title: title.value.trim(),
         passage_text: passage.value.trim(),
-        content_json: contentJson.value.trim() || null,
-        order_index: Number(order.value) || 0,
-        questions: collectQuestions(questionControls),
+        image_url: imageUrl.value.trim() || null,
+        context_label: contextLabel.value.trim() || null,
+        order_index: state.selected.order_index,
+        ad_stimuli: isSourceChoice() ? collectAdStimuli(adControls) : [],
+        questions: isSourceChoice()
+          ? collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource)
+          : collectQuestions(questionControls),
       };
       state.selected = state.isNew
         ? await createAdminReadingPassage(token, payload)
@@ -448,14 +520,19 @@ function renderPassageEditor(
     }
   });
 
+  questionSectionNode = questionSection(questions, addTemplate);
+  updateResolvedType();
+
   const actions = el("div", "actions");
   actions.append(save, remove);
   host.replaceChildren(
     el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title),
     metaGrid,
     wordField(title),
-    readingTextGrid(wordField(passage), contentJsonField),
-    questionSection(questions, addTemplate),
+    wordField(passage),
+    sourceChoicePanel,
+    questionSectionNode,
+    preview,
     actions,
     status,
   );
@@ -466,8 +543,11 @@ function readingGroupTabs(
   onSelect: (group: AdminReadingGroup) => void,
 ): HTMLElement {
   const tabs = el("div", "admin-reading-tabs");
+  tabs.setAttribute("role", "tablist");
   for (const group of READING_GROUPS) {
     const tab = button(readingGroupLabel(group), group === activeGroup ? "button primary" : "button");
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", group === activeGroup ? "true" : "false");
     tab.addEventListener("click", () => {
       if (group !== activeGroup) onSelect(group);
     });
@@ -484,6 +564,16 @@ type QuestionBlock = {
   correct: HTMLInputElement;
   incorrect: HTMLTextAreaElement;
   remove: HTMLButtonElement;
+};
+
+type AdStimulusBlock = {
+  node: HTMLElement;
+  key: "a" | "b";
+  id?: string;
+  title: HTMLInputElement;
+  body: HTMLTextAreaElement;
+  contextLabel: HTMLInputElement;
+  orderIndex: number;
 };
 
 function questionBlock(question: AdminReadingQuestion): QuestionBlock {
@@ -513,17 +603,66 @@ function questionBlock(question: AdminReadingQuestion): QuestionBlock {
   return { node, title, prompt, explanation, correct, incorrect, remove };
 }
 
+function adStimulusBlock(ad: AdminReadingAdStimulus, key: "a" | "b"): AdStimulusBlock {
+  const node = el("div", "admin-ad-block");
+  const title = input(`${key}) Advert title`, ad.title);
+  const body = textarea(`${key}) Advert text`, ad.body, 5);
+  const contextLabel = input(`${key}) Context label`, ad.context_label ?? "");
+  node.append(
+    el("h3", "admin-question-title", `${key}) Advert`),
+    wordField(title),
+    wordField(body),
+    wordField(contextLabel),
+  );
+  return {
+    node,
+    key,
+    id: ad.id,
+    title,
+    body,
+    contextLabel,
+    orderIndex: ad.order_index,
+  };
+}
+
+function sourceChoiceSection(
+  situation: HTMLTextAreaElement,
+  explanation: HTMLTextAreaElement,
+  correct: HTMLSelectElement,
+  ads: AdStimulusBlock[],
+): HTMLElement {
+  const wrap = el("section", "admin-source-choice-section");
+  const adGrid = el("div", "admin-ad-grid");
+  adGrid.append(...ads.map((ad) => ad.node));
+  wrap.append(
+    el("h3", "admin-section-title", "Teil 2 source choice"),
+    wordField(situation),
+    adGrid,
+    wordField(correct, "Correct advert"),
+    wordField(explanation),
+  );
+  return wrap;
+}
+
+function selectSourceAnswer(question: AdminReadingQuestion): HTMLSelectElement {
+  const node = document.createElement("select");
+  node.className = "admin-input";
+  const correct = question.answers.find((answer) => answer.is_correct)?.order_index ?? 0;
+  for (const [index, label] of ["a", "b"].entries()) {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = `${label})`;
+    option.selected = index === correct;
+    node.append(option);
+  }
+  return node;
+}
+
 function questionSection(questions: HTMLElement, addButton: HTMLButtonElement): HTMLElement {
   const wrap = el("section", "admin-question-section");
   const header = el("div", "admin-question-header");
   header.append(el("h3", "admin-section-title", "Questions"), addButton);
   wrap.append(header, questions);
-  return wrap;
-}
-
-function readingTextGrid(passageField: HTMLElement, contentField: HTMLElement): HTMLElement {
-  const wrap = el("div", "admin-reading-text-grid");
-  wrap.append(passageField, contentField);
   return wrap;
 }
 
@@ -565,6 +704,104 @@ function collectQuestions(blocks: QuestionBlock[]): AdminReadingQuestion[] {
     });
 }
 
+function collectQuestionsSafely(blocks: QuestionBlock[]): AdminReadingQuestion[] {
+  try {
+    return collectQuestions(blocks);
+  } catch {
+    return [];
+  }
+}
+
+function collectSourceChoiceQuestion(
+  situation: HTMLTextAreaElement,
+  explanation: HTMLTextAreaElement,
+  correct: HTMLSelectElement,
+): AdminReadingQuestion[] {
+  const prompt = situation.value.trim();
+  if (!prompt) {
+    throw new Error("Teil 2 needs a situation.");
+  }
+  const correctIndex = Number(correct.value);
+  return [
+    {
+      prompt,
+      explanation: explanation.value.trim() || null,
+      order_index: 0,
+      answers: [
+        { answer_text: "a)", is_correct: correctIndex === 0, order_index: 0 },
+        { answer_text: "b)", is_correct: correctIndex === 1, order_index: 1 },
+      ],
+    },
+  ];
+}
+
+function collectAdStimuli(blocks: AdStimulusBlock[]): AdminReadingAdStimulus[] {
+  return blocks.map((block, index) => {
+    const title = block.title.value.trim();
+    const body = block.body.value.trim();
+    if (!title || !body) {
+      throw new Error(`Advert ${block.key}) needs a title and text.`);
+    }
+    return {
+      id: block.id,
+      key: block.key,
+      title,
+      body,
+      context_label: block.contextLabel.value.trim() || null,
+      order_index: index,
+    };
+  });
+}
+
+function collectAdStimuliSafely(blocks: AdStimulusBlock[]): AdminReadingAdStimulus[] {
+  return blocks.map((block, index) => ({
+    id: block.id,
+    key: block.key,
+    title: block.title.value.trim(),
+    body: block.body.value.trim(),
+    context_label: block.contextLabel.value.trim() || null,
+    order_index: index,
+  }));
+}
+
+function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): void {
+  const isSourceChoice = passage.group === "goethe" && passage.part === "teil_2";
+  const isNotice = passage.group === "goethe" && passage.part === "teil_3";
+  const title = el("h3", "admin-section-title", "Preview");
+  const text = el("div", "admin-preview-text");
+  text.append(el("strong", "", passage.title || "Untitled passage"));
+  if (passage.context_label) text.append(el("span", "", passage.context_label));
+  if (isNotice && passage.image_url) {
+    const image = document.createElement("img");
+    image.src = passage.image_url;
+    image.alt = passage.title || "Notice image";
+    text.append(image);
+  }
+  text.append(el("p", "", passage.passage_text || "Reading text appears here."));
+
+  const body = el("div", "admin-preview-body");
+  if (isSourceChoice) {
+    const adGrid = el("div", "admin-preview-ad-grid");
+    for (const ad of passage.ad_stimuli) {
+      const card = el("article", "admin-preview-ad");
+      card.append(el("strong", "", `${ad.key}) ${ad.title}`), el("p", "", ad.body));
+      adGrid.append(card);
+    }
+    body.append(adGrid);
+  }
+  for (const question of passage.questions) {
+    const item = el("div", "admin-preview-question");
+    item.append(el("p", "", question.prompt || "Question prompt appears here."));
+    const answers = el("div", "admin-preview-options");
+    for (const answer of question.answers) {
+      answers.append(el("span", "", answer.answer_text || "Option"));
+    }
+    item.append(answers);
+    body.append(item);
+  }
+  host.replaceChildren(title, text, body);
+}
+
 function emptyWord(): AdminWord {
   return {
     word: "",
@@ -587,13 +824,24 @@ function emptyPassage(group: AdminReadingGroup): AdminReadingPassage {
     group,
     level: "A1",
     part: group === "goethe" ? "teil_1" : null,
-    exercise_type: null,
     topic: null,
     title: "",
     passage_text: "",
-    content_json: null,
+    image_url: null,
+    context_label: null,
     order_index: 0,
+    ad_stimuli: [],
     questions: [emptyQuestion(0)],
+  };
+}
+
+function emptyAdStimulus(key: "a" | "b", orderIndex: number): AdminReadingAdStimulus {
+  return {
+    key,
+    title: "",
+    body: "",
+    context_label: null,
+    order_index: orderIndex,
   };
 }
 
@@ -657,20 +905,6 @@ function selectGoethePart(value: AdminGoethePart): HTMLSelectElement {
   return node;
 }
 
-function selectExerciseType(value: string): HTMLSelectElement {
-  const node = document.createElement("select");
-  node.setAttribute("placeholder", "Exercise type");
-  node.className = "admin-input";
-  for (const type of EXERCISE_TYPES) {
-    const option = document.createElement("option");
-    option.value = type;
-    option.textContent = type ? exerciseTypeLabel(type) : "Standard questions";
-    option.selected = type === value;
-    node.append(option);
-  }
-  return node;
-}
-
 function readingGroupLabel(group: AdminReadingGroup): string {
   return group === "goethe" ? "Goethe-Institut" : "General";
 }
@@ -679,15 +913,17 @@ function partLabel(part: AdminGoethePart): string {
   return part.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function exerciseTypeLabel(type: string): string {
-  if (type === "source_choice") return "Source choice";
-  if (type === "true_false_notice") return "Notice true/false";
-  return type;
+function resolvedExerciseLabel(group: AdminReadingGroup, level: string, part: string): string {
+  if (group === "general") return "General practice";
+  if ((level === "A1" || level === "A2") && part === "teil_1") return "Personal text - true/false";
+  if ((level === "A1" || level === "A2") && part === "teil_2") return "Two adverts - choose one";
+  if ((level === "A1" || level === "A2") && part === "teil_3") return "Sign or notice - true/false";
+  return "Reading text - standard questions";
 }
 
-function wordField(control: HTMLElement): HTMLElement {
+function wordField(control: HTMLElement, fallbackLabel?: string): HTMLElement {
   const wrap = el("label", "admin-field");
-  const label = control.getAttribute("placeholder") ?? "Level";
+  const label = fallbackLabel ?? control.getAttribute("placeholder") ?? "Level";
   wrap.append(el("span", "", label), control);
   return wrap;
 }

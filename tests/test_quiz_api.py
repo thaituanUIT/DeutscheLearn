@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from app.core.config import Settings
 from app.core.time import utc_now
@@ -16,6 +17,7 @@ from app.db.models import (
     ReadingAnswer,
     ReadingPassage,
     ReadingQuestion,
+    Topic,
 )
 from app.db.session import SessionLocal
 from app.main import app
@@ -119,10 +121,12 @@ def test_admin_word_rejects_unknown_focus_topic(monkeypatch: pytest.MonkeyPatch)
 
     db = SessionLocal()
     try:
-        assert db.get(CachedWord, word) is None
+        assert db.scalar(select(CachedWord).where(CachedWord.lemma == word)) is None
         assert (
             db.query(FocusWordEntry)
-            .filter(FocusWordEntry.word == word, FocusWordEntry.topic == "food_drinks")
+            .join(CachedWord)
+            .join(Topic)
+            .filter(CachedWord.lemma == word, Topic.slug == "food_drinks")
             .first()
             is None
         )
@@ -166,8 +170,14 @@ def test_admin_word_rejects_unknown_focus_topic_without_replacing_existing_entri
 
     db = SessionLocal()
     try:
-        entries = db.query(FocusWordEntry).filter(FocusWordEntry.word == word).all()
-        assert [(entry.level, entry.topic) for entry in entries] == [("A1", "food_drink")]
+        entries = (
+            db.query(FocusWordEntry)
+            .join(CachedWord)
+            .join(Topic)
+            .filter(CachedWord.lemma == word)
+            .all()
+        )
+        assert [(entry.level, entry.topic.slug) for entry in entries] == [("A1", "food_drink")]
     finally:
         db.close()
 
@@ -197,17 +207,36 @@ def test_focus_seed_import_preserves_admin_focus_entries(tmp_path) -> None:
             )
         )
         db.flush()
-        db.add(FocusWordEntry(word=admin_word, level="A2", topic="travel_transport"))
+        topic = db.scalar(select(Topic).where(Topic.slug == "travel_transport"))
+        if topic is None:
+            topic = Topic(slug="travel_transport", name="Travel & Transport")
+            db.add(topic)
+            db.flush()
+        stored_word = db.scalar(select(CachedWord).where(CachedWord.lemma == admin_word))
+        assert stored_word is not None
+        db.add(FocusWordEntry(word_id=stored_word.id, level="A2", topic_id=topic.id))
         db.commit()
 
         import_focus_words(db, csv_path)
 
-        admin_entries = db.query(FocusWordEntry).filter(FocusWordEntry.word == admin_word).all()
-        csv_entries = db.query(FocusWordEntry).filter(FocusWordEntry.word == csv_word).all()
-        assert [(entry.level, entry.topic) for entry in admin_entries] == [
+        admin_entries = (
+            db.query(FocusWordEntry)
+            .join(CachedWord)
+            .join(Topic)
+            .filter(CachedWord.lemma == admin_word)
+            .all()
+        )
+        csv_entries = (
+            db.query(FocusWordEntry)
+            .join(CachedWord)
+            .join(Topic)
+            .filter(CachedWord.lemma == csv_word)
+            .all()
+        )
+        assert [(entry.level, entry.topic.slug) for entry in admin_entries] == [
             ("A2", "travel_transport")
         ]
-        assert [(entry.level, entry.topic) for entry in csv_entries] == [("A1", "food_drink")]
+        assert [(entry.level, entry.topic.slug) for entry in csv_entries] == [("A1", "food_drink")]
     finally:
         db.close()
 
@@ -454,7 +483,7 @@ def test_endless_answer_returns_cached_meaning_overview(
             assert stored_question is not None
             correct_answer = stored_question.correct_answer
             answered_word = stored_question.word
-            cached_word = db.get(CachedWord, answered_word)
+            cached_word = db.scalar(select(CachedWord).where(CachedWord.lemma == answered_word))
             assert cached_word is not None
             expected_meaning = cached_word.meaning
         finally:
@@ -486,7 +515,7 @@ def test_meaning_overview_falls_back_to_duden_for_uncached_word(
 
     db = SessionLocal()
     try:
-        assert db.get(CachedWord, "NichtImCache") is None
+        assert db.scalar(select(CachedWord).where(CachedWord.lemma == "NichtImCache")) is None
         assert get_meaning_overview(db, "NichtImCache") == "Duden fallback meaning."
     finally:
         db.close()
@@ -525,7 +554,7 @@ def test_endless_answer_handles_missing_duden_meaning_overview() -> None:
         assert body["attempt_finished"] is True
         db = SessionLocal()
         try:
-            cached_word = db.get(CachedWord, body["answered_word"])
+            cached_word = db.scalar(select(CachedWord).where(CachedWord.lemma == body["answered_word"]))
             assert cached_word is not None
             assert body["meaning_overview"] == cached_word.meaning
         finally:
