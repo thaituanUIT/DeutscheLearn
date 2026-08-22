@@ -248,9 +248,12 @@ export function deleteAdminWord(token: string, word: string): Promise<void> {
 
 export function getAdminReadingPassages(
   token: string,
-  level = "",
+  filters: { group?: string; level?: string } = {},
 ): Promise<AdminReadingPassageSummary[]> {
-  const suffix = level ? `?level=${encodeURIComponent(level)}` : "";
+  const params = new URLSearchParams();
+  if (filters.group) params.set("group", filters.group);
+  if (filters.level) params.set("level", filters.level);
+  const suffix = params.toString() ? `?${params.toString()}` : "";
   return adminRequest<AdminReadingPassageSummary[]>(token, `/api/admin/reading/passages${suffix}`);
 }
 

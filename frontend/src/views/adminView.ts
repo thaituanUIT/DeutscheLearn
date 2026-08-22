@@ -259,8 +259,9 @@ function renderWordEditor(
 
 function renderReadingAdmin(host: HTMLElement, token: string): void {
   const state = {
+    activeGroup: "general" as AdminReadingGroup,
     passages: [] as AdminReadingPassageSummary[],
-    selected: emptyPassage(),
+    selected: emptyPassage("general"),
     isNew: true,
   };
 
@@ -273,7 +274,7 @@ function renderReadingAdmin(host: HTMLElement, token: string): void {
   const reload = async (): Promise<void> => {
     listPanel.replaceChildren(el("p", "prompt", "Loading passages..."));
     try {
-      state.passages = await getAdminReadingPassages(token);
+      state.passages = await getAdminReadingPassages(token, { group: state.activeGroup });
       renderPassageList(listPanel, token, state, renderEditor);
     } catch (error) {
       listPanel.replaceChildren(adminError(error));
@@ -281,6 +282,7 @@ function renderReadingAdmin(host: HTMLElement, token: string): void {
   };
 
   const renderEditor = (): void => {
+    state.selected.group = state.activeGroup;
     renderPassageEditor(editor, token, state, async () => {
       await reload();
       renderEditor();
@@ -295,6 +297,7 @@ function renderPassageList(
   host: HTMLElement,
   token: string,
   state: {
+    activeGroup: AdminReadingGroup;
     passages: AdminReadingPassageSummary[];
     selected: AdminReadingPassage;
     isNew: boolean;
@@ -303,9 +306,23 @@ function renderPassageList(
 ): void {
   const newButton = button("New passage", "button primary");
   newButton.addEventListener("click", () => {
-    state.selected = emptyPassage();
+    state.selected = emptyPassage(state.activeGroup);
     state.isNew = true;
     onSelect();
+  });
+  const tabs = readingGroupTabs(state.activeGroup, (group) => {
+    state.activeGroup = group;
+    state.selected = emptyPassage(group);
+    state.isNew = true;
+    onSelect();
+    void getAdminReadingPassages(token, { group })
+      .then((passages) => {
+        state.passages = passages;
+        renderPassageList(host, token, state, onSelect);
+      })
+      .catch((error) => {
+        host.replaceChildren(adminError(error));
+      });
   });
 
   const list = el("div", "admin-items");
@@ -329,17 +346,18 @@ function renderPassageList(
     list.append(item);
   }
 
-  host.replaceChildren(el("h2", "focus-title", "Reading"), newButton, list);
+  const header = el("div", "admin-list-header");
+  header.append(el("h2", "focus-title", "Reading"), newButton);
+  host.replaceChildren(header, tabs, list);
 }
 
 function renderPassageEditor(
   host: HTMLElement,
   token: string,
-  state: { selected: AdminReadingPassage; isNew: boolean },
+  state: { activeGroup: AdminReadingGroup; selected: AdminReadingPassage; isNew: boolean },
   onSaved: () => Promise<void>,
 ): void {
   const level = selectLevel(state.selected.level);
-  const group = selectReadingGroup(state.selected.group);
   const part = selectGoethePart(state.selected.part ?? "teil_1");
   const exerciseType = selectExerciseType(state.selected.exercise_type ?? "");
   const topic = input("Topic", state.selected.topic ?? "");
@@ -370,17 +388,12 @@ function renderPassageEditor(
   const partField = wordField(part);
   const exerciseTypeField = wordField(exerciseType);
   const contentJsonField = wordField(contentJson);
-  const updateGoetheFields = (): void => {
-    const isGoethe = group.value === "goethe";
-    toggleField(partField, isGoethe);
-    toggleField(exerciseTypeField, isGoethe);
-    toggleField(contentJsonField, isGoethe);
-  };
-  group.addEventListener("change", updateGoetheFields);
-  updateGoetheFields();
+  const isGoethe = state.activeGroup === "goethe";
+  toggleField(partField, isGoethe);
+  toggleField(exerciseTypeField, isGoethe);
+  toggleField(contentJsonField, isGoethe);
 
   metaGrid.append(
-    wordField(group),
     wordField(level),
     partField,
     exerciseTypeField,
@@ -393,9 +406,9 @@ function renderPassageEditor(
     try {
       const payload: AdminReadingPassage = {
         id: state.selected.id,
-        group: group.value as AdminReadingGroup,
+        group: state.activeGroup,
         level: level.value as AdminLevel,
-        part: group.value === "goethe" ? (part.value as AdminGoethePart) : null,
+        part: isGoethe ? (part.value as AdminGoethePart) : null,
         exercise_type: exerciseType.value.trim() || null,
         topic: topic.value.trim() || null,
         title: title.value.trim(),
@@ -427,7 +440,7 @@ function renderPassageEditor(
     if (!state.selected.id || !window.confirm(`Delete ${state.selected.title}?`)) return;
     try {
       await deleteAdminReadingPassage(token, state.selected.id);
-      state.selected = emptyPassage();
+      state.selected = emptyPassage(state.activeGroup);
       state.isNew = true;
       await onSaved();
     } catch (error) {
@@ -446,6 +459,21 @@ function renderPassageEditor(
     actions,
     status,
   );
+}
+
+function readingGroupTabs(
+  activeGroup: AdminReadingGroup,
+  onSelect: (group: AdminReadingGroup) => void,
+): HTMLElement {
+  const tabs = el("div", "admin-reading-tabs");
+  for (const group of READING_GROUPS) {
+    const tab = button(readingGroupLabel(group), group === activeGroup ? "button primary" : "button");
+    tab.addEventListener("click", () => {
+      if (group !== activeGroup) onSelect(group);
+    });
+    tabs.append(tab);
+  }
+  return tabs;
 }
 
 type QuestionBlock = {
@@ -554,11 +582,11 @@ function cloneWord(word: AdminWord): AdminWord {
   };
 }
 
-function emptyPassage(): AdminReadingPassage {
+function emptyPassage(group: AdminReadingGroup): AdminReadingPassage {
   return {
-    group: "general",
+    group,
     level: "A1",
-    part: null,
+    part: group === "goethe" ? "teil_1" : null,
     exercise_type: null,
     topic: null,
     title: "",
@@ -610,20 +638,6 @@ function selectLevel(value: AdminLevel): HTMLSelectElement {
     option.value = level;
     option.textContent = level;
     option.selected = level === value;
-    node.append(option);
-  }
-  return node;
-}
-
-function selectReadingGroup(value: AdminReadingGroup): HTMLSelectElement {
-  const node = document.createElement("select");
-  node.setAttribute("placeholder", "Reading group");
-  node.className = "admin-input";
-  for (const group of READING_GROUPS) {
-    const option = document.createElement("option");
-    option.value = group;
-    option.textContent = readingGroupLabel(group);
-    option.selected = group === value;
     node.append(option);
   }
   return node;

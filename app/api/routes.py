@@ -309,6 +309,7 @@ def admin_delete_word(word_key: str, db: Session = Depends(get_db)) -> None:
     dependencies=[Depends(require_admin)],
 )
 def admin_reading_passages(
+    group: str | None = Query(default=None, pattern="^(general|goethe)$"),
     level: str | None = Query(default=None, pattern="^(A1|A2|B1|B2)$"),
     db: Session = Depends(get_db),
 ) -> list[AdminReadingPassageSummaryOut]:
@@ -322,6 +323,8 @@ def admin_reading_passages(
         .outerjoin(question_counts, question_counts.c.passage_id == ReadingPassage.id)
         .order_by(ReadingPassage.level, ReadingPassage.order_index, ReadingPassage.title)
     )
+    if group:
+        query = query.where(ReadingPassage.group == group)
     if level:
         query = query.where(ReadingPassage.level == level)
     rows = db.execute(query).all()

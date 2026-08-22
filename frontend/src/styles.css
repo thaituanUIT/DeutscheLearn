@@ -929,6 +929,16 @@ button {
   min-width: 68px;
 }
 
+.admin-reading-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-reading-tabs .button {
+  min-height: 44px;
+}
+
 .admin-items {
   max-height: 70vh;
   display: grid;
@@ -956,13 +966,12 @@ button {
 
 .admin-reading-meta-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
-.admin-reading-meta-grid .admin-field:first-child,
-.admin-reading-meta-grid .admin-field:nth-child(4),
-.admin-reading-meta-grid .admin-field:nth-child(5) {
+.admin-reading-meta-grid .admin-field:nth-child(3),
+.admin-reading-meta-grid .admin-field:nth-child(4) {
   grid-column: span 2;
 }
 
