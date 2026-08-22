@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -142,6 +144,7 @@ class StoryPassageSummaryOut(BaseModel):
     group: str
     level: str
     part: str | None
+    exercise_type: str | None
     topic: str | None
     title: str
     order_index: int
@@ -166,9 +169,11 @@ class StoryPassageOut(BaseModel):
     group: str
     level: str
     part: str | None
+    exercise_type: str | None
     topic: str | None
     title: str
     passage_text: str
+    content: dict[str, Any] | None
     order_index: int
     questions: list[StoryQuestionOut]
 
@@ -252,9 +257,11 @@ class AdminReadingPassageIn(BaseModel):
     group: str = Field(default="general", pattern="^(general|goethe)$")
     level: str = Field(pattern="^(A1|A2|B1|B2)$")
     part: str | None = Field(default=None, pattern="^teil_[1-5]$")
+    exercise_type: str | None = Field(default=None, max_length=80)
     topic: str | None = Field(default=None, max_length=80)
     title: str = Field(min_length=1, max_length=160)
     passage_text: str = Field(min_length=1)
+    content_json: str | None = None
     order_index: int = Field(default=0, ge=0)
     questions: list[AdminReadingQuestionIn] = Field(default_factory=list)
 
@@ -264,6 +271,7 @@ class AdminReadingPassageSummaryOut(BaseModel):
     group: str
     level: str
     part: str | None
+    exercise_type: str | None
     topic: str | None
     title: str
     order_index: int
@@ -275,9 +283,11 @@ class AdminReadingPassageOut(BaseModel):
     group: str
     level: str
     part: str | None
+    exercise_type: str | None
     topic: str | None
     title: str
     passage_text: str
+    content_json: str | None
     order_index: int
     questions: list[AdminReadingQuestionOut]
 

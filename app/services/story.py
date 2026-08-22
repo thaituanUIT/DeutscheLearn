@@ -9,7 +9,12 @@ from app.services.focus import FOCUS_LEVELS
 
 STORY_SEED_PATH = Path("data/story_passages.json")
 STORY_GROUPS = ("general", "goethe")
-GOETHE_PARTS = ("teil_1", "teil_2", "teil_3", "teil_4", "teil_5")
+GOETHE_PARTS_BY_LEVEL = {
+    "A1": ("teil_1", "teil_2", "teil_3"),
+    "A2": ("teil_1", "teil_2", "teil_3", "teil_4"),
+    "B1": ("teil_1", "teil_2", "teil_3", "teil_4", "teil_5"),
+    "B2": ("teil_1", "teil_2", "teil_3", "teil_4", "teil_5"),
+}
 
 
 def import_story_passages(db: Session, json_path: Path = STORY_SEED_PATH) -> None:
@@ -22,9 +27,11 @@ def import_story_passages(db: Session, json_path: Path = STORY_SEED_PATH) -> Non
             group=passage_data.get("group", "general").strip().lower(),
             level=passage_data["level"].strip().upper(),
             part=_clean_part(passage_data.get("part")),
+            exercise_type=_clean_optional_text(passage_data.get("exercise_type")),
             topic=_clean_optional_text(passage_data.get("topic")),
             title=passage_data["title"].strip(),
             passage_text=passage_data["passage_text"].strip(),
+            content_json=_dump_optional_json(passage_data.get("content")),
             order_index=int(passage_data.get("order_index", 0)),
             questions=[
                 ReadingQuestion(
@@ -103,6 +110,7 @@ def get_story_levels(db: Session, group: str = "general") -> list[dict[str, int 
 
 
 def get_goethe_parts(db: Session, level: str) -> list[dict[str, int | str]]:
+    parts = GOETHE_PARTS_BY_LEVEL.get(level, ())
     counts = dict(
         db.execute(
             select(ReadingPassage.part, func.count(ReadingPassage.id))
@@ -125,7 +133,7 @@ def get_goethe_parts(db: Session, level: str) -> list[dict[str, int | str]]:
             "passage_count": counts.get(part, 0),
             "question_count": question_counts.get(part, 0),
         }
-        for part in GOETHE_PARTS
+        for part in parts
     ]
 
 
@@ -153,6 +161,7 @@ def get_story_passages(
             "group": passage.group,
             "level": passage.level,
             "part": passage.part,
+            "exercise_type": passage.exercise_type,
             "topic": passage.topic,
             "title": passage.title,
             "order_index": passage.order_index,
@@ -197,3 +206,9 @@ def _clean_part(value: str | None) -> str | None:
         return None
     text = "_".join(value.strip().lower().split())
     return text or None
+
+
+def _dump_optional_json(value: object) -> str | None:
+    if value is None:
+        return None
+    return json.dumps(value, ensure_ascii=False)

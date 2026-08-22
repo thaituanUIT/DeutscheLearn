@@ -59,9 +59,11 @@ class ReadingPassage(Base):
     group: Mapped[str] = mapped_column(String(40), default="general", nullable=False)
     level: Mapped[str] = mapped_column(String(8), nullable=False)
     part: Mapped[str | None] = mapped_column(String(40))
+    exercise_type: Mapped[str | None] = mapped_column(String(80))
     topic: Mapped[str | None] = mapped_column(String(80))
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     passage_text: Mapped[str] = mapped_column(Text, nullable=False)
+    content_json: Mapped[str | None] = mapped_column(Text)
     order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

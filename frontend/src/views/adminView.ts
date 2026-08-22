@@ -340,10 +340,12 @@ function renderPassageEditor(
   const level = selectLevel(state.selected.level);
   const group = selectReadingGroup(state.selected.group);
   const part = selectGoethePart(state.selected.part ?? "teil_1");
+  const exerciseType = input("Exercise type", state.selected.exercise_type ?? "");
   const topic = input("Topic", state.selected.topic ?? "");
   const title = input("Title", state.selected.title);
   const order = input("Order", String(state.selected.order_index), "number");
   const passage = textarea("Passage text", state.selected.passage_text, 10);
+  const contentJson = textarea("Structured content JSON", state.selected.content_json ?? "", 8);
   const questions = el("div", "admin-question-list");
   const questionControls = state.selected.questions.map((question) => questionBlock(question));
   const renderQuestions = (): void => {
@@ -371,9 +373,11 @@ function renderPassageEditor(
         group: group.value as AdminReadingGroup,
         level: level.value as AdminLevel,
         part: group.value === "goethe" ? (part.value as AdminGoethePart) : null,
+        exercise_type: exerciseType.value.trim() || null,
         topic: topic.value.trim() || null,
         title: title.value.trim(),
         passage_text: passage.value.trim(),
+        content_json: contentJson.value.trim() || null,
         order_index: Number(order.value) || 0,
         questions: collectQuestions(questionControls),
       };
@@ -415,10 +419,12 @@ function renderPassageEditor(
     wordField(group),
     wordField(level),
     wordField(part),
+    wordField(exerciseType),
     wordField(topic),
     wordField(title),
     wordField(order),
     wordField(passage),
+    wordField(contentJson),
     questionSection(questions, addTemplate),
     actions,
     status,
@@ -525,9 +531,11 @@ function emptyPassage(): AdminReadingPassage {
     group: "general",
     level: "A1",
     part: null,
+    exercise_type: null,
     topic: null,
     title: "",
     passage_text: "",
+    content_json: null,
     order_index: 0,
     questions: [emptyQuestion(0)],
   };

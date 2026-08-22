@@ -126,6 +126,7 @@ export type StoryPassageSummary = {
   group: "general" | "goethe";
   level: "A1" | "A2" | "B1" | "B2";
   part: StoryPart["part"] | null;
+  exercise_type: string | null;
   topic: string | null;
   title: string;
   order_index: number;
@@ -150,9 +151,11 @@ export type StoryPassage = {
   group: "general" | "goethe";
   level: "A1" | "A2" | "B1" | "B2";
   part: StoryPart["part"] | null;
+  exercise_type: string | null;
   topic: string | null;
   title: string;
   passage_text: string;
+  content: Record<string, unknown> | null;
   order_index: number;
   questions: StoryQuestion[];
 };
@@ -198,6 +201,7 @@ export type AdminReadingPassageSummary = {
   group: "general" | "goethe";
   level: "A1" | "A2" | "B1" | "B2";
   part: StoryPart["part"] | null;
+  exercise_type: string | null;
   topic: string | null;
   title: string;
   order_index: number;
@@ -209,9 +213,11 @@ export type AdminReadingPassage = {
   group: "general" | "goethe";
   level: "A1" | "A2" | "B1" | "B2";
   part: StoryPart["part"] | null;
+  exercise_type: string | null;
   topic: string | null;
   title: string;
   passage_text: string;
+  content_json: string | null;
   order_index: number;
   questions: AdminReadingQuestion[];
 };

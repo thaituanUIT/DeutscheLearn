@@ -84,7 +84,7 @@ async function renderStoryLevels(
         group === "goethe"
           ? () => renderStoryParts(section, level.level, options)
           : () => renderStoryPassages(section, group, level.level, null, options);
-      grid.append(levelCard(level, onClick, { disabledWhenEmpty: group === "general" }));
+      grid.append(levelCard(level, onClick, { disabledWhenEmpty: group === "general", itemLabel: itemLabel(group) }));
     }
 
     section.replaceChildren(intro, grid);
@@ -137,16 +137,21 @@ async function renderStoryPassages(
     const intro = el("div");
     intro.append(
       el("div", "question-type", part ? `${groupLabel(group)} · ${level} · ${partLabel(part)}` : level),
-      el("h2", "focus-title", "Choose a story"),
+      el("h2", "focus-title", group === "goethe" ? "Choose an Übung" : "Choose a story"),
     );
 
     const grid = el("div", "focus-grid topics-grid");
     for (const passage of passages) {
-      grid.append(passageCard(passage, () => renderStoryReader(section, passage.id, group, level, part, options)));
+      grid.append(
+        passageCard(passage, () => renderStoryReader(section, passage.id, group, level, part, options)),
+      );
     }
 
     if (passages.length === 0) {
-      section.replaceChildren(intro, el("p", "prompt", "No stories are available here yet."));
+      section.replaceChildren(
+        intro,
+        el("p", "prompt", group === "goethe" ? "No Übungen are available here yet." : "No stories are available here yet."),
+      );
       return;
     }
     section.replaceChildren(intro, grid);
@@ -179,6 +184,7 @@ function renderStoryPractice(
   session: StorySession,
   options: StoryViewOptions,
 ): void {
+  section.classList.toggle("goethe-reader-card", session.passage.group === "goethe");
   if (session.passage.questions.length === 0) {
     const empty = el("div", "story-question-panel");
     empty.append(
@@ -287,6 +293,13 @@ function renderStoryPractice(
 }
 
 function storyContent(passage: StoryPassage): HTMLElement {
+  if (passage.group === "goethe" && passage.exercise_type === "source_choice") {
+    return sourceChoiceContent(passage);
+  }
+  if (passage.group === "goethe" && passage.exercise_type === "true_false_notice") {
+    return noticeContent(passage);
+  }
+
   const content = el("article", "story-passage");
   content.append(
     el("div", "question-type", passage.topic ? `${passage.level} · ${topicLabel(passage.topic)}` : passage.level),
@@ -296,8 +309,77 @@ function storyContent(passage: StoryPassage): HTMLElement {
   return content;
 }
 
+function sourceChoiceContent(passage: StoryPassage): HTMLElement {
+  const content = el("article", "story-passage goethe-exercise source-choice-exercise");
+  const data = asRecord(passage.content);
+  const prompt = stringValue(data.prompt) || passage.passage_text;
+  const sources = arrayValue(data.sources).map(asRecord).filter(Boolean);
+  content.append(
+    el("div", "question-type", `${passage.level} · ${partLabel(passage.part ?? "teil_2")}`),
+    el("h2", "story-title", passage.title),
+    el("p", "goethe-task-prompt", prompt),
+  );
+
+  const grid = el("div", "source-card-grid");
+  sources.forEach((source, index) => {
+    const card = el("section", "source-card");
+    const header = el("div", "source-card-header");
+    header.append(
+      el("span", "source-pill", stringValue(source.id) || String.fromCharCode(97 + index)),
+      el("strong", "", stringValue(source.title) || `Option ${index + 1}`),
+    );
+    const details = arrayValue(source.details)
+      .map((item) => stringValue(item))
+      .filter(Boolean);
+    card.append(
+      header,
+      el("p", "source-subtitle", stringValue(source.subtitle)),
+      detailList(details),
+    );
+    grid.append(card);
+  });
+
+  if (sources.length === 0) {
+    grid.append(el("p", "story-text", passage.passage_text));
+  }
+  content.append(grid);
+  return content;
+}
+
+function noticeContent(passage: StoryPassage): HTMLElement {
+  const content = el("article", "story-passage goethe-exercise notice-exercise");
+  const data = asRecord(passage.content);
+  const notice = asRecord(data.notice);
+  const tone = stringValue(notice.tone) || "info";
+  const card = el("section", `notice-card notice-${tone}`);
+  card.append(
+    el("div", "notice-bar", stringValue(notice.label) || "Hinweis"),
+    el("h3", "", stringValue(notice.headline) || passage.title),
+    el("p", "", stringValue(notice.body) || passage.passage_text),
+  );
+  content.append(
+    el("div", "question-type", `${passage.level} · ${partLabel(passage.part ?? "teil_3")}`),
+    el("h2", "story-title", passage.title),
+    card,
+  );
+  return content;
+}
+
+function detailList(items: string[]): HTMLElement {
+  const list = el("ul", "source-detail-list");
+  for (const item of items) {
+    list.append(el("li", "", item));
+  }
+  return list;
+}
+
 function storyPracticeLayout(passage: StoryPassage, questionPanel: HTMLElement): HTMLElement {
-  const layout = el("div", "story-practice-layout");
+  const layout = el(
+    "div",
+    passage.group === "goethe"
+      ? "story-practice-layout goethe-practice-layout"
+      : "story-practice-layout",
+  );
   layout.append(storyContent(passage), questionPanel);
   return layout;
 }
@@ -308,7 +390,7 @@ function groupCard(group: StoryGroup, onClick: () => void): HTMLButtonElement {
   card.append(
     el("strong", "", group.label),
     el("span", "", group.group === "general" ? "A1, A2, B1, B2 stories" : "Exam-style reading practice"),
-    el("span", "", `${group.passage_count} stories · ${group.question_count} questions`),
+    el("span", "", `${group.passage_count} ${itemLabel(group.group)} · ${group.question_count} questions`),
   );
   return card;
 }
@@ -316,14 +398,14 @@ function groupCard(group: StoryGroup, onClick: () => void): HTMLButtonElement {
 function levelCard(
   level: StoryLevel,
   onClick: () => void,
-  options: { disabledWhenEmpty: boolean },
+  options: { disabledWhenEmpty: boolean; itemLabel: string },
 ): HTMLButtonElement {
   const card = button("", "focus-option");
   card.disabled = options.disabledWhenEmpty && level.passage_count === 0;
   card.addEventListener("click", onClick);
   card.append(
     el("strong", "", level.level),
-    el("span", "", `${level.passage_count} stories`),
+    el("span", "", `${level.passage_count} ${options.itemLabel}`),
     el("span", "", `${level.question_count} questions`),
   );
   return card;
@@ -334,7 +416,7 @@ function partCard(part: StoryPart, onClick: () => void): HTMLButtonElement {
   card.addEventListener("click", onClick);
   card.append(
     el("strong", "", part.label),
-    el("span", "", `${part.passage_count} stories`),
+    el("span", "", `${part.passage_count} Übungen`),
     el("span", "", `${part.question_count} questions`),
   );
   return card;
@@ -356,8 +438,24 @@ function groupLabel(group: StoryGroup["group"]): string {
   return group === "goethe" ? "Goethe-Institut" : "General";
 }
 
+function itemLabel(group: StoryGroup["group"]): string {
+  return group === "goethe" ? "Übungen" : "stories";
+}
+
 function partLabel(part: StoryPart["part"]): string {
   return part.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
 function topicLabel(topic: string): string {

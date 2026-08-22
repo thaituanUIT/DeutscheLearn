@@ -331,6 +331,7 @@ def admin_reading_passages(
             group=passage.group,
             level=passage.level,
             part=passage.part,
+            exercise_type=passage.exercise_type,
             topic=passage.topic,
             title=passage.title,
             order_index=passage.order_index,
@@ -703,9 +704,11 @@ def _story_passage_out(passage: ReadingPassage) -> StoryPassageOut:
         group=passage.group,
         level=passage.level,
         part=passage.part,
+        exercise_type=passage.exercise_type,
         topic=passage.topic,
         title=passage.title,
         passage_text=passage.passage_text,
+        content=_reading_content(passage.content_json),
         order_index=passage.order_index,
         questions=[
             StoryQuestionOut(
@@ -785,9 +788,11 @@ def _apply_reading_payload(passage: ReadingPassage, payload: AdminReadingPassage
     passage.group = payload.group
     passage.level = payload.level
     passage.part = payload.part if payload.group == "goethe" else None
+    passage.exercise_type = _clean_optional_text(payload.exercise_type)
     passage.topic = _clean_optional_text(payload.topic)
     passage.title = payload.title.strip()
     passage.passage_text = payload.passage_text.strip()
+    passage.content_json = _clean_content_json(payload.content_json)
     passage.order_index = payload.order_index
     passage.updated_at = utc_now()
     passage.questions = [
@@ -814,9 +819,11 @@ def _admin_reading_passage_out(passage: ReadingPassage) -> AdminReadingPassageOu
         group=passage.group,
         level=passage.level,
         part=passage.part,
+        exercise_type=passage.exercise_type,
         topic=passage.topic,
         title=passage.title,
         passage_text=passage.passage_text,
+        content_json=passage.content_json,
         order_index=passage.order_index,
         questions=[
             AdminReadingQuestionOut(
@@ -844,3 +851,25 @@ def _clean_optional_text(value: str | None) -> str | None:
         return None
     text = " ".join(value.split())
     return text or None
+
+
+def _clean_content_json(value: str | None) -> str | None:
+    if value is None or not value.strip():
+        return None
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=422, detail=f"Invalid content JSON: {error.msg}") from error
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=422, detail="Content JSON must be an object")
+    return json.dumps(parsed, ensure_ascii=False)
+
+
+def _reading_content(value: str | None) -> dict | None:
+    if not value:
+        return None
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None

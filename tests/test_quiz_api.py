@@ -307,15 +307,16 @@ def test_story_mode_exposes_general_and_goethe_structure() -> None:
         assert levels.status_code == 200
         assert [level["level"] for level in levels.json()] == ["A1", "A2", "B1", "B2"]
 
-        parts = client.get("/api/story/parts?level=A1")
-        assert parts.status_code == 200
-        assert [part["part"] for part in parts.json()] == [
-            "teil_1",
-            "teil_2",
-            "teil_3",
-            "teil_4",
-            "teil_5",
-        ]
+        expected_parts = {
+            "A1": ["teil_1", "teil_2", "teil_3"],
+            "A2": ["teil_1", "teil_2", "teil_3", "teil_4"],
+            "B1": ["teil_1", "teil_2", "teil_3", "teil_4", "teil_5"],
+            "B2": ["teil_1", "teil_2", "teil_3", "teil_4", "teil_5"],
+        }
+        for level, expected in expected_parts.items():
+            parts = client.get(f"/api/story/parts?level={level}")
+            assert parts.status_code == 200
+            assert [part["part"] for part in parts.json()] == expected
 
 
 def test_story_passages_filter_by_group_level_and_part() -> None:
