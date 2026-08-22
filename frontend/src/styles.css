@@ -897,7 +897,7 @@ button {
 
 .admin-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.8fr);
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 2fr);
   gap: 20px;
   align-items: start;
 }
@@ -938,9 +938,9 @@ button {
 
 .admin-item {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   width: 100%;
-  padding: 12px;
+  padding: 13px;
   border: 1px solid #e0e2dc;
   border-radius: 8px;
   background: #ffffff;
@@ -952,6 +952,31 @@ button {
 .admin-item span {
   color: #687078;
   font-size: 0.88rem;
+}
+
+.admin-reading-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-reading-meta-grid .admin-field:first-child,
+.admin-reading-meta-grid .admin-field:nth-child(4),
+.admin-reading-meta-grid .admin-field:nth-child(5) {
+  grid-column: span 2;
+}
+
+.admin-reading-text-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.admin-reading-text-grid .admin-field[hidden],
+.admin-reading-meta-grid .admin-field[hidden],
+.admin-field.is-hidden {
+  display: none;
 }
 
 .admin-field {
@@ -983,6 +1008,16 @@ button {
 .admin-textarea {
   resize: vertical;
   line-height: 1.45;
+}
+
+.admin-reading-text-grid .admin-textarea {
+  min-height: 230px;
+  font-family: inherit;
+}
+
+.admin-reading-text-grid .admin-field:last-child .admin-textarea {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.9rem;
 }
 
 .admin-question-section {
@@ -1314,6 +1349,11 @@ button {
   }
 
   .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-reading-meta-grid,
+  .admin-reading-text-grid {
     grid-template-columns: 1fr;
   }
 

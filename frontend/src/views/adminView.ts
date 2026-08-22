@@ -25,6 +25,7 @@ const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
 const READING_GROUPS = ["general", "goethe"] as const;
 const GOETHE_PARTS = ["teil_1", "teil_2", "teil_3", "teil_4", "teil_5"] as const;
+const EXERCISE_TYPES = ["", "source_choice", "true_false_notice"] as const;
 
 type AdminLevel = (typeof LEVELS)[number];
 type AdminReadingGroup = (typeof READING_GROUPS)[number];
@@ -340,12 +341,13 @@ function renderPassageEditor(
   const level = selectLevel(state.selected.level);
   const group = selectReadingGroup(state.selected.group);
   const part = selectGoethePart(state.selected.part ?? "teil_1");
-  const exerciseType = input("Exercise type", state.selected.exercise_type ?? "");
+  const exerciseType = selectExerciseType(state.selected.exercise_type ?? "");
   const topic = input("Topic", state.selected.topic ?? "");
   const title = input("Title", state.selected.title);
   const order = input("Order", String(state.selected.order_index), "number");
   const passage = textarea("Passage text", state.selected.passage_text, 10);
   const contentJson = textarea("Structured content JSON", state.selected.content_json ?? "", 8);
+  contentJson.spellcheck = false;
   const questions = el("div", "admin-question-list");
   const questionControls = state.selected.questions.map((question) => questionBlock(question));
   const renderQuestions = (): void => {
@@ -364,6 +366,27 @@ function renderPassageEditor(
   };
   renderQuestions();
   const status = el("p", "prompt");
+  const metaGrid = el("div", "admin-reading-meta-grid");
+  const partField = wordField(part);
+  const exerciseTypeField = wordField(exerciseType);
+  const contentJsonField = wordField(contentJson);
+  const updateGoetheFields = (): void => {
+    const isGoethe = group.value === "goethe";
+    toggleField(partField, isGoethe);
+    toggleField(exerciseTypeField, isGoethe);
+    toggleField(contentJsonField, isGoethe);
+  };
+  group.addEventListener("change", updateGoetheFields);
+  updateGoetheFields();
+
+  metaGrid.append(
+    wordField(group),
+    wordField(level),
+    partField,
+    exerciseTypeField,
+    wordField(topic),
+    wordField(order),
+  );
 
   const save = button(state.isNew ? "Create passage" : "Save passage", "button primary");
   save.addEventListener("click", async () => {
@@ -416,15 +439,9 @@ function renderPassageEditor(
   actions.append(save, remove);
   host.replaceChildren(
     el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title),
-    wordField(group),
-    wordField(level),
-    wordField(part),
-    wordField(exerciseType),
-    wordField(topic),
+    metaGrid,
     wordField(title),
-    wordField(order),
-    wordField(passage),
-    wordField(contentJson),
+    readingTextGrid(wordField(passage), contentJsonField),
     questionSection(questions, addTemplate),
     actions,
     status,
@@ -474,6 +491,17 @@ function questionSection(questions: HTMLElement, addButton: HTMLButtonElement): 
   header.append(el("h3", "admin-section-title", "Questions"), addButton);
   wrap.append(header, questions);
   return wrap;
+}
+
+function readingTextGrid(passageField: HTMLElement, contentField: HTMLElement): HTMLElement {
+  const wrap = el("div", "admin-reading-text-grid");
+  wrap.append(passageField, contentField);
+  return wrap;
+}
+
+function toggleField(field: HTMLElement, visible: boolean): void {
+  field.hidden = !visible;
+  field.classList.toggle("is-hidden", !visible);
 }
 
 function collectQuestions(blocks: QuestionBlock[]): AdminReadingQuestion[] {
@@ -615,12 +643,32 @@ function selectGoethePart(value: AdminGoethePart): HTMLSelectElement {
   return node;
 }
 
+function selectExerciseType(value: string): HTMLSelectElement {
+  const node = document.createElement("select");
+  node.setAttribute("placeholder", "Exercise type");
+  node.className = "admin-input";
+  for (const type of EXERCISE_TYPES) {
+    const option = document.createElement("option");
+    option.value = type;
+    option.textContent = type ? exerciseTypeLabel(type) : "Standard questions";
+    option.selected = type === value;
+    node.append(option);
+  }
+  return node;
+}
+
 function readingGroupLabel(group: AdminReadingGroup): string {
   return group === "goethe" ? "Goethe-Institut" : "General";
 }
 
 function partLabel(part: AdminGoethePart): string {
   return part.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function exerciseTypeLabel(type: string): string {
+  if (type === "source_choice") return "Source choice";
+  if (type === "true_false_notice") return "Notice true/false";
+  return type;
 }
 
 function wordField(control: HTMLElement): HTMLElement {
