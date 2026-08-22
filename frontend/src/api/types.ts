@@ -107,9 +107,25 @@ export type StoryLevel = {
   question_count: number;
 };
 
+export type StoryGroup = {
+  group: "general" | "goethe";
+  label: string;
+  passage_count: number;
+  question_count: number;
+};
+
+export type StoryPart = {
+  part: "teil_1" | "teil_2" | "teil_3" | "teil_4" | "teil_5";
+  label: string;
+  passage_count: number;
+  question_count: number;
+};
+
 export type StoryPassageSummary = {
   id: string;
+  group: "general" | "goethe";
   level: "A1" | "A2" | "B1" | "B2";
+  part: StoryPart["part"] | null;
   topic: string | null;
   title: string;
   order_index: number;
@@ -131,7 +147,9 @@ export type StoryQuestion = {
 
 export type StoryPassage = {
   id: string;
+  group: "general" | "goethe";
   level: "A1" | "A2" | "B1" | "B2";
+  part: StoryPart["part"] | null;
   topic: string | null;
   title: string;
   passage_text: string;
@@ -177,7 +195,9 @@ export type AdminReadingQuestion = {
 
 export type AdminReadingPassageSummary = {
   id: string;
+  group: "general" | "goethe";
   level: "A1" | "A2" | "B1" | "B2";
+  part: StoryPart["part"] | null;
   topic: string | null;
   title: string;
   order_index: number;
@@ -186,7 +206,9 @@ export type AdminReadingPassageSummary = {
 
 export type AdminReadingPassage = {
   id?: string;
+  group: "general" | "goethe";
   level: "A1" | "A2" | "B1" | "B2";
+  part: StoryPart["part"] | null;
   topic: string | null;
   title: string;
   passage_text: string;

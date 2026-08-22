@@ -62,8 +62,11 @@ function draw(
 
   const showHome = (syncRoute = true): void => {
     if (syncRoute) writeRoute("home");
+    layout.className = "layout home-layout";
     headerStart.replaceChildren(el("h1", "brand", "German Word Quiz"));
     mainHost.replaceChildren(homeView({ onSelectMode: showMode }));
+    sidebar.replaceChildren(wordOfDayView(wordOfDay), leaderboardHost);
+    layout.replaceChildren(mainHost, sidebar);
   };
 
   const renderHeaderBack = (onClick: () => void): void => {
@@ -74,6 +77,8 @@ function draw(
 
   const showMode = (mode: HomeMode, syncRoute = true): void => {
     if (syncRoute) writeRoute(mode);
+    layout.className = mode === "story" ? "layout mode-layout story-mode-layout" : "layout mode-layout";
+    layout.replaceChildren(mainHost);
     renderHeaderBack(showHome);
     if (mode === "focus") {
       mainHost.replaceChildren(
@@ -133,8 +138,6 @@ function draw(
   window.addEventListener("hashchange", renderRoute);
   window.addEventListener("popstate", renderRoute);
   renderRoute();
-  sidebar.replaceChildren(wordOfDayView(wordOfDay), leaderboardHost);
-  layout.replaceChildren(mainHost, sidebar);
   shell.replaceChildren(header, layout);
   clear(root);
   root.append(shell);

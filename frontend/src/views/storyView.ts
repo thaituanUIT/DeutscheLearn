@@ -1,5 +1,19 @@
-import { getStoryLevels, getStoryPassage, getStoryPassages, submitStoryAnswer } from "../api/client";
-import type { StoryAnswer, StoryLevel, StoryPassage, StoryPassageSummary } from "../api/types";
+import {
+  getStoryGroups,
+  getStoryLevels,
+  getStoryParts,
+  getStoryPassage,
+  getStoryPassages,
+  submitStoryAnswer,
+} from "../api/client";
+import type {
+  StoryAnswer,
+  StoryGroup,
+  StoryLevel,
+  StoryPart,
+  StoryPassage,
+  StoryPassageSummary,
+} from "../api/types";
 import { button } from "../components/button";
 import { el } from "../utils/dom";
 
@@ -21,25 +35,56 @@ type StoryQuestionResult = StoryAnswer & {
 
 export function storyView(options: StoryViewOptions): HTMLElement {
   const section = el("section", "panel story-card");
-  renderStoryLevels(section, options);
+  renderStoryGroups(section, options);
   return section;
 }
 
-async function renderStoryLevels(section: HTMLElement, options: StoryViewOptions): Promise<void> {
+async function renderStoryGroups(section: HTMLElement, options: StoryViewOptions): Promise<void> {
   section.className = "panel story-card";
   options.onBackChange(options.onBack);
-  section.replaceChildren(el("p", "prompt", "Loading story levels..."));
+  section.replaceChildren(el("p", "prompt", "Loading story topics..."));
   try {
-    const levels = await getStoryLevels();
+    const groups = await getStoryGroups();
     const intro = el("div");
     intro.append(
       el("div", "question-type", "Story mode"),
+      el("h2", "focus-title", "Choose a reading topic"),
+    );
+
+    const grid = el("div", "focus-grid story-group-grid");
+    for (const group of groups) {
+      grid.append(groupCard(group, () => renderStoryLevels(section, group.group, options)));
+    }
+
+    section.replaceChildren(intro, grid);
+  } catch (error) {
+    options.onError(error instanceof Error ? error.message : "Could not load story topics");
+  }
+}
+
+async function renderStoryLevels(
+  section: HTMLElement,
+  group: StoryGroup["group"],
+  options: StoryViewOptions,
+): Promise<void> {
+  section.className = "panel story-card";
+  options.onBackChange(() => renderStoryGroups(section, options));
+  section.replaceChildren(el("p", "prompt", "Loading story levels..."));
+  try {
+    const levels = await getStoryLevels(group);
+    const intro = el("div");
+    intro.append(
+      el("div", "question-type", groupLabel(group)),
       el("h2", "focus-title", "Choose a reading level"),
     );
 
     const grid = el("div", "focus-grid");
     for (const level of levels) {
-      grid.append(levelCard(level, () => renderStoryPassages(section, level.level, options)));
+      const onClick =
+        group === "goethe"
+          ? () => renderStoryParts(section, level.level, options)
+          : () => renderStoryPassages(section, group, level.level, null, options);
+      grid.append(levelCard(level, onClick, { disabledWhenEmpty: group === "general" }));
     }
 
     section.replaceChildren(intro, grid);
@@ -48,29 +93,60 @@ async function renderStoryLevels(section: HTMLElement, options: StoryViewOptions
   }
 }
 
-async function renderStoryPassages(
+async function renderStoryParts(
   section: HTMLElement,
   level: StoryLevel["level"],
   options: StoryViewOptions,
 ): Promise<void> {
   section.className = "panel story-card";
-  options.onBackChange(() => renderStoryLevels(section, options));
-  section.replaceChildren(el("p", "prompt", "Loading stories..."));
+  options.onBackChange(() => renderStoryLevels(section, "goethe", options));
+  section.replaceChildren(el("p", "prompt", "Loading Goethe parts..."));
   try {
-    const passages = await getStoryPassages(level);
+    const parts = await getStoryParts(level);
     const intro = el("div");
     intro.append(
-      el("div", "question-type", level),
+      el("div", "question-type", `Goethe-Institut · ${level}`),
+      el("h2", "focus-title", "Choose a Teil"),
+    );
+
+    const grid = el("div", "focus-grid goethe-parts-grid");
+    for (const part of parts) {
+      grid.append(partCard(part, () => renderStoryPassages(section, "goethe", level, part.part, options)));
+    }
+
+    section.replaceChildren(intro, grid);
+  } catch (error) {
+    options.onError(error instanceof Error ? error.message : "Could not load Goethe parts");
+  }
+}
+
+async function renderStoryPassages(
+  section: HTMLElement,
+  group: StoryGroup["group"],
+  level: StoryLevel["level"],
+  part: StoryPart["part"] | null,
+  options: StoryViewOptions,
+): Promise<void> {
+  section.className = "panel story-card";
+  options.onBackChange(() =>
+    part ? renderStoryParts(section, level, options) : renderStoryLevels(section, group, options),
+  );
+  section.replaceChildren(el("p", "prompt", "Loading stories..."));
+  try {
+    const passages = await getStoryPassages(level, group, part ?? undefined);
+    const intro = el("div");
+    intro.append(
+      el("div", "question-type", part ? `${groupLabel(group)} · ${level} · ${partLabel(part)}` : level),
       el("h2", "focus-title", "Choose a story"),
     );
 
     const grid = el("div", "focus-grid topics-grid");
     for (const passage of passages) {
-      grid.append(passageCard(passage, () => renderStoryReader(section, passage.id, level, options)));
+      grid.append(passageCard(passage, () => renderStoryReader(section, passage.id, group, level, part, options)));
     }
 
     if (passages.length === 0) {
-      section.replaceChildren(el("p", "prompt", "No stories are available for this level yet."));
+      section.replaceChildren(intro, el("p", "prompt", "No stories are available here yet."));
       return;
     }
     section.replaceChildren(intro, grid);
@@ -82,11 +158,13 @@ async function renderStoryPassages(
 async function renderStoryReader(
   section: HTMLElement,
   passageId: string,
+  group: StoryGroup["group"],
   level: StoryLevel["level"],
+  part: StoryPart["part"] | null,
   options: StoryViewOptions,
 ): Promise<void> {
   section.className = "panel story-card story-reader-card";
-  options.onBackChange(() => renderStoryPassages(section, level, options));
+  options.onBackChange(() => renderStoryPassages(section, group, level, part, options));
   section.replaceChildren(el("p", "prompt", "Loading story..."));
   try {
     const passage = await getStoryPassage(passageId);
@@ -224,14 +302,40 @@ function storyPracticeLayout(passage: StoryPassage, questionPanel: HTMLElement):
   return layout;
 }
 
-function levelCard(level: StoryLevel, onClick: () => void): HTMLButtonElement {
+function groupCard(group: StoryGroup, onClick: () => void): HTMLButtonElement {
+  const card = button("", "focus-option story-group-option");
+  card.addEventListener("click", onClick);
+  card.append(
+    el("strong", "", group.label),
+    el("span", "", group.group === "general" ? "A1, A2, B1, B2 stories" : "Exam-style reading practice"),
+    el("span", "", `${group.passage_count} stories · ${group.question_count} questions`),
+  );
+  return card;
+}
+
+function levelCard(
+  level: StoryLevel,
+  onClick: () => void,
+  options: { disabledWhenEmpty: boolean },
+): HTMLButtonElement {
   const card = button("", "focus-option");
-  card.disabled = level.passage_count === 0;
+  card.disabled = options.disabledWhenEmpty && level.passage_count === 0;
   card.addEventListener("click", onClick);
   card.append(
     el("strong", "", level.level),
     el("span", "", `${level.passage_count} stories`),
     el("span", "", `${level.question_count} questions`),
+  );
+  return card;
+}
+
+function partCard(part: StoryPart, onClick: () => void): HTMLButtonElement {
+  const card = button("", "focus-option goethe-part-option");
+  card.addEventListener("click", onClick);
+  card.append(
+    el("strong", "", part.label),
+    el("span", "", `${part.passage_count} stories`),
+    el("span", "", `${part.question_count} questions`),
   );
   return card;
 }
@@ -246,6 +350,14 @@ function passageCard(passage: StoryPassageSummary, onClick: () => void): HTMLBut
     el("span", "", `${passage.question_count} questions`),
   );
   return card;
+}
+
+function groupLabel(group: StoryGroup["group"]): string {
+  return group === "goethe" ? "Goethe-Institut" : "General";
+}
+
+function partLabel(part: StoryPart["part"]): string {
+  return part.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function topicLabel(topic: string): string {

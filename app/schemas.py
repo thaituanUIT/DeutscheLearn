@@ -123,9 +123,25 @@ class StoryLevelOut(BaseModel):
     question_count: int
 
 
+class StoryGroupOut(BaseModel):
+    group: str
+    label: str
+    passage_count: int
+    question_count: int
+
+
+class StoryPartOut(BaseModel):
+    part: str
+    label: str
+    passage_count: int
+    question_count: int
+
+
 class StoryPassageSummaryOut(BaseModel):
     id: str
+    group: str
     level: str
+    part: str | None
     topic: str | None
     title: str
     order_index: int
@@ -147,7 +163,9 @@ class StoryQuestionOut(BaseModel):
 
 class StoryPassageOut(BaseModel):
     id: str
+    group: str
     level: str
+    part: str | None
     topic: str | None
     title: str
     passage_text: str
@@ -231,7 +249,9 @@ class AdminReadingQuestionOut(BaseModel):
 
 
 class AdminReadingPassageIn(BaseModel):
+    group: str = Field(default="general", pattern="^(general|goethe)$")
     level: str = Field(pattern="^(A1|A2|B1|B2)$")
+    part: str | None = Field(default=None, pattern="^teil_[1-5]$")
     topic: str | None = Field(default=None, max_length=80)
     title: str = Field(min_length=1, max_length=160)
     passage_text: str = Field(min_length=1)
@@ -241,7 +261,9 @@ class AdminReadingPassageIn(BaseModel):
 
 class AdminReadingPassageSummaryOut(BaseModel):
     id: str
+    group: str
     level: str
+    part: str | None
     topic: str | None
     title: str
     order_index: int
@@ -250,7 +272,9 @@ class AdminReadingPassageSummaryOut(BaseModel):
 
 class AdminReadingPassageOut(BaseModel):
     id: str
+    group: str
     level: str
+    part: str | None
     topic: str | None
     title: str
     passage_text: str

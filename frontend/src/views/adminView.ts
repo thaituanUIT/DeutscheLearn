@@ -23,8 +23,12 @@ import { clear, el } from "../utils/dom";
 
 const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
+const READING_GROUPS = ["general", "goethe"] as const;
+const GOETHE_PARTS = ["teil_1", "teil_2", "teil_3", "teil_4", "teil_5"] as const;
 
 type AdminLevel = (typeof LEVELS)[number];
+type AdminReadingGroup = (typeof READING_GROUPS)[number];
+type AdminGoethePart = (typeof GOETHE_PARTS)[number];
 
 export function renderAdminApp(root: HTMLElement): void {
   const params = new URLSearchParams(window.location.search);
@@ -308,7 +312,13 @@ function renderPassageList(
     const item = button("", "admin-item");
     item.append(
       el("strong", "", passage.title),
-      el("span", "", `${passage.level} · ${passage.topic ?? "No topic"} · ${passage.question_count} questions`),
+      el(
+        "span",
+        "",
+        `${readingGroupLabel(passage.group)} · ${passage.level}${
+          passage.part ? ` · ${partLabel(passage.part)}` : ""
+        } · ${passage.question_count} questions`,
+      ),
     );
     item.addEventListener("click", async () => {
       state.selected = await getAdminReadingPassage(token, passage.id);
@@ -328,6 +338,8 @@ function renderPassageEditor(
   onSaved: () => Promise<void>,
 ): void {
   const level = selectLevel(state.selected.level);
+  const group = selectReadingGroup(state.selected.group);
+  const part = selectGoethePart(state.selected.part ?? "teil_1");
   const topic = input("Topic", state.selected.topic ?? "");
   const title = input("Title", state.selected.title);
   const order = input("Order", String(state.selected.order_index), "number");
@@ -356,7 +368,9 @@ function renderPassageEditor(
     try {
       const payload: AdminReadingPassage = {
         id: state.selected.id,
+        group: group.value as AdminReadingGroup,
         level: level.value as AdminLevel,
+        part: group.value === "goethe" ? (part.value as AdminGoethePart) : null,
         topic: topic.value.trim() || null,
         title: title.value.trim(),
         passage_text: passage.value.trim(),
@@ -398,7 +412,9 @@ function renderPassageEditor(
   actions.append(save, remove);
   host.replaceChildren(
     el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title),
+    wordField(group),
     wordField(level),
+    wordField(part),
     wordField(topic),
     wordField(title),
     wordField(order),
@@ -506,7 +522,9 @@ function cloneWord(word: AdminWord): AdminWord {
 
 function emptyPassage(): AdminReadingPassage {
   return {
+    group: "general",
     level: "A1",
+    part: null,
     topic: null,
     title: "",
     passage_text: "",
@@ -549,6 +567,7 @@ function textarea(label: string, value: string, rows: number): HTMLTextAreaEleme
 
 function selectLevel(value: AdminLevel): HTMLSelectElement {
   const node = document.createElement("select");
+  node.setAttribute("placeholder", "Level");
   node.className = "admin-input";
   for (const level of LEVELS) {
     const option = document.createElement("option");
@@ -558,6 +577,42 @@ function selectLevel(value: AdminLevel): HTMLSelectElement {
     node.append(option);
   }
   return node;
+}
+
+function selectReadingGroup(value: AdminReadingGroup): HTMLSelectElement {
+  const node = document.createElement("select");
+  node.setAttribute("placeholder", "Reading group");
+  node.className = "admin-input";
+  for (const group of READING_GROUPS) {
+    const option = document.createElement("option");
+    option.value = group;
+    option.textContent = readingGroupLabel(group);
+    option.selected = group === value;
+    node.append(option);
+  }
+  return node;
+}
+
+function selectGoethePart(value: AdminGoethePart): HTMLSelectElement {
+  const node = document.createElement("select");
+  node.setAttribute("placeholder", "Goethe Teil");
+  node.className = "admin-input";
+  for (const part of GOETHE_PARTS) {
+    const option = document.createElement("option");
+    option.value = part;
+    option.textContent = partLabel(part);
+    option.selected = part === value;
+    node.append(option);
+  }
+  return node;
+}
+
+function readingGroupLabel(group: AdminReadingGroup): string {
+  return group === "goethe" ? "Goethe-Institut" : "General";
+}
+
+function partLabel(part: AdminGoethePart): string {
+  return part.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function wordField(control: HTMLElement): HTMLElement {

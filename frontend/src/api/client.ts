@@ -13,8 +13,10 @@ import type {
   Player,
   PracticeAnswer,
   PracticeStart,
+  StoryGroup,
   StoryAnswer,
   StoryLevel,
+  StoryPart,
   StoryPassage,
   StoryPassageSummary,
   TimedAnswer,
@@ -171,12 +173,26 @@ export function getFocusRevision(level: string, topic: string): Promise<FocusRev
   return request<FocusRevisionQuestion[]>(`/api/focus/revision?${params.toString()}`);
 }
 
-export function getStoryLevels(): Promise<StoryLevel[]> {
-  return request<StoryLevel[]>("/api/story/levels");
+export function getStoryGroups(): Promise<StoryGroup[]> {
+  return request<StoryGroup[]>("/api/story/groups");
 }
 
-export function getStoryPassages(level: string): Promise<StoryPassageSummary[]> {
-  return request<StoryPassageSummary[]>(`/api/story/passages?level=${encodeURIComponent(level)}`);
+export function getStoryLevels(group = "general"): Promise<StoryLevel[]> {
+  return request<StoryLevel[]>(`/api/story/levels?group=${encodeURIComponent(group)}`);
+}
+
+export function getStoryParts(level: string): Promise<StoryPart[]> {
+  return request<StoryPart[]>(`/api/story/parts?level=${encodeURIComponent(level)}`);
+}
+
+export function getStoryPassages(
+  level: string,
+  group = "general",
+  part?: string,
+): Promise<StoryPassageSummary[]> {
+  const params = new URLSearchParams({ level, group });
+  if (part) params.set("part", part);
+  return request<StoryPassageSummary[]>(`/api/story/passages?${params.toString()}`);
 }
 
 export function getStoryPassage(passageId: string): Promise<StoryPassage> {

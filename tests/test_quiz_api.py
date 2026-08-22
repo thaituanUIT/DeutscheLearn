@@ -295,6 +295,68 @@ def test_story_mode_lists_passages_without_exposing_correct_answers() -> None:
         assert "is_correct" not in body["questions"][0]["answers"][0]
 
 
+def test_story_mode_exposes_general_and_goethe_structure() -> None:
+    with TestClient(app) as client:
+        groups = client.get("/api/story/groups")
+        assert groups.status_code == 200
+        groups_by_key = {group["group"]: group for group in groups.json()}
+        assert groups_by_key["general"]["label"] == "General"
+        assert groups_by_key["goethe"]["label"] == "Goethe-Institut"
+
+        levels = client.get("/api/story/levels?group=goethe")
+        assert levels.status_code == 200
+        assert [level["level"] for level in levels.json()] == ["A1", "A2", "B1", "B2"]
+
+        parts = client.get("/api/story/parts?level=A1")
+        assert parts.status_code == 200
+        assert [part["part"] for part in parts.json()] == [
+            "teil_1",
+            "teil_2",
+            "teil_3",
+            "teil_4",
+            "teil_5",
+        ]
+
+
+def test_story_passages_filter_by_group_level_and_part() -> None:
+    db = SessionLocal()
+    try:
+        general = ReadingPassage(
+            group="general",
+            level="A1",
+            topic="daily_life",
+            title=f"General Story {uuid4()}",
+            passage_text="Ein kurzer allgemeiner Text.",
+        )
+        goethe = ReadingPassage(
+            group="goethe",
+            level="A1",
+            part="teil_3",
+            topic="goethe_institut",
+            title=f"Goethe Story {uuid4()}",
+            passage_text="Ein kurzer Goethe-Text.",
+        )
+        db.add_all([general, goethe])
+        db.commit()
+        general_id = general.id
+        goethe_id = goethe.id
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        general_list = client.get("/api/story/passages?group=general&level=A1")
+        assert general_list.status_code == 200
+        general_ids = {item["id"] for item in general_list.json()}
+        assert general_id in general_ids
+        assert goethe_id not in general_ids
+
+        goethe_list = client.get("/api/story/passages?group=goethe&level=A1&part=teil_3")
+        assert goethe_list.status_code == 200
+        goethe_ids = {item["id"] for item in goethe_list.json()}
+        assert goethe_id in goethe_ids
+        assert general_id not in goethe_ids
+
+
 def test_story_answer_is_checked_server_side() -> None:
     db = SessionLocal()
     try:

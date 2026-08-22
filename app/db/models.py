@@ -56,7 +56,9 @@ class ReadingPassage(Base):
     __tablename__ = "reading_passages"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    group: Mapped[str] = mapped_column(String(40), default="general", nullable=False)
     level: Mapped[str] = mapped_column(String(8), nullable=False)
+    part: Mapped[str | None] = mapped_column(String(40))
     topic: Mapped[str | None] = mapped_column(String(80))
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     passage_text: Mapped[str] = mapped_column(Text, nullable=False)

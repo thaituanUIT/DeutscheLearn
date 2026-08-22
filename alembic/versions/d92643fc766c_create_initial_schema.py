@@ -45,7 +45,9 @@ def upgrade() -> None:
     op.create_table(
         "reading_passages",
         sa.Column("id", sa.String(length=36), nullable=False),
+        sa.Column("group", sa.String(length=40), nullable=False),
         sa.Column("level", sa.String(length=8), nullable=False),
+        sa.Column("part", sa.String(length=40), nullable=True),
         sa.Column("topic", sa.String(length=80), nullable=True),
         sa.Column("title", sa.String(length=160), nullable=False),
         sa.Column("passage_text", sa.Text(), nullable=False),

@@ -21,7 +21,7 @@ button {
 }
 
 .shell {
-  width: min(1120px, calc(100vw - 32px));
+  width: min(1280px, calc(100vw - 32px));
   margin: 0 auto;
   padding: 28px 0;
 }
@@ -63,6 +63,14 @@ button {
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: 24px;
   align-items: start;
+}
+
+.mode-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.story-mode-layout {
+  width: min(1440px, 100%);
 }
 
 .sidebar {
@@ -237,42 +245,42 @@ button {
   background: #ffffff;
   border: 1px solid #dfe3df;
   border-radius: 8px;
-  padding: 22px;
+  padding: 32px;
   box-shadow: 0 12px 30px rgb(32 33 36 / 7%);
 }
 
 .quiz-card {
-  min-height: 410px;
+  min-height: 560px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 24px;
+  gap: 32px;
 }
 
 .focus-card {
-  min-height: 410px;
+  min-height: 560px;
   display: grid;
   align-content: start;
-  gap: 22px;
+  gap: 28px;
 }
 
 .story-card {
-  min-height: 410px;
+  min-height: 560px;
   display: grid;
   align-content: start;
-  gap: 20px;
+  gap: 28px;
 }
 
 .story-reader-card {
   height: calc(100vh - 132px);
-  min-height: 520px;
+  min-height: 620px;
   grid-template-rows: minmax(0, 1fr);
   align-content: stretch;
 }
 
 .focus-title {
   margin: 8px 0 0;
-  font-size: 1.65rem;
+  font-size: 2rem;
   line-height: 1.2;
   font-weight: 800;
 }
@@ -280,19 +288,27 @@ button {
 .focus-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 .topics-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.story-group-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.goethe-parts-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .focus-option {
-  min-height: 132px;
+  min-height: 164px;
   display: grid;
   align-content: start;
-  gap: 10px;
-  padding: 16px;
+  gap: 12px;
+  padding: 20px;
   border: 1px solid #dfe3df;
   border-radius: 8px;
   background: #ffffff;
@@ -316,28 +332,33 @@ button {
 }
 
 .focus-option strong {
-  font-size: 1.35rem;
+  font-size: 1.55rem;
   line-height: 1.15;
 }
 
 .focus-option span {
   color: #4d555e;
-  font-size: 0.92rem;
+  font-size: 1rem;
 }
 
 .topic-option strong {
-  font-size: 1.08rem;
+  font-size: 1.22rem;
 }
 
 .story-option {
-  min-height: 150px;
+  min-height: 178px;
+}
+
+.story-group-option,
+.goethe-part-option {
+  min-height: 190px;
 }
 
 .flashcard {
-  min-height: 340px;
+  min-height: 420px;
   display: grid;
   align-content: center;
-  gap: 12px;
+  gap: 16px;
   text-align: center;
 }
 
@@ -375,7 +396,7 @@ button {
   max-width: 68ch;
   margin: 0;
   color: #202124;
-  font-size: 1.16rem;
+  font-size: 1.24rem;
   line-height: 1.72;
   white-space: pre-wrap;
 }
@@ -384,8 +405,8 @@ button {
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.92fr);
-  gap: 22px;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.75fr);
+  gap: 32px;
   align-items: start;
 }
 
@@ -398,7 +419,7 @@ button {
 }
 
 .story-practice-layout .story-title {
-  font-size: clamp(1.45rem, 2.2vw, 2.15rem);
+  font-size: clamp(1.7rem, 2.4vw, 2.6rem);
 }
 
 .story-practice-layout .story-text {
@@ -420,7 +441,7 @@ button {
   max-height: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 14px;
+  gap: 18px;
   align-content: start;
   overflow: hidden;
 }
@@ -466,7 +487,7 @@ button {
 .story-question-title {
   margin: 0;
   color: #202124;
-  font-size: 1.08rem;
+  font-size: 1.18rem;
   line-height: 1.35;
   font-weight: 800;
 }
@@ -523,14 +544,14 @@ button {
 .stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
 }
 
 .score-badge {
-  min-width: 108px;
+  min-width: 132px;
   display: grid;
   gap: 4px;
-  padding: 12px 14px;
+  padding: 14px 18px;
   border: 1px solid #e0e2dc;
   border-radius: 8px;
   background: #fbfbf8;
@@ -544,12 +565,12 @@ button {
 }
 
 .score-badge strong {
-  font-size: 1.4rem;
+  font-size: 1.7rem;
 }
 
 .question-type {
   color: #33658a;
-  font-size: 0.88rem;
+  font-size: 0.96rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0;
@@ -557,7 +578,7 @@ button {
 
 .question-word {
   margin: 8px 0 10px;
-  font-size: clamp(2.2rem, 9vw, 5.2rem);
+  font-size: clamp(2.8rem, 9vw, 6.4rem);
   line-height: 1;
   font-weight: 800;
 }
@@ -565,7 +586,7 @@ button {
 .prompt {
   margin: 0;
   color: #4d555e;
-  font-size: 1.05rem;
+  font-size: 1.16rem;
 }
 
 .answered-word {
@@ -588,7 +609,7 @@ button {
 .answers {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 .revision-answers {
@@ -629,8 +650,8 @@ button {
 
 .answer-option,
 .button {
-  min-height: 48px;
-  padding: 0 16px;
+  min-height: 58px;
+  padding: 0 20px;
   border: 1px solid #cfd6d8;
   border-radius: 8px;
   background: #ffffff;
@@ -1053,7 +1074,9 @@ button {
   }
 
   .focus-grid,
-  .topics-grid {
+  .topics-grid,
+  .story-group-grid,
+  .goethe-parts-grid {
     grid-template-columns: 1fr;
   }
 

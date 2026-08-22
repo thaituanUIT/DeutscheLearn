@@ -44,7 +44,9 @@ from app.schemas import (
     StoryAnswerChoiceOut,
     StoryAnswerIn,
     StoryAnswerOut,
+    StoryGroupOut,
     StoryLevelOut,
+    StoryPartOut,
     StoryPassageOut,
     StoryPassageSummaryOut,
     StoryQuestionOut,
@@ -62,7 +64,9 @@ from app.services.focus import (
 from app.services.quiz import create_question
 from app.services.story import (
     get_correct_story_answer,
+    get_goethe_parts,
     get_story_answer,
+    get_story_groups,
     get_story_levels,
     get_story_passage,
     get_story_passages,
@@ -154,17 +158,38 @@ def focus_revision(
     ]
 
 
+@router.get("/story/groups", response_model=list[StoryGroupOut])
+def story_groups(db: Session = Depends(get_db)) -> list[StoryGroupOut]:
+    return [StoryGroupOut(**group) for group in get_story_groups(db)]
+
+
 @router.get("/story/levels", response_model=list[StoryLevelOut])
-def story_levels(db: Session = Depends(get_db)) -> list[StoryLevelOut]:
-    return [StoryLevelOut(**level) for level in get_story_levels(db)]
+def story_levels(
+    group: str = Query(default="general", pattern="^(general|goethe)$"),
+    db: Session = Depends(get_db),
+) -> list[StoryLevelOut]:
+    return [StoryLevelOut(**level) for level in get_story_levels(db, group)]
+
+
+@router.get("/story/parts", response_model=list[StoryPartOut])
+def story_parts(
+    level: str = Query(pattern="^(A1|A2|B1|B2)$"),
+    db: Session = Depends(get_db),
+) -> list[StoryPartOut]:
+    return [StoryPartOut(**part) for part in get_goethe_parts(db, level)]
 
 
 @router.get("/story/passages", response_model=list[StoryPassageSummaryOut])
 def story_passages(
+    group: str = Query(default="general", pattern="^(general|goethe)$"),
     level: str = Query(pattern="^(A1|A2|B1|B2)$"),
+    part: str | None = Query(default=None, pattern="^teil_[1-5]$"),
     db: Session = Depends(get_db),
 ) -> list[StoryPassageSummaryOut]:
-    return [StoryPassageSummaryOut(**passage) for passage in get_story_passages(db, level)]
+    return [
+        StoryPassageSummaryOut(**passage)
+        for passage in get_story_passages(db, level, group, part)
+    ]
 
 
 @router.get("/story/passages/{passage_id}", response_model=StoryPassageOut)
@@ -303,7 +328,9 @@ def admin_reading_passages(
     return [
         AdminReadingPassageSummaryOut(
             id=passage.id,
+            group=passage.group,
             level=passage.level,
+            part=passage.part,
             topic=passage.topic,
             title=passage.title,
             order_index=passage.order_index,
@@ -673,7 +700,9 @@ def _leaderboard_entry(
 def _story_passage_out(passage: ReadingPassage) -> StoryPassageOut:
     return StoryPassageOut(
         id=passage.id,
+        group=passage.group,
         level=passage.level,
+        part=passage.part,
         topic=passage.topic,
         title=passage.title,
         passage_text=passage.passage_text,
@@ -753,7 +782,9 @@ def _get_reading_passage(db: Session, passage_id: str) -> ReadingPassage:
 
 
 def _apply_reading_payload(passage: ReadingPassage, payload: AdminReadingPassageIn) -> None:
+    passage.group = payload.group
     passage.level = payload.level
+    passage.part = payload.part if payload.group == "goethe" else None
     passage.topic = _clean_optional_text(payload.topic)
     passage.title = payload.title.strip()
     passage.passage_text = payload.passage_text.strip()
@@ -780,7 +811,9 @@ def _apply_reading_payload(passage: ReadingPassage, payload: AdminReadingPassage
 def _admin_reading_passage_out(passage: ReadingPassage) -> AdminReadingPassageOut:
     return AdminReadingPassageOut(
         id=passage.id,
+        group=passage.group,
         level=passage.level,
+        part=passage.part,
         topic=passage.topic,
         title=passage.title,
         passage_text=passage.passage_text,

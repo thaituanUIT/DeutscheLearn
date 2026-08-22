@@ -8,6 +8,8 @@ from app.db.models import ReadingAnswer, ReadingPassage, ReadingQuestion
 from app.services.focus import FOCUS_LEVELS
 
 STORY_SEED_PATH = Path("data/story_passages.json")
+STORY_GROUPS = ("general", "goethe")
+GOETHE_PARTS = ("teil_1", "teil_2", "teil_3", "teil_4", "teil_5")
 
 
 def import_story_passages(db: Session, json_path: Path = STORY_SEED_PATH) -> None:
@@ -17,7 +19,9 @@ def import_story_passages(db: Session, json_path: Path = STORY_SEED_PATH) -> Non
     passages = json.loads(json_path.read_text(encoding="utf-8"))
     for passage_data in passages:
         passage = ReadingPassage(
+            group=passage_data.get("group", "general").strip().lower(),
             level=passage_data["level"].strip().upper(),
+            part=_clean_part(passage_data.get("part")),
             topic=_clean_optional_text(passage_data.get("topic")),
             title=passage_data["title"].strip(),
             passage_text=passage_data["passage_text"].strip(),
@@ -43,10 +47,40 @@ def import_story_passages(db: Session, json_path: Path = STORY_SEED_PATH) -> Non
     db.commit()
 
 
-def get_story_levels(db: Session) -> list[dict[str, int | str]]:
+def get_story_groups(db: Session) -> list[dict[str, int | str]]:
+    counts = dict(
+        db.execute(
+            select(ReadingPassage.group, func.count(ReadingPassage.id))
+            .group_by(ReadingPassage.group)
+        ).all()
+    )
+    question_counts = dict(
+        db.execute(
+            select(ReadingPassage.group, func.count(ReadingQuestion.id))
+            .join(ReadingQuestion, ReadingQuestion.passage_id == ReadingPassage.id)
+            .group_by(ReadingPassage.group)
+        ).all()
+    )
+    labels = {
+        "general": "General",
+        "goethe": "Goethe-Institut",
+    }
+    return [
+        {
+            "group": group,
+            "label": labels[group],
+            "passage_count": counts.get(group, 0),
+            "question_count": question_counts.get(group, 0),
+        }
+        for group in STORY_GROUPS
+    ]
+
+
+def get_story_levels(db: Session, group: str = "general") -> list[dict[str, int | str]]:
     counts = dict(
         db.execute(
             select(ReadingPassage.level, func.count(ReadingPassage.id))
+            .where(ReadingPassage.group == group)
             .group_by(ReadingPassage.level)
         ).all()
     )
@@ -54,6 +88,7 @@ def get_story_levels(db: Session) -> list[dict[str, int | str]]:
         db.execute(
             select(ReadingPassage.level, func.count(ReadingQuestion.id))
             .join(ReadingQuestion, ReadingQuestion.passage_id == ReadingPassage.id)
+            .where(ReadingPassage.group == group)
             .group_by(ReadingPassage.level)
         ).all()
     )
@@ -67,7 +102,39 @@ def get_story_levels(db: Session) -> list[dict[str, int | str]]:
     ]
 
 
-def get_story_passages(db: Session, level: str) -> list[dict[str, int | str | None]]:
+def get_goethe_parts(db: Session, level: str) -> list[dict[str, int | str]]:
+    counts = dict(
+        db.execute(
+            select(ReadingPassage.part, func.count(ReadingPassage.id))
+            .where(ReadingPassage.group == "goethe", ReadingPassage.level == level)
+            .group_by(ReadingPassage.part)
+        ).all()
+    )
+    question_counts = dict(
+        db.execute(
+            select(ReadingPassage.part, func.count(ReadingQuestion.id))
+            .join(ReadingQuestion, ReadingQuestion.passage_id == ReadingPassage.id)
+            .where(ReadingPassage.group == "goethe", ReadingPassage.level == level)
+            .group_by(ReadingPassage.part)
+        ).all()
+    )
+    return [
+        {
+            "part": part,
+            "label": part.replace("_", " ").title(),
+            "passage_count": counts.get(part, 0),
+            "question_count": question_counts.get(part, 0),
+        }
+        for part in GOETHE_PARTS
+    ]
+
+
+def get_story_passages(
+    db: Session,
+    level: str,
+    group: str = "general",
+    part: str | None = None,
+) -> list[dict[str, int | str | None]]:
     question_counts = (
         select(ReadingQuestion.passage_id, func.count(ReadingQuestion.id).label("question_count"))
         .group_by(ReadingQuestion.passage_id)
@@ -76,13 +143,16 @@ def get_story_passages(db: Session, level: str) -> list[dict[str, int | str | No
     rows = db.execute(
         select(ReadingPassage, func.coalesce(question_counts.c.question_count, 0))
         .outerjoin(question_counts, question_counts.c.passage_id == ReadingPassage.id)
-        .where(ReadingPassage.level == level)
+        .where(ReadingPassage.group == group, ReadingPassage.level == level)
+        .where(ReadingPassage.part == part if part else ReadingPassage.part.is_(None))
         .order_by(ReadingPassage.order_index, ReadingPassage.title)
     ).all()
     return [
         {
             "id": passage.id,
+            "group": passage.group,
             "level": passage.level,
+            "part": passage.part,
             "topic": passage.topic,
             "title": passage.title,
             "order_index": passage.order_index,
@@ -119,4 +189,11 @@ def _clean_optional_text(value: str | None) -> str | None:
     if value is None:
         return None
     text = " ".join(value.split())
+    return text or None
+
+
+def _clean_part(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = "_".join(value.strip().lower().split())
     return text or None
