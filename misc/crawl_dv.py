@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Crawler cho deutsch-vorbereitung.com (Lesen / Hoeren / Schreiben ... Uebungen)
 Xuat ra 2 file CSV:
@@ -46,7 +45,7 @@ def get_soup(session, url, data=None, retries=3, delay=1.0):
             r.raise_for_status()
             r.encoding = r.apparent_encoding or "utf-8"
             return BeautifulSoup(r.text, "html.parser")
-        except Exception as e:
+        except requests.RequestException as e:
             if attempt == retries - 1:
                 print(f"  [!] loi {url}: {e}", file=sys.stderr)
                 return None

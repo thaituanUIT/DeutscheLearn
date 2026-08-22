@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 
-
 TEST_DATABASE_PATH = Path("/tmp/recognition-pytest.db")
 
 TEST_DATABASE_PATH.unlink(missing_ok=True)
