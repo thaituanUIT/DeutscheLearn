@@ -889,10 +889,45 @@ button {
   gap: 18px;
 }
 
-.admin-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+.segmented-control {
+  --segment-count: 2;
+  width: max-content;
+  min-width: min(100%, calc(var(--segment-count) * 128px));
+  height: 44px;
+  display: grid;
+  grid-template-columns: repeat(var(--segment-count), minmax(0, 1fr));
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #d8ded8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.segmented-control__item {
+  height: 36px;
+  min-width: 0;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #4d555e;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segmented-control__item[aria-selected="true"] {
+  background: #edf1ec;
+  color: #202124;
+  font-weight: 900;
+  box-shadow: inset 0 0 0 1px #d8ded8;
+}
+
+.segmented-control__item:focus-visible {
+  outline: 3px solid rgba(47, 93, 80, 0.25);
+  outline-offset: 2px;
 }
 
 .admin-grid {
@@ -929,16 +964,6 @@ button {
   min-width: 68px;
 }
 
-.admin-reading-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.admin-reading-tabs .button {
-  min-height: 44px;
-}
-
 .admin-items {
   max-height: 70vh;
   display: grid;
@@ -962,17 +987,14 @@ button {
 .admin-item span {
   color: #687078;
   font-size: 0.88rem;
+  font-weight: 600;
 }
 
 .admin-reading-meta-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
   gap: 12px;
-}
-
-.admin-reading-meta-grid .admin-field:nth-child(3),
-.admin-reading-meta-grid .admin-field:nth-child(4) {
-  grid-column: span 2;
 }
 
 .admin-reading-text-grid {
@@ -982,22 +1004,17 @@ button {
   align-items: start;
 }
 
-.admin-reading-text-grid .admin-field[hidden],
-.admin-reading-meta-grid .admin-field[hidden],
-.admin-field.is-hidden {
-  display: none;
-}
-
 .admin-resolved-type {
-  min-height: 46px;
-  display: flex;
+  min-height: 34px;
+  display: inline-flex;
   align-items: center;
-  padding: 10px 12px;
-  border: 1px solid #dce2df;
-  border-radius: 8px;
-  background: #f6f7f4;
+  align-self: end;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #edf5f1;
   color: #244d43;
   font-weight: 800;
+  font-size: 0.88rem;
 }
 
 .admin-field {
@@ -1006,6 +1023,14 @@ button {
   color: #4d555e;
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.admin-reading-meta-grid .admin-field {
+  width: min(180px, 100%);
+}
+
+.admin-reading-meta-grid .admin-field:has(input[placeholder="Topic"]) {
+  width: min(360px, 100%);
 }
 
 .admin-field-header {
