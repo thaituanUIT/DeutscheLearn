@@ -167,6 +167,9 @@ function renderWordList(
 ): void {
   let searchTimer: number | undefined;
   const newButton = button("New word", "button primary");
+  newButton.textContent = "+ New";
+  newButton.ariaLabel = "New word";
+  newButton.title = "New word";
   newButton.addEventListener("click", () => {
     state.selected = emptyWord();
     state.isNew = true;
@@ -198,9 +201,10 @@ function renderWordList(
   const list = el("div", "admin-items");
   for (const word of state.words) {
     const item = button("", "admin-item");
+    const focusCount = `${word.focus_entries.length} ${pluralize("focus entry", word.focus_entries.length)}`;
     item.append(
       el("strong", "", word.article ? `${word.article} ${word.word}` : word.word),
-      el("span", "", `${word.part_of_speech} · ${word.focus_entries.length} focus entries`),
+      el("span", "", `${word.part_of_speech} · ${focusCount}`),
     );
     item.addEventListener("click", () => {
       state.selected = cloneWord(word);
@@ -215,7 +219,7 @@ function renderWordList(
   }
 
   const header = el("div", "admin-list-header");
-  header.append(el("h2", "focus-title", "Vocabulary"), newButton);
+  header.append(el("h2", "focus-title", "Words"), newButton);
   host.replaceChildren(header, controls, list);
 }
 
@@ -292,6 +296,7 @@ function renderReadingAdmin(host: HTMLElement, token: string): void {
     passages: [] as AdminReadingPassageSummary[],
     selected: emptyPassage("general"),
     isNew: true,
+    search: "",
   };
 
   const wrap = el("div", "admin-grid");
@@ -330,10 +335,14 @@ function renderPassageList(
     passages: AdminReadingPassageSummary[];
     selected: AdminReadingPassage;
     isNew: boolean;
+    search: string;
   },
   onSelect: () => void,
 ): void {
   const newButton = button("New passage", "button primary");
+  newButton.textContent = "+ New";
+  newButton.ariaLabel = "New passage";
+  newButton.title = "New passage";
   newButton.addEventListener("click", () => {
     state.selected = emptyPassage(state.activeGroup);
     state.isNew = true;
@@ -355,10 +364,26 @@ function renderPassageList(
       });
     return true;
   });
+  const search = input("Search passages", state.search);
+  search.autocomplete = "off";
+  search.addEventListener("input", () => {
+    state.search = search.value;
+    renderPassageList(host, token, state, onSelect);
+  });
+  const clearSearch = button("Clear", "button compact-button");
+  clearSearch.disabled = !state.search.trim();
+  clearSearch.addEventListener("click", () => {
+    state.search = "";
+    renderPassageList(host, token, state, onSelect);
+  });
+  const controls = el("div", "admin-list-controls");
+  controls.append(search, clearSearch);
 
   const list = el("div", "admin-items");
-  for (const passage of state.passages) {
+  const filteredPassages = state.passages.filter((passage) => matchesPassageSearch(passage, state.search));
+  for (const passage of filteredPassages) {
     const item = button("", "admin-item");
+    const questionCount = `${passage.question_count} ${pluralize("question", passage.question_count)}`;
     item.append(
       el("strong", "", passage.title),
       el(
@@ -366,7 +391,7 @@ function renderPassageList(
         "",
         `${readingGroupLabel(passage.group)} · ${passage.level}${
           passage.part ? ` · ${partLabel(passage.part)}` : ""
-        } · ${passage.question_count} questions`,
+        } · ${questionCount}`,
       ),
     );
     item.addEventListener("click", async () => {
@@ -378,11 +403,8 @@ function renderPassageList(
   }
 
   const header = el("div", "admin-list-header");
-  header.append(
-    el("h2", "focus-title", `${state.passages.length} ${pluralize("passage", state.passages.length)} · ${readingGroupLabel(state.activeGroup)}`),
-    newButton,
-  );
-  host.replaceChildren(header, tabs, list);
+  header.append(el("h2", "focus-title", "Passages"), newButton);
+  host.replaceChildren(header, tabs, controls, list);
 }
 
 function renderPassageEditor(
@@ -414,7 +436,6 @@ function renderPassageEditor(
     questions.replaceChildren(
       ...questionControls.map((control, index) => {
         control.title.textContent = `Question ${index + 1}`;
-        control.prompt.placeholder = `Question ${index + 1}: main text`;
         control.remove.disabled = questionControls.length === 1;
         control.remove.onclick = () => {
           questionControls.splice(index, 1);
@@ -520,7 +541,9 @@ function renderPassageEditor(
   for (const control of adControls) {
     control.title.addEventListener("input", renderForm);
     control.body.addEventListener("input", renderForm);
+    control.title.addEventListener("input", () => updateCorrectSourceOptions(correctSource, adControls));
   }
+  updateCorrectSourceOptions(correctSource, adControls);
 
   const save = button(state.isNew ? "Create passage" : "Save passage", "button primary");
   save.addEventListener("click", async () => {
@@ -658,10 +681,12 @@ function questionBlock(question: AdminReadingQuestion): QuestionBlock {
 
 function adStimulusBlock(ad: AdminReadingAdStimulus, key: "a" | "b"): AdStimulusBlock {
   const node = el("div", "admin-ad-block");
-  const title = input(`${key}) Advert title`, ad.title);
-  const body = textarea(`${key}) Advert text`, ad.body, 5);
+  const title = input("Title", ad.title);
+  const body = textarea("Text", ad.body, 5);
+  const header = el("h3", "admin-question-title admin-ad-title");
+  header.append(el("span", "admin-ad-chip", key), document.createTextNode(" Advert"));
   node.append(
-    el("h3", "admin-question-title", `${key}) Advert`),
+    header,
     wordField(title),
     wordField(body),
   );
@@ -706,6 +731,13 @@ function selectSourceAnswer(question: AdminReadingQuestion): HTMLSelectElement {
     node.append(option);
   }
   return node;
+}
+
+function updateCorrectSourceOptions(select: HTMLSelectElement, ads: AdStimulusBlock[]): void {
+  for (const [index, option] of Array.from(select.options).entries()) {
+    const ad = ads[index];
+    option.textContent = ad?.title.value.trim() || `${ad?.key ?? index + 1})`;
+  }
 }
 
 function questionSection(questions: HTMLElement, addButton: HTMLButtonElement): HTMLElement {
@@ -906,18 +938,22 @@ function emptyQuestion(orderIndex: number): AdminReadingPassage["questions"][num
   };
 }
 
-function input(label: string, value: string, type = "text"): HTMLInputElement {
+function input(label: string, value: string, type = "text", placeholder = ""): HTMLInputElement {
   const node = document.createElement("input");
   node.type = type;
-  node.placeholder = label;
+  node.dataset.label = label;
+  node.ariaLabel = label;
+  node.placeholder = placeholder;
   node.value = value;
   node.className = "admin-input";
   return node;
 }
 
-function textarea(label: string, value: string, rows: number): HTMLTextAreaElement {
+function textarea(label: string, value: string, rows: number, placeholder = ""): HTMLTextAreaElement {
   const node = document.createElement("textarea");
-  node.placeholder = label;
+  node.dataset.label = label;
+  node.ariaLabel = label;
+  node.placeholder = placeholder;
   node.value = value;
   node.rows = rows;
   node.className = "admin-input admin-textarea";
@@ -926,7 +962,7 @@ function textarea(label: string, value: string, rows: number): HTMLTextAreaEleme
 
 function selectLevel(value: AdminLevel): HTMLSelectElement {
   const node = document.createElement("select");
-  node.setAttribute("placeholder", "Level");
+  node.dataset.label = "Level";
   node.className = "admin-input";
   for (const level of LEVELS) {
     const option = document.createElement("option");
@@ -940,7 +976,7 @@ function selectLevel(value: AdminLevel): HTMLSelectElement {
 
 function selectGoethePart(value: AdminGoethePart): HTMLSelectElement {
   const node = document.createElement("select");
-  node.setAttribute("placeholder", "Goethe Teil");
+  node.dataset.label = "Goethe Teil";
   node.className = "admin-input";
   for (const part of GOETHE_PARTS) {
     const option = document.createElement("option");
@@ -953,7 +989,7 @@ function selectGoethePart(value: AdminGoethePart): HTMLSelectElement {
 }
 
 function readingGroupLabel(group: AdminReadingGroup): string {
-  return group === "goethe" ? "Goethe-Institut" : "General";
+  return group === "goethe" ? "Goethe" : "General";
 }
 
 function resolveReadingShape(
@@ -1083,7 +1119,8 @@ function confirmDiscardingShapeData(
 
 function wordField(control: HTMLElement, fallbackLabel?: string): HTMLElement {
   const wrap = el("label", "admin-field");
-  const label = fallbackLabel ?? control.getAttribute("placeholder") ?? "Level";
+  const label = fallbackLabel ?? control.dataset.label ?? "Level";
+  wrap.dataset.field = label;
   wrap.append(el("span", "", label), control);
   return wrap;
 }
@@ -1103,9 +1140,24 @@ function focusEntriesField(control: HTMLTextAreaElement): HTMLElement {
       modal.body.replaceChildren(adminError(error));
     }
   });
-  header.append(el("span", "", control.getAttribute("placeholder") ?? "Focus entries"), topics);
+  header.append(el("span", "", control.dataset.label ?? "Focus entries"), topics);
   wrap.append(header, control);
   return wrap;
+}
+
+function matchesPassageSearch(passage: AdminReadingPassageSummary, search: string): boolean {
+  const term = search.trim().toLowerCase();
+  if (!term) return true;
+  const haystack = [
+    passage.title,
+    passage.group,
+    readingGroupLabel(passage.group),
+    passage.level,
+    passage.part ? partLabel(passage.part) : "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(term);
 }
 
 function topicAliasModal(): {

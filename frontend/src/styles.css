@@ -885,8 +885,13 @@ button {
 }
 
 .admin-panel {
+  --admin-space-label: 4px;
+  --admin-space-inline: 8px;
+  --admin-space-field: 16px;
+  --admin-space-group: 24px;
+  --admin-space-region: 32px;
   display: grid;
-  gap: 18px;
+  gap: var(--admin-space-group);
 }
 
 .segmented-control {
@@ -897,8 +902,8 @@ button {
   display: grid;
   grid-template-columns: repeat(var(--segment-count), minmax(0, 1fr));
   align-items: center;
-  gap: 2px;
-  padding: 3px;
+  gap: var(--admin-space-label);
+  padding: var(--admin-space-label);
   border: 1px solid #d8ded8;
   border-radius: 8px;
   background: #ffffff;
@@ -907,7 +912,7 @@ button {
 .segmented-control__item {
   height: 36px;
   min-width: 0;
-  padding: 0 14px;
+  padding: 0 var(--admin-space-field);
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -933,7 +938,7 @@ button {
 .admin-grid {
   display: grid;
   grid-template-columns: minmax(260px, 0.7fr) minmax(0, 2fr);
-  gap: 20px;
+  gap: var(--admin-space-region);
   align-items: start;
 }
 
@@ -941,18 +946,24 @@ button {
 .admin-editor {
   min-width: 0;
   display: grid;
-  gap: 14px;
+  gap: var(--admin-space-field);
 }
 
 .admin-list-header,
 .admin-list-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--admin-space-inline);
 }
 
 .admin-list-header {
   justify-content: space-between;
+}
+
+.admin-list-header .focus-title {
+  line-height: 1;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .admin-list-controls {
@@ -967,15 +978,15 @@ button {
 .admin-items {
   max-height: 70vh;
   display: grid;
-  gap: 8px;
+  gap: var(--admin-space-inline);
   overflow: auto;
 }
 
 .admin-item {
   display: grid;
-  gap: 6px;
+  gap: var(--admin-space-inline);
   width: 100%;
-  padding: 13px;
+  padding: var(--admin-space-field);
   border: 1px solid #e0e2dc;
   border-radius: 8px;
   background: #ffffff;
@@ -994,13 +1005,13 @@ button {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
-  gap: 12px;
+  gap: var(--admin-space-field);
 }
 
 .admin-reading-text-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-  gap: 14px;
+  gap: var(--admin-space-field);
   align-items: start;
 }
 
@@ -1009,7 +1020,7 @@ button {
   display: inline-flex;
   align-items: center;
   align-self: end;
-  padding: 7px 10px;
+  padding: var(--admin-space-inline);
   border-radius: 999px;
   background: #edf5f1;
   color: #244d43;
@@ -1019,7 +1030,7 @@ button {
 
 .admin-field {
   display: grid;
-  gap: 6px;
+  gap: var(--admin-space-label);
   color: #4d555e;
   font-size: 0.9rem;
   font-weight: 700;
@@ -1029,21 +1040,26 @@ button {
   width: min(180px, 100%);
 }
 
-.admin-reading-meta-grid .admin-field:has(input[placeholder="Topic"]) {
+.admin-reading-meta-grid .admin-field[data-field="Topic"] {
   width: min(360px, 100%);
+}
+
+.admin-form-fields {
+  display: grid;
+  gap: var(--admin-space-region);
 }
 
 .admin-field-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--admin-space-inline);
 }
 
 .admin-input {
   width: 100%;
   min-height: 46px;
-  padding: 10px 12px;
+  padding: var(--admin-space-inline);
   border: 1px solid #cfd6d8;
   border-radius: 8px;
   background: #ffffff;
@@ -1052,6 +1068,8 @@ button {
 }
 
 .admin-textarea {
+  margin: 0;
+  padding-bottom: var(--admin-space-field);
   resize: vertical;
   line-height: 1.45;
 }
@@ -1068,14 +1086,14 @@ button {
 
 .admin-question-section {
   display: grid;
-  gap: 12px;
+  gap: var(--admin-space-field);
 }
 
 .admin-question-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--admin-space-inline);
 }
 
 .admin-section-title,
@@ -1090,10 +1108,10 @@ button {
 .admin-question-list {
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: var(--admin-space-field);
   max-height: min(68vh, 760px);
   min-height: 0;
-  padding: 8px 0 18px;
+  padding: var(--admin-space-inline) 0 var(--admin-space-group);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -1114,8 +1132,8 @@ button {
 
 .admin-question-block {
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: var(--admin-space-field);
+  padding: var(--admin-space-field);
   border: 1px solid #e0e2dc;
   border-radius: 8px;
   background: #fbfbf8;
@@ -1125,11 +1143,34 @@ button {
   justify-self: start;
 }
 
-.admin-source-choice-section,
+.admin-ad-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--admin-space-inline);
+}
+
+.admin-ad-chip {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--admin-space-inline);
+  border-radius: 999px;
+  background: #edf1ec;
+  color: #244d43;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.admin-source-choice-section {
+  display: grid;
+  gap: var(--admin-space-group);
+}
+
 .admin-reading-preview {
   display: grid;
-  gap: 14px;
-  padding: 14px;
+  gap: var(--admin-space-field);
+  padding: var(--admin-space-field);
   border: 1px solid #e0e2dc;
   border-radius: 8px;
   background: #fbfbf8;
@@ -1139,14 +1180,15 @@ button {
 .admin-preview-ad-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  align-items: start;
+  gap: var(--admin-space-field);
 }
 
 .admin-ad-block,
 .admin-preview-ad {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: var(--admin-space-field);
+  padding: var(--admin-space-field);
   border: 1px solid #dce2df;
   border-radius: 8px;
   background: #ffffff;
@@ -1157,7 +1199,7 @@ button {
 .admin-preview-question,
 .admin-preview-options {
   display: grid;
-  gap: 10px;
+  gap: var(--admin-space-inline);
 }
 
 .admin-preview-text span {
@@ -1187,7 +1229,7 @@ button {
 }
 
 .admin-preview-options span {
-  padding: 10px 12px;
+  padding: var(--admin-space-inline);
   border: 1px solid #dce2df;
   border-radius: 8px;
   background: #ffffff;
