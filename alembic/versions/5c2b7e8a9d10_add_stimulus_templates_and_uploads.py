@@ -24,41 +24,77 @@ def upgrade() -> None:
     """Upgrade schema."""
     bind = op.get_bind()
     is_postgresql = bind.dialect.name == "postgresql"
+    is_sqlite = bind.dialect.name == "sqlite"
+    inspector = sa.inspect(bind)
+    table_names = set(inspector.get_table_names())
+    stimulus_columns = {column["name"] for column in inspector.get_columns("stimulus")}
+    stimulus_constraints = {
+        constraint["name"] for constraint in inspector.get_check_constraints("stimulus")
+    }
     json_type = postgresql.JSONB(astext_type=sa.Text()) if is_postgresql else sa.JSON()
 
-    op.add_column("stimulus", sa.Column("render_kind", sa.String(length=40), nullable=False, server_default="text"))
-    op.add_column("stimulus", sa.Column("content", json_type, nullable=True))
-    op.add_column("stimulus", sa.Column("image_path", sa.String(length=500), nullable=True))
-    op.add_column("stimulus", sa.Column("transcript", sa.Text(), nullable=True))
-    op.add_column("stimulus", sa.Column("status", sa.String(length=20), nullable=False, server_default="published"))
-    op.create_check_constraint(
-        "ck_stimulus_image_path_only_for_image",
-        "stimulus",
-        "render_kind = 'image' or image_path is null",
+    if "render_kind" not in stimulus_columns:
+        op.add_column(
+            "stimulus",
+            sa.Column("render_kind", sa.String(length=40), nullable=False, server_default="text"),
+        )
+    if "content" not in stimulus_columns:
+        op.add_column("stimulus", sa.Column("content", json_type, nullable=True))
+    if "image_path" not in stimulus_columns:
+        op.add_column("stimulus", sa.Column("image_path", sa.String(length=500), nullable=True))
+    if "transcript" not in stimulus_columns:
+        op.add_column("stimulus", sa.Column("transcript", sa.Text(), nullable=True))
+    if "status" not in stimulus_columns:
+        op.add_column(
+            "stimulus",
+            sa.Column("status", sa.String(length=20), nullable=False, server_default="published"),
+        )
+
+    if not is_sqlite:
+        if "ck_stimulus_image_path_only_for_image" not in stimulus_constraints:
+            op.create_check_constraint(
+                "ck_stimulus_image_path_only_for_image",
+                "stimulus",
+                "render_kind = 'image' or image_path is null",
+            )
+        if "ck_stimulus_image_has_transcript" not in stimulus_constraints:
+            op.create_check_constraint(
+                "ck_stimulus_image_has_transcript",
+                "stimulus",
+                "render_kind <> 'image' or transcript is not null",
+            )
+        if "ck_stimulus_status" not in stimulus_constraints:
+            op.create_check_constraint(
+                "ck_stimulus_status",
+                "stimulus",
+                "status in ('draft', 'published')",
+            )
+
+    if "upload" not in table_names:
+        op.create_table(
+            "upload",
+            sa.Column("path", sa.String(length=500), nullable=False),
+            sa.Column("created_at", sa.DateTime(), nullable=False),
+            sa.Column("stimulus_id", sa.String(length=36), nullable=True),
+            sa.Column("delete_after_at", sa.DateTime(), nullable=True),
+            sa.ForeignKeyConstraint(["stimulus_id"], ["stimulus.id"]),
+            sa.PrimaryKeyConstraint("path"),
+        )
+    upload_indexes = (
+        {index["name"] for index in sa.inspect(bind).get_indexes("upload")}
+        if "upload" in set(sa.inspect(bind).get_table_names())
+        else set()
     )
-    op.create_check_constraint(
-        "ck_stimulus_image_has_transcript",
-        "stimulus",
-        "render_kind <> 'image' or transcript is not null",
-    )
-    op.create_check_constraint(
-        "ck_stimulus_status",
-        "stimulus",
-        "status in ('draft', 'published')",
+    if op.f("ix_upload_stimulus_id") not in upload_indexes:
+        op.create_index(op.f("ix_upload_stimulus_id"), "upload", ["stimulus_id"], unique=False)
+
+    has_storage_schema = bool(
+        bind.scalar(sa.text("select exists (select 1 from information_schema.schemata where schema_name = 'storage')"))
+        if is_postgresql
+        else False
     )
 
-    op.create_table(
-        "upload",
-        sa.Column("path", sa.String(length=500), nullable=False),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.Column("stimulus_id", sa.String(length=36), nullable=True),
-        sa.Column("delete_after_at", sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(["stimulus_id"], ["stimulus.id"]),
-        sa.PrimaryKeyConstraint("path"),
-    )
-    op.create_index(op.f("ix_upload_stimulus_id"), "upload", ["stimulus_id"], unique=False)
-
-    if is_postgresql:
+    if has_storage_schema:
         op.execute(
             """
             insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -107,7 +143,12 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
+    has_storage_schema = bool(
+        bind.scalar(sa.text("select exists (select 1 from information_schema.schemata where schema_name = 'storage')"))
+        if bind.dialect.name == "postgresql"
+        else False
+    )
+    if has_storage_schema:
         op.execute('drop policy if exists "Service role writes stimuli" on storage.objects')
         op.execute('drop policy if exists "Public read stimuli" on storage.objects')
         op.execute("delete from storage.buckets where id = 'stimuli'")
