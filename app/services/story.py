@@ -56,7 +56,7 @@ def get_story_groups(db: Session) -> list[dict[str, int | str]]:
     counts = dict(
         db.execute(
             select(Stimulus.collection, func.count(Stimulus.id))
-            .where(Stimulus.kind != "ad")
+            .where(Stimulus.kind != "ad", Stimulus.status == "published")
             .group_by(Stimulus.collection)
         ).all()
     )
@@ -64,7 +64,7 @@ def get_story_groups(db: Session) -> list[dict[str, int | str]]:
         db.execute(
             select(Stimulus.collection, func.count(Item.id))
             .join(Item, Item.stimulus_id == Stimulus.id)
-            .where(Stimulus.kind != "ad")
+            .where(Stimulus.kind != "ad", Stimulus.status == "published")
             .group_by(Stimulus.collection)
         ).all()
     )
@@ -88,6 +88,7 @@ def get_story_levels(db: Session, group: str = "general") -> list[dict[str, int 
         db.execute(
             select(Stimulus.level, func.count(Stimulus.id))
             .where(Stimulus.collection == group, Stimulus.kind != "ad")
+            .where(Stimulus.status == "published")
             .group_by(Stimulus.level)
         ).all()
     )
@@ -96,6 +97,7 @@ def get_story_levels(db: Session, group: str = "general") -> list[dict[str, int 
             select(Stimulus.level, func.count(Item.id))
             .join(Item, Item.stimulus_id == Stimulus.id)
             .where(Stimulus.collection == group, Stimulus.kind != "ad")
+            .where(Stimulus.status == "published")
             .group_by(Stimulus.level)
         ).all()
     )
@@ -115,6 +117,7 @@ def get_goethe_parts(db: Session, level: str) -> list[dict[str, int | str]]:
         db.execute(
             select(Stimulus.teil, func.count(Stimulus.id))
             .where(Stimulus.collection == "goethe", Stimulus.level == level, Stimulus.kind != "ad")
+            .where(Stimulus.status == "published")
             .group_by(Stimulus.teil)
         ).all()
     )
@@ -123,6 +126,7 @@ def get_goethe_parts(db: Session, level: str) -> list[dict[str, int | str]]:
             select(Stimulus.teil, func.count(Item.id))
             .join(Item, Item.stimulus_id == Stimulus.id)
             .where(Stimulus.collection == "goethe", Stimulus.level == level, Stimulus.kind != "ad")
+            .where(Stimulus.status == "published")
             .group_by(Stimulus.teil)
         ).all()
     )
@@ -152,6 +156,7 @@ def get_story_passages(
         select(Stimulus, func.coalesce(question_counts.c.question_count, 0))
         .outerjoin(question_counts, question_counts.c.stimulus_id == Stimulus.id)
         .where(Stimulus.collection == group, Stimulus.level == level, Stimulus.kind != "ad")
+        .where(Stimulus.status == "published")
         .where(Stimulus.teil == part if part else Stimulus.teil.is_(None))
         .order_by(Stimulus.sort_order, Stimulus.title)
     ).all()
@@ -175,7 +180,7 @@ def get_story_passage(db: Session, passage_id: str) -> Stimulus | None:
     return db.scalar(
         select(Stimulus)
         .options(selectinload(Stimulus.items).selectinload(Item.options).selectinload(ItemOption.ref_stimulus))
-        .where(Stimulus.id == passage_id)
+        .where(Stimulus.id == passage_id, Stimulus.status == "published")
     )
 
 

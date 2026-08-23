@@ -1055,7 +1055,20 @@ button {
 
 .admin-form-fields {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
   gap: var(--admin-space-region);
+  align-items: start;
+}
+
+.admin-form-fields > .admin-reading-preview {
+  position: sticky;
+  top: 18px;
+  grid-column: 2;
+  grid-row: 1 / span 20;
+}
+
+.admin-form-fields > :not(.admin-reading-preview) {
+  grid-column: 1;
 }
 
 .admin-editor-form {
@@ -1287,6 +1300,265 @@ button {
   border-radius: 8px;
   background: #ffffff;
   font-weight: 700;
+}
+
+.admin-item-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.draft-badge {
+  padding: 2px 7px;
+  border: 1px solid #d6b46b;
+  border-radius: 999px;
+  background: #fff8e6;
+  color: #6f4c00;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.stimulus-template-editor,
+.stimulus-template-fields,
+.stimulus-repeater,
+.stimulus-repeater-list {
+  display: grid;
+  gap: var(--admin-space-field);
+}
+
+.stimulus-repeater-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--admin-space-inline);
+}
+
+.stimulus-object-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: center;
+  gap: var(--admin-space-inline);
+}
+
+.stimulus-row-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--admin-space-inline);
+}
+
+.stimulus-warning {
+  min-height: 1.2em;
+  margin: 0;
+  color: #8a5a00;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.stimulus-upload-zone {
+  display: grid;
+  gap: var(--admin-space-inline);
+  padding: var(--admin-space-field);
+  border: 1px dashed #a8b4ae;
+  border-radius: 8px;
+  background: #f8faf8;
+}
+
+.stimulus-upload-zone.drag-over {
+  border-color: #2f6f5e;
+  background: #eef7f4;
+}
+
+.stimulus-upload-zone p {
+  margin: 0;
+  color: #596168;
+  line-height: 1.45;
+}
+
+.stimulus-upload-status {
+  font-weight: 700;
+}
+
+.stimulus-upload-thumbnail {
+  display: none;
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border: 1px solid #dce2df;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.stimulus-upload-thumbnail[src] {
+  display: block;
+}
+
+.stimulus-figure {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  color: #202124;
+  hyphens: auto;
+}
+
+.stimulus-caption {
+  color: #4d555e;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.stimulus-surface {
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #202124;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.stimulus-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #d2d7d2;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.stimulus-ad-box {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 2px solid #2f373b;
+  background: #fffdf7;
+  font-family: Aptos, "Segoe UI", system-ui, sans-serif;
+}
+
+.stimulus-ad-name {
+  font-size: 1.08rem;
+  line-height: 1.2;
+}
+
+.stimulus-ad-tagline,
+.stimulus-meta,
+.stimulus-note,
+.stimulus-notice-sheet p {
+  margin: 0;
+}
+
+.stimulus-detail-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.stimulus-meta {
+  padding-top: 8px;
+  border-top: 1px solid #d8d6cc;
+  color: #4d555e;
+  font-size: 0.95em;
+  font-weight: 700;
+}
+
+.stimulus-hours-table,
+.stimulus-timetable {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #30363a;
+  background: #f4f6f5;
+  font-family: Bahnschrift, "DIN Alternate", "Arial Narrow", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.stimulus-board-title {
+  font-size: 1.14rem;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.stimulus-hours-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stimulus-hours-table td {
+  padding: 5px 0;
+  border-bottom: 1px solid #d0d6d2;
+}
+
+.stimulus-hours-table td:last-child {
+  text-align: right;
+  font-weight: 800;
+}
+
+.stimulus-notice-sheet {
+  display: grid;
+  gap: 10px;
+  padding: 24px;
+  border: 1px solid #d7d2c5;
+  background: #fffdf4;
+  box-shadow: 0 8px 18px rgba(32, 33, 36, 0.09);
+  transform: rotate(-0.35deg);
+  font-family: Aptos, "Segoe UI", system-ui, sans-serif;
+}
+
+.stimulus-notice-heading {
+  font-size: 1.18rem;
+  line-height: 1.25;
+}
+
+.stimulus-signature,
+.stimulus-date {
+  color: #4d555e;
+  font-weight: 700;
+}
+
+.stimulus-door-sign,
+.stimulus-pictogram-sign {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 120px;
+  padding: 24px;
+  border: 3px solid #202124;
+  background: #f7f8f5;
+  text-align: center;
+  font-family: Bahnschrift, "DIN Alternate", "Arial Narrow", system-ui, sans-serif;
+}
+
+.stimulus-door-sign strong,
+.stimulus-pictogram-sign strong {
+  font-size: 1.65rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.stimulus-door-sign span,
+.stimulus-pictogram-sign span {
+  color: #4d555e;
+  font-weight: 800;
+}
+
+.stimulus-timetable-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid #d0d6d2;
+}
+
+.stimulus-timetable-row span:first-child {
+  font-weight: 900;
+}
+
+.stimulus-pictogram {
+  width: 58px;
+  height: 58px;
+  color: #202124;
 }
 
 .modal-overlay {
@@ -1567,13 +1839,79 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .admin-form-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-form-fields > .admin-reading-preview,
+  .admin-form-fields > :not(.admin-reading-preview) {
+    position: static;
+    grid-column: auto;
+    grid-row: auto;
+  }
+
   .admin-ad-grid,
   .admin-preview-ad-grid,
   .admin-preview-options {
     grid-template-columns: 1fr;
   }
 
+  .stimulus-repeater-row,
+  .stimulus-object-row {
+    grid-template-columns: 1fr;
+  }
+
+  .stimulus-row-controls {
+    justify-content: flex-start;
+  }
+
   .admin-items {
     max-height: none;
+  }
+}
+
+@media print {
+  :root,
+  body {
+    background: #ffffff;
+  }
+
+  .topbar,
+  .story-question-controls,
+  .actions,
+  .admin-list,
+  .segmented-control {
+    display: none !important;
+  }
+
+  .shell,
+  .panel,
+  .story-card,
+  .story-reader-card {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: #ffffff;
+  }
+
+  .story-practice-layout,
+  .goethe-practice-layout,
+  .admin-grid {
+    display: block;
+  }
+
+  .stimulus-surface,
+  .stimulus-image {
+    break-inside: avoid;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .source-card-grid,
+  .admin-preview-ad-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
   }
 }

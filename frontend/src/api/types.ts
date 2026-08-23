@@ -142,6 +142,11 @@ export type StoryAnswerChoice = {
     title: string;
     body: string;
     context_label: string | null;
+    render_kind: StimulusRenderKind;
+    content: StimulusContent | null;
+    image_path: string | null;
+    image_url: string | null;
+    transcript: string | null;
   } | null;
 };
 
@@ -162,6 +167,10 @@ export type StoryPassage = {
   title: string;
   passage_text: string;
   image_url: string | null;
+  render_kind: StimulusRenderKind;
+  content: StimulusContent | null;
+  image_path: string | null;
+  transcript: string | null;
   context_label: string | null;
   order_index: number;
   questions: StoryQuestion[];
@@ -208,6 +217,10 @@ export type AdminReadingAdStimulus = {
   key: "a" | "b";
   title: string;
   body: string;
+  render_kind: StimulusRenderKind;
+  content: StimulusContent | null;
+  image_path: string | null;
+  transcript: string | null;
   context_label: string | null;
   order_index: number;
 };
@@ -220,6 +233,7 @@ export type AdminReadingPassageSummary = {
   exercise_type: string | null;
   topic: string | null;
   title: string;
+  status: "draft" | "published";
   order_index: number;
   question_count: number;
 };
@@ -233,10 +247,34 @@ export type AdminReadingPassage = {
   title: string;
   passage_text: string;
   image_url: string | null;
+  render_kind: StimulusRenderKind;
+  content: StimulusContent | null;
+  image_path: string | null;
+  transcript: string | null;
   context_label: string | null;
+  status: "draft" | "published";
   order_index: number;
   ad_stimuli: AdminReadingAdStimulus[];
   questions: AdminReadingQuestion[];
+};
+
+export type StimulusRenderKind =
+  | "text"
+  | "image"
+  | "ad_box"
+  | "hours_table"
+  | "notice_sheet"
+  | "door_sign"
+  | "timetable"
+  | "pictogram_sign";
+
+export type StimulusContent = Record<string, unknown>;
+
+export type StimulusImageUploadTarget = {
+  bucket: "stimuli";
+  path: string;
+  token: string;
+  upload_url: string;
 };
 
 export type LeaderboardEntry = {

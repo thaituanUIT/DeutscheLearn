@@ -19,6 +19,7 @@ import type {
   StoryPart,
   StoryPassage,
   StoryPassageSummary,
+  StimulusImageUploadTarget,
   TimedAnswer,
   TimedStart,
   WordOfDay,
@@ -297,5 +298,23 @@ export function deleteAdminReadingPassage(token: string, passageId: string): Pro
     token,
     `/api/admin/reading/passages/${encodeURIComponent(passageId)}`,
     { method: "DELETE" },
+  );
+}
+
+export function createStimulusImageUploadUrl(
+  token: string,
+  stimulusId: string,
+  file: File,
+): Promise<StimulusImageUploadTarget> {
+  return adminRequest<StimulusImageUploadTarget>(
+    token,
+    `/api/stimuli/${encodeURIComponent(stimulusId)}/image-upload-url`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        content_type: file.type,
+        size: file.size,
+      }),
+    },
   );
 }

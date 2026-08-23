@@ -15,6 +15,7 @@ import type {
   StoryPassageSummary,
 } from "../api/types";
 import { button } from "../components/button";
+import { stimulusRenderer, type StimulusViewModel } from "../stimuli/templates";
 import { el } from "../utils/dom";
 
 type StoryViewOptions = {
@@ -322,19 +323,12 @@ function sourceChoiceContent(passage: StoryPassage): HTMLElement {
 
   const grid = el("div", "source-card-grid");
   sources.forEach((source, index) => {
-    const card = el("section", "source-card");
-    const header = el("div", "source-card-header");
-    header.append(
+    const wrap = el("section", "source-card");
+    wrap.append(
       el("span", "source-pill", String.fromCharCode(97 + index)),
-      el("strong", "", source.title || `Option ${index + 1}`),
+      stimulusRenderer(source),
     );
-    const details = source.body.split("\n").map((item) => item.trim()).filter(Boolean);
-    card.append(
-      header,
-      el("p", "source-subtitle", source.context_label ?? ""),
-      detailList(details),
-    );
-    grid.append(card);
+    grid.append(wrap);
   });
 
   if (sources.length === 0) {
@@ -346,33 +340,25 @@ function sourceChoiceContent(passage: StoryPassage): HTMLElement {
 
 function noticeContent(passage: StoryPassage): HTMLElement {
   const content = el("article", "story-passage goethe-exercise notice-exercise");
-  const card = el("section", "notice-card notice-info");
-  if (passage.image_url) {
-    const image = document.createElement("img");
-    image.className = "notice-image";
-    image.src = passage.image_url;
-    image.alt = passage.title;
-    card.append(image);
-  }
-  card.append(
-    el("div", "notice-bar", passage.context_label ?? "Hinweis"),
-    el("h3", "", passage.title),
-    el("p", "", passage.passage_text),
-  );
   content.append(
     el("div", "question-type", `${passage.level} · ${partLabel(passage.part ?? "teil_3")}`),
     el("h2", "story-title", passage.title),
-    card,
+    stimulusRenderer(stimulusFromPassage(passage)),
   );
   return content;
 }
 
-function detailList(items: string[]): HTMLElement {
-  const list = el("ul", "source-detail-list");
-  for (const item of items) {
-    list.append(el("li", "", item));
-  }
-  return list;
+function stimulusFromPassage(passage: StoryPassage): StimulusViewModel {
+  return {
+    title: passage.title,
+    body: passage.passage_text,
+    context_label: passage.context_label,
+    render_kind: passage.render_kind,
+    content: passage.content,
+    image_url: passage.image_url,
+    image_path: passage.image_path,
+    transcript: passage.transcript,
+  };
 }
 
 function storyPracticeLayout(passage: StoryPassage, questionPanel: HTMLElement): HTMLElement {

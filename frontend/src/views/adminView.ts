@@ -1,6 +1,7 @@
 import {
   createAdminReadingPassage,
   createAdminWord,
+  createStimulusImageUploadUrl,
   deleteAdminReadingPassage,
   deleteAdminWord,
   getAdminReadingPassage,
@@ -20,6 +21,12 @@ import type {
   FocusTopicAlias,
 } from "../api/types";
 import { button } from "../components/button";
+import {
+  createStimulusEditor,
+  stimulusRenderer,
+  type StimulusEditor,
+  type StimulusViewModel,
+} from "../stimuli/templates";
 import { clear, el } from "../utils/dom";
 
 const ADMIN_TOKEN_KEY = "recognition_admin_token";
@@ -400,7 +407,7 @@ function renderPassageList(
     const item = button("", "admin-item");
     const questionCount = `${passage.question_count} ${pluralize("question", passage.question_count)}`;
     item.append(
-      el("strong", "", passage.title),
+      adminItemTitle(passage.title, passage.status),
       el(
         "span",
         "",
@@ -432,7 +439,6 @@ function renderPassageEditor(
   const part = selectGoethePart(state.selected.part ?? "teil_1");
   const topic = input("Topic", state.selected.topic ?? "");
   const contextLabel = input("Context label", state.selected.context_label ?? "");
-  const imageUrl = input("Image URL", state.selected.image_url ?? "");
   const title = input("Title", state.selected.title);
   const passage = textarea("Passage text", state.selected.passage_text, 10);
   const questions = el("div", "admin-question-list");
@@ -440,8 +446,33 @@ function renderPassageEditor(
   const sourceSituation = textarea("Situation", firstQuestion.prompt, 3);
   const sourceExplanation = textarea("Explanation after answer", firstQuestion.explanation ?? "", 3);
   const correctSource = selectSourceAnswer(firstQuestion);
+  const noticeEditor = createStimulusEditor(
+    {
+      id: state.selected.id,
+      title: state.selected.title,
+      body: state.selected.passage_text,
+      context_label: state.selected.context_label,
+      render_kind: state.selected.render_kind,
+      content: state.selected.content,
+      image_url: state.selected.image_url,
+      image_path: state.selected.image_path,
+      transcript: state.selected.transcript,
+    },
+    "teil_3",
+    () => {
+      const value = noticeEditor.getValue();
+      title.value = value.title;
+      passage.value = value.body;
+      renderPreviewState();
+    },
+    (stimulusId, file) => createStimulusImageUploadUrl(token, stimulusId, file),
+  );
   const adControls = (["a", "b"] as const).map((key, index) =>
-    adStimulusBlock(state.selected.ad_stimuli?.[index] ?? emptyAdStimulus(key, index), key),
+    adStimulusBlock(
+      state.selected.ad_stimuli?.[index] ?? emptyAdStimulus(key, index),
+      key,
+      (stimulusId, file) => createStimulusImageUploadUrl(token, stimulusId, file),
+    ),
   );
   const sourceChoicePanel = sourceChoiceSection(sourceSituation, sourceExplanation, correctSource, adControls);
   const preview = el("section", "admin-reading-preview");
@@ -500,8 +531,13 @@ function renderPassageEditor(
       title: title.value,
       passage_text: activeShape === "goethe_source_choice" ? "" : passage.value,
       context_label: activeShape === "goethe_true_false_notice" ? contextLabel.value || null : null,
-      image_url: activeShape === "goethe_true_false_notice" ? imageUrl.value || null : null,
+      image_url: state.selected.image_url,
+      render_kind: activeShape === "goethe_true_false_notice" ? noticeEditor.getValue().render_kind : "text",
+      content: activeShape === "goethe_true_false_notice" ? noticeEditor.getValue().content : null,
+      image_path: activeShape === "goethe_true_false_notice" ? noticeEditor.getValue().image_path : null,
+      transcript: activeShape === "goethe_true_false_notice" ? noticeEditor.getValue().transcript : null,
       topic: state.activeGroup === "general" ? topic.value || null : null,
+      status: state.selected.status,
       order_index: state.selected.order_index,
       questions: activeShape === "goethe_source_choice" ? sourceQuestions() : collectQuestionBlocksSafely(questionControls),
       ad_stimuli: activeShape === "goethe_source_choice" ? collectAdStimuliSafely(adControls) : [],
@@ -532,7 +568,7 @@ function renderPassageEditor(
       stimulusFields.push(sourceChoicePanel);
     } else {
       if (activeShape === "goethe_true_false_notice") {
-        stimulusFields.push(wordField(contextLabel), wordField(imageUrl));
+        stimulusFields.push(wordField(contextLabel), noticeEditor.node);
       }
       stimulusFields.push(wordField(passage), questionSectionNode);
     }
@@ -566,20 +602,20 @@ function renderPassageEditor(
     previousPart = part.value;
     renderForm();
   });
-  for (const control of [title, passage, topic, contextLabel, imageUrl, sourceSituation, sourceExplanation]) {
+  for (const control of [title, passage, topic, contextLabel, sourceSituation, sourceExplanation]) {
     control.addEventListener("input", renderPreviewState);
   }
   correctSource.addEventListener("change", renderPreviewState);
   for (const control of adControls) {
-    control.title.addEventListener("input", renderPreviewState);
-    control.body.addEventListener("input", renderPreviewState);
-    control.title.addEventListener("input", () => updateCorrectSourceOptions(correctSource, adControls));
+    control.editor.node.addEventListener("input", renderPreviewState);
+    control.editor.node.addEventListener("input", () => updateCorrectSourceOptions(correctSource, adControls));
   }
   updateCorrectSourceOptions(correctSource, adControls);
 
   const savePassage = async (): Promise<void> => {
     try {
       const activeShape = shape();
+      const noticeValue = noticeEditor.getValue();
       const payload: AdminReadingPassage = {
         id: state.selected.id,
         group: state.activeGroup,
@@ -590,10 +626,17 @@ function renderPassageEditor(
         passage_text:
           activeShape === "goethe_source_choice"
             ? "Lesen Sie die Situation und die zwei Anzeigen."
-            : passage.value.trim(),
-        image_url: activeShape === "goethe_true_false_notice" ? imageUrl.value.trim() || null : null,
+            : activeShape === "goethe_true_false_notice"
+              ? noticeValue.body
+              : passage.value.trim(),
+        image_url: state.selected.image_url,
+        render_kind: activeShape === "goethe_true_false_notice" ? noticeValue.render_kind : "text",
+        content: activeShape === "goethe_true_false_notice" ? noticeValue.content : null,
+        image_path: activeShape === "goethe_true_false_notice" ? noticeValue.image_path : null,
+        transcript: activeShape === "goethe_true_false_notice" ? noticeValue.transcript : null,
         context_label: activeShape === "goethe_true_false_notice" ? contextLabel.value.trim() || null : null,
         order_index: state.selected.order_index,
+        status: state.selected.status,
         ad_stimuli: activeShape === "goethe_source_choice" ? collectAdStimuli(adControls) : [],
         questions: activeShape === "goethe_source_choice"
           ? collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource)
@@ -707,8 +750,7 @@ type AdStimulusBlock = {
   node: HTMLElement;
   key: "a" | "b";
   id?: string;
-  title: HTMLInputElement;
-  body: HTMLTextAreaElement;
+  editor: StimulusEditor;
   orderIndex: number;
 };
 
@@ -843,23 +885,36 @@ function canonicalTrueFalseAnswer(question: AdminReadingQuestion): TrueFalseAnsw
   return correct === "falsch" || correct === "false" ? "Falsch" : "Richtig";
 }
 
-function adStimulusBlock(ad: AdminReadingAdStimulus, key: "a" | "b"): AdStimulusBlock {
+function adStimulusBlock(
+  ad: AdminReadingAdStimulus,
+  key: "a" | "b",
+  uploadHandler: Parameters<typeof createStimulusEditor>[3],
+): AdStimulusBlock {
   const node = el("div", "admin-ad-block");
-  const title = input("Title", ad.title);
-  const body = textarea("Text", ad.body, 5);
+  const editor = createStimulusEditor(
+    {
+      id: ad.id,
+      title: ad.title,
+      body: ad.body,
+      context_label: ad.context_label,
+      render_kind: ad.render_kind,
+      content: ad.content,
+      image_url: null,
+      image_path: ad.image_path,
+      transcript: ad.transcript,
+    },
+    "teil_2",
+    () => undefined,
+    uploadHandler,
+  );
   const header = el("h3", "admin-question-title admin-ad-title");
   header.append(el("span", "admin-ad-chip", key), document.createTextNode(" Advert"));
-  node.append(
-    header,
-    wordField(title),
-    wordField(body),
-  );
+  node.append(header, editor.node);
   return {
     node,
     key,
     id: ad.id,
-    title,
-    body,
+    editor,
     orderIndex: ad.order_index,
   };
 }
@@ -900,7 +955,7 @@ function selectSourceAnswer(question: AdminReadingQuestion): HTMLSelectElement {
 function updateCorrectSourceOptions(select: HTMLSelectElement, ads: AdStimulusBlock[]): void {
   for (const [index, option] of Array.from(select.options).entries()) {
     const ad = ads[index];
-    option.textContent = ad?.title.value.trim() || `${ad?.key ?? index + 1})`;
+    option.textContent = ad?.editor.getValue().title.trim() || `${ad?.key ?? index + 1})`;
   }
 }
 
@@ -1011,16 +1066,24 @@ function collectSourceChoiceQuestion(
 
 function collectAdStimuli(blocks: AdStimulusBlock[]): AdminReadingAdStimulus[] {
   return blocks.map((block, index) => {
-    const title = block.title.value.trim();
-    const body = block.body.value.trim();
+    const value = block.editor.getValue();
+    const title = value.title.trim();
+    const body = value.body.trim();
     if (!title || !body) {
-      throw new Error(`Advert ${block.key}) needs a title and text.`);
+      throw new Error(`Advert ${block.key}) needs content.`);
+    }
+    if (value.render_kind === "image" && !value.transcript) {
+      throw new Error(`Advert ${block.key}) needs a transcript for the image.`);
     }
     return {
       id: block.id,
       key: block.key,
       title,
       body,
+      render_kind: value.render_kind,
+      content: value.content,
+      image_path: value.image_path,
+      transcript: value.transcript,
       context_label: null,
       order_index: index,
     };
@@ -1028,14 +1091,21 @@ function collectAdStimuli(blocks: AdStimulusBlock[]): AdminReadingAdStimulus[] {
 }
 
 function collectAdStimuliSafely(blocks: AdStimulusBlock[]): AdminReadingAdStimulus[] {
-  return blocks.map((block, index) => ({
-    id: block.id,
-    key: block.key,
-    title: block.title.value.trim(),
-    body: block.body.value.trim(),
-    context_label: null,
-    order_index: index,
-  }));
+  return blocks.map((block, index) => {
+    const value = block.editor.getValue();
+    return {
+      id: block.id,
+      key: block.key,
+      title: value.title.trim(),
+      body: value.body.trim(),
+      render_kind: value.render_kind,
+      content: value.content,
+      image_path: value.image_path,
+      transcript: value.transcript,
+      context_label: null,
+      order_index: index,
+    };
+  });
 }
 
 function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): void {
@@ -1052,7 +1122,11 @@ function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): 
     text.append(image);
   }
   if (!isSourceChoice) {
-    text.append(el("p", "", passage.passage_text || "Reading text appears here."));
+    if (passage.render_kind !== "text") {
+      text.append(stimulusRenderer(stimulusFromPassage(passage)));
+    } else {
+      text.append(el("p", "", passage.passage_text || "Reading text appears here."));
+    }
   }
 
   const body = el("div", "admin-preview-body");
@@ -1060,7 +1134,7 @@ function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): 
     const adGrid = el("div", "admin-preview-ad-grid");
     for (const ad of passage.ad_stimuli) {
       const card = el("article", "admin-preview-ad");
-      card.append(el("strong", "", `${ad.key}) ${ad.title}`), el("p", "", ad.body));
+      card.append(el("strong", "", `${ad.key})`), stimulusRenderer(stimulusFromAd(ad)));
       adGrid.append(card);
     }
     body.append(adGrid);
@@ -1097,6 +1171,7 @@ function cloneWord(word: AdminWord): AdminWord {
 
 function emptyPassage(group: AdminReadingGroup): AdminReadingPassage {
   return {
+    id: crypto.randomUUID(),
     group,
     level: "A1",
     part: group === "goethe" ? "teil_1" : null,
@@ -1104,7 +1179,12 @@ function emptyPassage(group: AdminReadingGroup): AdminReadingPassage {
     title: "",
     passage_text: "",
     image_url: null,
+    render_kind: "text",
+    content: null,
+    image_path: null,
+    transcript: null,
     context_label: null,
+    status: "published",
     order_index: 0,
     ad_stimuli: [],
     questions: [emptyQuestion(0)],
@@ -1113,9 +1193,22 @@ function emptyPassage(group: AdminReadingGroup): AdminReadingPassage {
 
 function emptyAdStimulus(key: "a" | "b", orderIndex: number): AdminReadingAdStimulus {
   return {
+    id: crypto.randomUUID(),
     key,
     title: "",
     body: "",
+    render_kind: "ad_box",
+    content: {
+      business_name: "",
+      tagline: "",
+      lines: ["", ""],
+      hours: "",
+      address: "",
+      phone: "",
+      price: "",
+    },
+    image_path: null,
+    transcript: null,
     context_label: null,
     order_index: orderIndex,
   };
@@ -1297,8 +1390,46 @@ function pluralize(noun: string, count: number): string {
   return count === 1 ? noun : `${noun}s`;
 }
 
+function adminItemTitle(title: string, status: "draft" | "published"): HTMLElement {
+  const wrap = el("strong", "admin-item-title");
+  wrap.append(document.createTextNode(title));
+  if (status === "draft") wrap.append(el("span", "draft-badge", "Draft"));
+  return wrap;
+}
+
 function hasAdvertDraft(adControls: AdStimulusBlock[]): boolean {
-  return adControls.some((ad) => ad.title.value.trim() || ad.body.value.trim());
+  return adControls.some((ad) => {
+    const value = ad.editor.getValue();
+    return value.title.trim() || value.body.trim();
+  });
+}
+
+function stimulusFromPassage(passage: AdminReadingPassage): StimulusViewModel {
+  return {
+    id: passage.id,
+    title: passage.title,
+    body: passage.passage_text,
+    context_label: passage.context_label,
+    render_kind: passage.render_kind,
+    content: passage.content,
+    image_url: passage.image_url,
+    image_path: passage.image_path,
+    transcript: passage.transcript,
+  };
+}
+
+function stimulusFromAd(ad: AdminReadingAdStimulus): StimulusViewModel {
+  return {
+    id: ad.id,
+    title: ad.title,
+    body: ad.body,
+    context_label: ad.context_label,
+    render_kind: ad.render_kind,
+    content: ad.content,
+    image_url: null,
+    image_path: ad.image_path,
+    transcript: ad.transcript,
+  };
 }
 
 function confirmShapeSwitch(

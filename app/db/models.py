@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -104,6 +105,15 @@ class Stimulus(Base):
         CheckConstraint("level in ('A1', 'A2', 'B1', 'B2')", name="ck_stimulus_level"),
         CheckConstraint("teil in ('teil_1', 'teil_2', 'teil_3', 'teil_4', 'teil_5') or teil is null", name="ck_stimulus_teil"),
         CheckConstraint("kind in ('text', 'ad', 'sign')", name="ck_stimulus_kind"),
+        CheckConstraint(
+            "render_kind = 'image' or image_path is null",
+            name="ck_stimulus_image_path_only_for_image",
+        ),
+        CheckConstraint(
+            "render_kind <> 'image' or transcript is not null",
+            name="ck_stimulus_image_has_transcript",
+        ),
+        CheckConstraint("status in ('draft', 'published')", name="ck_stimulus_status"),
         CheckConstraint("collection <> 'goethe' or teil is not null", name="ck_goethe_stimulus_has_teil"),
     )
 
@@ -115,6 +125,11 @@ class Stimulus(Base):
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(500))
+    render_kind: Mapped[str] = mapped_column(String(40), default="text", nullable=False)
+    content: Mapped[dict | None] = mapped_column(JSON)
+    image_path: Mapped[str | None] = mapped_column(String(500))
+    transcript: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="published", nullable=False)
     audio_url: Mapped[str | None] = mapped_column(String(500))
     context_label: Mapped[str | None] = mapped_column(String(160))
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -294,6 +309,15 @@ FocusWordEntry = WordFocus
 ReadingPassage = Stimulus
 ReadingQuestion = Item
 ReadingAnswer = ItemOption
+
+
+class Upload(Base):
+    __tablename__ = "upload"
+
+    path: Mapped[str] = mapped_column(String(500), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    stimulus_id: Mapped[str | None] = mapped_column(ForeignKey("stimulus.id"), index=True)
+    delete_after_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 def _options_look_true_false(options: list[ItemOption]) -> bool:

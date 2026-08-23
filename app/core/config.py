@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     seed_on_startup: bool = True
     admin_token: str | None = None
     admin_key: str | None = None
+    supabase_url: str | None = None
+    supabase_service_role_key: str | None = None
 
     @model_validator(mode="after")
     def require_persistent_database_in_production(self) -> "Settings":

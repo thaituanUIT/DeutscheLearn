@@ -1,5 +1,7 @@
 import json
 from secrets import compare_digest
+from urllib import request as urlrequest
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -18,6 +20,7 @@ from app.db.models import (
     ReadingPassage,
     ReadingQuestion,
     Topic,
+    Upload,
 )
 from app.db.session import get_db
 from app.schemas import (
@@ -43,6 +46,8 @@ from app.schemas import (
     PlayerOut,
     PracticeAnswerOut,
     PracticeStartOut,
+    StimulusImageUploadUrlIn,
+    StimulusImageUploadUrlOut,
     StoryAnswerChoiceOut,
     StoryAnswerIn,
     StoryAnswerOut,
@@ -327,7 +332,7 @@ def admin_reading_passages(
         select(ReadingPassage, func.coalesce(question_counts.c.question_count, 0))
         .outerjoin(question_counts, question_counts.c.stimulus_id == ReadingPassage.id)
         .where(ReadingPassage.kind != "ad")
-        .order_by(ReadingPassage.level, ReadingPassage.sort_order, ReadingPassage.title)
+        .order_by(ReadingPassage.status, ReadingPassage.level, ReadingPassage.sort_order, ReadingPassage.title)
     )
     if group:
         query = query.where(ReadingPassage.collection == group)
@@ -343,6 +348,7 @@ def admin_reading_passages(
             exercise_type=_exercise_type(passage),
             topic=passage.topic,
             title=passage.title,
+            status=passage.status,
             order_index=passage.order_index,
             question_count=question_count,
         )
@@ -359,9 +365,11 @@ def admin_create_reading_passage(
     payload: AdminReadingPassageIn,
     db: Session = Depends(get_db),
 ) -> AdminReadingPassageOut:
-    passage = ReadingPassage()
+    kwargs = {"id": payload.id} if payload.id else {}
+    passage = ReadingPassage(**kwargs)
     db.add(passage)
     _apply_reading_payload(passage, payload)
+    _claim_stimulus_uploads(db, passage)
     db.commit()
     return _admin_reading_passage_out(passage)
 
@@ -388,6 +396,7 @@ def admin_update_reading_passage(
 ) -> AdminReadingPassageOut:
     passage = _get_reading_passage(db, passage_id)
     _apply_reading_payload(passage, payload)
+    _claim_stimulus_uploads(db, passage)
     db.commit()
     return _admin_reading_passage_out(passage)
 
@@ -399,8 +408,33 @@ def admin_update_reading_passage(
 )
 def admin_delete_reading_passage(passage_id: str, db: Session = Depends(get_db)) -> None:
     passage = _get_reading_passage(db, passage_id)
+    _mark_stimulus_uploads_for_delete(db, passage)
     db.delete(passage)
     db.commit()
+
+
+@router.post(
+    "/stimuli/{stimulus_id}/image-upload-url",
+    response_model=StimulusImageUploadUrlOut,
+    dependencies=[Depends(require_admin)],
+)
+def create_stimulus_image_upload_url(
+    stimulus_id: str,
+    payload: StimulusImageUploadUrlIn,
+    db: Session = Depends(get_db),
+) -> StimulusImageUploadUrlOut:
+    path = f"stimuli/{stimulus_id}/{uuid4()}.{_image_extension(payload.content_type)}"
+    token = _create_supabase_signed_upload_token(path)
+    settings = get_settings()
+    upload_url = (
+        f"{settings.supabase_url.rstrip('/')}/storage/v1/object/upload/sign/stimuli/{path}"
+        f"?token={token}"
+        if settings.supabase_url
+        else ""
+    )
+    db.add(Upload(path=path))
+    db.commit()
+    return StimulusImageUploadUrlOut(bucket="stimuli", path=path, token=token, upload_url=upload_url)
 
 
 @router.post("/quiz/endless/start", response_model=EndlessStartOut)
@@ -717,7 +751,11 @@ def _story_passage_out(passage: ReadingPassage) -> StoryPassageOut:
         topic=passage.topic,
         title=passage.title,
         passage_text=passage.passage_text,
-        image_url=passage.image_url,
+        image_url=_stimulus_image_url(passage),
+        render_kind=passage.render_kind,
+        content=passage.content,
+        image_path=passage.image_path,
+        transcript=passage.transcript,
         context_label=passage.context_label,
         order_index=passage.order_index,
         questions=[
@@ -736,6 +774,11 @@ def _story_passage_out(passage: ReadingPassage) -> StoryPassageOut:
                                 title=answer.ref_stimulus.title,
                                 body=answer.ref_stimulus.body,
                                 context_label=answer.ref_stimulus.context_label,
+                                render_kind=answer.ref_stimulus.render_kind,
+                                content=answer.ref_stimulus.content,
+                                image_path=answer.ref_stimulus.image_path,
+                                image_url=_stimulus_image_url(answer.ref_stimulus),
+                                transcript=answer.ref_stimulus.transcript,
                             )
                             if answer.ref_stimulus
                             else None
@@ -830,6 +873,11 @@ def _apply_reading_payload(passage: ReadingPassage, payload: AdminReadingPassage
     passage.title = payload.title.strip()
     passage.body = payload.passage_text.strip()
     passage.image_url = _clean_optional_text(payload.image_url)
+    passage.render_kind = payload.render_kind
+    passage.content = payload.content
+    passage.image_path = _clean_optional_text(payload.image_path)
+    passage.transcript = _clean_optional_text(payload.transcript)
+    passage.status = payload.status
     passage.context_label = _clean_optional_text(payload.context_label)
     passage.sort_order = payload.order_index
     passage.updated_at = utc_now()
@@ -851,8 +899,13 @@ def _admin_reading_passage_out(passage: ReadingPassage) -> AdminReadingPassageOu
         topic=passage.topic,
         title=passage.title,
         passage_text=passage.passage_text,
-        image_url=passage.image_url,
+        image_url=_stimulus_image_url(passage),
+        render_kind=passage.render_kind,
+        content=passage.content,
+        image_path=passage.image_path,
+        transcript=passage.transcript,
         context_label=passage.context_label,
+        status=passage.status,
         order_index=passage.order_index,
         ad_stimuli=ad_stimuli,
         questions=[
@@ -927,6 +980,11 @@ def _reading_ad_stimuli_from_payload(payload: AdminReadingPassageIn) -> list[Rea
                 kind="ad",
                 title=f"{ad.key}) {ad.title.strip()}",
                 body=ad.body.strip(),
+                render_kind=ad.render_kind,
+                content=ad.content,
+                image_path=_clean_optional_text(ad.image_path),
+                transcript=_clean_optional_text(ad.transcript),
+                status="published",
                 context_label=_clean_optional_text(ad.context_label),
                 sort_order=index,
             )
@@ -953,6 +1011,10 @@ def _admin_ad_stimuli_out(passage: ReadingPassage) -> list[AdminReadingAdOut]:
             key="a" if index == 0 else "b",
             title=ad.title.removeprefix("a) ").removeprefix("b) "),
             body=ad.body,
+            render_kind=ad.render_kind,
+            content=ad.content,
+            image_path=ad.image_path,
+            transcript=ad.transcript,
             context_label=ad.context_label,
             order_index=index,
         )
@@ -986,3 +1048,83 @@ def _stimulus_kind(group: str, part: str | None) -> str:
     if group == "goethe" and part == "teil_3":
         return "sign"
     return "text"
+
+
+def _image_extension(content_type: str) -> str:
+    if content_type == "image/jpeg":
+        return "jpg"
+    if content_type == "image/png":
+        return "png"
+    return "webp"
+
+
+def _create_supabase_signed_upload_token(path: str) -> str:
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise HTTPException(status_code=503, detail="Supabase Storage is not configured")
+
+    base_url = settings.supabase_url.rstrip("/")
+    endpoint = f"{base_url}/storage/v1/object/upload/sign/stimuli/{path}"
+    body = json.dumps({"upsert": False}).encode("utf-8")
+    request = urlrequest.Request(
+        endpoint,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {settings.supabase_service_role_key}",
+            "apikey": settings.supabase_service_role_key,
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urlrequest.urlopen(request, timeout=10) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except OSError as error:
+        raise HTTPException(status_code=502, detail="Could not create signed upload URL") from error
+    token = data.get("token")
+    if not isinstance(token, str) or not token:
+        raise HTTPException(status_code=502, detail="Supabase did not return an upload token")
+    return token
+
+
+def _stimulus_image_url(stimulus: ReadingPassage) -> str | None:
+    if stimulus.image_url:
+        return stimulus.image_url
+    if not stimulus.image_path:
+        return None
+    settings = get_settings()
+    if not settings.supabase_url:
+        return stimulus.image_path
+    return f"{settings.supabase_url.rstrip('/')}/storage/v1/object/public/stimuli/{stimulus.image_path}"
+
+
+def _claim_stimulus_uploads(db: Session, passage: ReadingPassage) -> None:
+    owners = _stimulus_image_owners(passage)
+    if not owners:
+        return
+    uploads = db.scalars(select(Upload).where(Upload.path.in_(owners))).all()
+    for upload in uploads:
+        upload.stimulus_id = owners[upload.path]
+        upload.delete_after_at = None
+
+
+def _mark_stimulus_uploads_for_delete(db: Session, passage: ReadingPassage) -> None:
+    paths = [path for path in _stimulus_image_paths(passage) if path]
+    if not paths:
+        return
+    uploads = db.scalars(select(Upload).where(Upload.path.in_(paths))).all()
+    for upload in uploads:
+        upload.delete_after_at = utc_now()
+
+
+def _stimulus_image_paths(passage: ReadingPassage) -> list[str | None]:
+    return list(_stimulus_image_owners(passage))
+
+
+def _stimulus_image_owners(passage: ReadingPassage) -> dict[str, str]:
+    owners = {passage.image_path: passage.id} if passage.image_path else {}
+    for question in passage.questions:
+        for answer in question.answers:
+            if answer.ref_stimulus is not None and answer.ref_stimulus.image_path:
+                owners[answer.ref_stimulus.image_path] = answer.ref_stimulus.id
+    return owners
