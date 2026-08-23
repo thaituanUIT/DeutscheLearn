@@ -230,6 +230,7 @@ function renderWordEditor(
   state: { selected: AdminWord; isNew: boolean },
   onSaved: () => Promise<void>,
 ): void {
+  const editorForm = adminEditorForm();
   const word = input("Word", state.selected.word);
   word.disabled = !state.isNew;
   const article = input("Article", state.selected.article ?? "");
@@ -242,8 +243,7 @@ function renderWordEditor(
   );
   const status = el("p", "prompt");
 
-  const save = button(state.isNew ? "Create word" : "Save word", "button primary");
-  save.addEventListener("click", async () => {
+  const saveWord = async (): Promise<void> => {
     try {
       const payload = {
         word: word.value.trim(),
@@ -261,6 +261,17 @@ function renderWordEditor(
     } catch (error) {
       status.replaceChildren(adminError(error));
     }
+  };
+
+  editorForm.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || (!event.metaKey && !event.ctrlKey)) return;
+    event.preventDefault();
+    void saveWord();
+  });
+
+  const save = button(state.isNew ? "Create word" : "Save word", "button primary");
+  save.addEventListener("click", () => {
+    void saveWord();
   });
 
   const remove = button("Delete", "button danger-button");
@@ -279,8 +290,7 @@ function renderWordEditor(
 
   const actions = el("div", "actions");
   actions.append(save, remove);
-  host.replaceChildren(
-    el("h2", "focus-title", state.isNew ? "New word" : state.selected.word),
+  editorForm.append(
     wordField(word),
     wordField(article),
     wordField(partOfSpeech),
@@ -288,6 +298,10 @@ function renderWordEditor(
     focusEntriesField(focusEntries),
     actions,
     status,
+  );
+  host.replaceChildren(
+    el("h2", "focus-title", state.isNew ? "New word" : state.selected.word),
+    editorForm,
   );
 }
 
@@ -453,11 +467,7 @@ function renderPassageEditor(
     );
   };
   renderQuestions();
-  const editorForm = document.createElement("form");
-  editorForm.className = "admin-editor-form";
-  editorForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-  });
+  const editorForm = adminEditorForm();
   const status = el("p", "prompt");
   const metaGrid = el("div", "admin-reading-meta-grid");
   const resolvedType = el("span", "admin-resolved-type");
@@ -559,11 +569,6 @@ function renderPassageEditor(
   for (const control of [title, passage, topic, contextLabel, imageUrl, sourceSituation, sourceExplanation]) {
     control.addEventListener("input", renderPreviewState);
   }
-  editorForm.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" || (!event.metaKey && !event.ctrlKey)) return;
-    event.preventDefault();
-    save.click();
-  });
   correctSource.addEventListener("change", renderPreviewState);
   for (const control of adControls) {
     control.title.addEventListener("input", renderPreviewState);
@@ -572,8 +577,7 @@ function renderPassageEditor(
   }
   updateCorrectSourceOptions(correctSource, adControls);
 
-  const save = button(state.isNew ? "Create passage" : "Save passage", "button primary");
-  save.addEventListener("click", async () => {
+  const savePassage = async (): Promise<void> => {
     try {
       const activeShape = shape();
       const payload: AdminReadingPassage = {
@@ -604,6 +608,17 @@ function renderPassageEditor(
     } catch (error) {
       status.replaceChildren(adminError(error));
     }
+  };
+
+  editorForm.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || (!event.metaKey && !event.ctrlKey)) return;
+    event.preventDefault();
+    void savePassage();
+  });
+
+  const save = button(state.isNew ? "Create passage" : "Save passage", "button primary");
+  save.addEventListener("click", () => {
+    void savePassage();
   });
 
   const addTemplate = button("+ Add question", "button");
@@ -641,6 +656,15 @@ function renderPassageEditor(
     el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title),
     editorForm,
   );
+}
+
+function adminEditorForm(): HTMLFormElement {
+  const form = document.createElement("form");
+  form.className = "admin-editor-form";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+  });
+  return form;
 }
 
 function readingGroupTabs(
