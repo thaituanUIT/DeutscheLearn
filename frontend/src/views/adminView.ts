@@ -141,6 +141,7 @@ function adminWorkspace(token: string): HTMLElement {
       else showReading();
     },
   });
+  tabs.classList.add("admin-section-tabs");
   panel.append(tabs, host);
   showWords();
   return panel;

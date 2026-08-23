@@ -886,11 +886,14 @@ button {
 .admin-shell {
   width: min(1600px, calc(100vw - 48px));
   max-width: 1600px;
+  margin-inline: auto;
   height: 100dvh;
   padding: 24px 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+  font-size: 15px;
+  line-height: 1.35;
 }
 
 .admin-panel {
@@ -910,12 +913,44 @@ button {
 }
 
 .admin-shell .topbar {
-  margin-bottom: 18px;
+  min-height: 0;
+  margin-bottom: 16px;
+}
+
+.admin-shell .brand {
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 600;
+}
+
+.admin-shell .button {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.admin-shell .compact-button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.admin-shell .prompt {
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .admin-host {
+  height: 100%;
   min-height: 0;
   overflow: hidden;
+}
+
+.admin-section-tabs {
+  width: max-content;
+  min-width: 240px;
+  justify-self: start;
 }
 
 .segmented-control {
@@ -942,7 +977,8 @@ button {
   background: transparent;
   color: #4d555e;
   font: inherit;
-  font-weight: 900;
+  font-size: 15px;
+  font-weight: 400;
   font-synthesis: none;
   line-height: 1;
   white-space: nowrap;
@@ -964,7 +1000,9 @@ button {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   gap: 24px;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
   align-items: stretch;
 }
 
@@ -987,23 +1025,27 @@ button {
 
 .admin-list-header,
 .admin-list-controls {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: var(--admin-space-inline);
 }
 
 .admin-list-header {
+  min-height: 38px;
   justify-content: space-between;
 }
 
 .admin-list-header .focus-title {
+  margin: 0;
+  font-size: 20px;
   line-height: 1.15;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .admin-list-header .button {
-  min-height: 38px;
+  min-height: 34px;
   display: inline-flex;
 }
 
@@ -1021,15 +1063,17 @@ button {
   min-height: 0;
   display: grid;
   align-content: start;
-  gap: var(--admin-space-inline);
-  overflow: auto;
+  gap: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .admin-item {
   display: grid;
-  gap: var(--admin-space-inline);
+  gap: 2px;
   width: 100%;
-  padding: var(--admin-space-field);
+  min-height: 52px;
+  padding: 8px 10px;
   border: 1px solid #e0e2dc;
   border-radius: 8px;
   background: #ffffff;
@@ -1038,10 +1082,17 @@ button {
   cursor: pointer;
 }
 
+.admin-item strong {
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 400;
+}
+
 .admin-item span {
   color: #687078;
-  font-size: 0.88rem;
-  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.25;
+  font-weight: 400;
 }
 
 .admin-reading-meta-grid {
@@ -1068,16 +1119,16 @@ button {
   border-radius: 999px;
   background: #edf5f1;
   color: #244d43;
-  font-weight: 800;
-  font-size: 0.88rem;
+  font-weight: 400;
+  font-size: 13px;
 }
 
 .admin-field {
   display: grid;
   gap: var(--admin-space-label);
   color: #4d555e;
-  font-size: 0.9rem;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 400;
 }
 
 .admin-reading-meta-grid .admin-field {
@@ -1092,6 +1143,7 @@ button {
   display: grid;
   align-content: start;
   gap: var(--admin-space-field);
+  width: min(720px, 100%);
 }
 
 .admin-editor-header {
@@ -1101,6 +1153,13 @@ button {
   justify-content: space-between;
   gap: var(--admin-space-inline);
   min-height: 40px;
+}
+
+.admin-editor-header .focus-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 600;
 }
 
 .admin-passage-editor {
@@ -1154,6 +1213,8 @@ button {
   background: #ffffff;
   color: #202124;
   font: inherit;
+  font-size: 15px;
+  font-weight: 400;
 }
 
 .admin-textarea {
@@ -1167,7 +1228,7 @@ button {
 .admin-field[data-field="Passage text"] .admin-textarea {
   min-height: 260px;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 15px;
   font-weight: 400;
   line-height: 1.6;
 }
@@ -1188,9 +1249,9 @@ button {
 .admin-question-title {
   margin: 0;
   color: #202124;
-  font-size: 1rem;
+  font-size: 15px;
   line-height: 1.25;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .admin-question-list {
@@ -1223,8 +1284,8 @@ button {
   background: transparent;
   color: #4d555e;
   font: inherit;
-  font-size: 0.88rem;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 400;
   cursor: pointer;
 }
 
@@ -1263,8 +1324,8 @@ button {
   border-radius: 8px;
   background: #ffffff;
   color: #4d555e;
-  font-size: 1.2rem;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 400;
   line-height: 1;
   cursor: pointer;
 }
@@ -1295,8 +1356,8 @@ button {
   border-radius: 999px;
   background: #edf1ec;
   color: #244d43;
-  font-size: 0.84rem;
-  font-weight: 900;
+  font-size: 13px;
+  font-weight: 400;
 }
 
 .admin-source-choice-section {
@@ -1320,8 +1381,8 @@ button {
 
 .admin-focus-repeater {
   color: #4d555e;
-  font-size: 0.9rem;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 400;
 }
 
 .admin-focus-row {
@@ -1339,9 +1400,9 @@ button {
 .admin-preview-label {
   margin: 0;
   color: #687078;
-  font-size: 0.76rem;
+  font-size: 13px;
   line-height: 1;
-  font-weight: 900;
+  font-weight: 400;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -1424,8 +1485,8 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: var(--admin-space-field);
-  min-height: 62px;
-  padding-top: var(--admin-space-field);
+  min-height: 54px;
+  padding-top: 12px;
   border-top: 1px solid #dfe3df;
   background: #f6f7f4;
 }
@@ -1453,8 +1514,8 @@ button {
   border-radius: 999px;
   background: #fff8e6;
   color: #6f4c00;
-  font-size: 0.72rem;
-  font-weight: 900;
+  font-size: 13px;
+  font-weight: 400;
   text-transform: uppercase;
 }
 
