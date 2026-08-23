@@ -845,6 +845,7 @@ button {
 
 .answer-option,
 .button {
+  display: inline-flex;
   min-height: 58px;
   padding: 0 20px;
   border: 1px solid #cfd6d8;
@@ -852,6 +853,8 @@ button {
   background: #ffffff;
   color: #202124;
   cursor: pointer;
+  align-items: center;
+  justify-content: center;
   transition:
     border-color 120ms ease,
     transform 120ms ease,
@@ -896,13 +899,11 @@ button {
 
 .segmented-control {
   --segment-count: 2;
-  width: max-content;
-  min-width: min(100%, calc(var(--segment-count) * 128px));
+  width: 100%;
   height: 44px;
   display: grid;
   grid-template-columns: repeat(var(--segment-count), minmax(0, 1fr));
   align-items: center;
-  gap: var(--admin-space-label);
   padding: var(--admin-space-label);
   border: 1px solid #d8ded8;
   border-radius: 8px;
@@ -910,15 +911,19 @@ button {
 }
 
 .segmented-control__item {
-  height: 36px;
+  display: grid;
+  place-items: center;
+  height: 100%;
   min-width: 0;
-  padding: 0 var(--admin-space-field);
+  padding: 0 var(--admin-space-inline);
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: #4d555e;
   font: inherit;
-  font-weight: 700;
+  font-weight: 900;
+  font-synthesis: none;
+  line-height: 1;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -926,7 +931,6 @@ button {
 .segmented-control__item[aria-selected="true"] {
   background: #edf1ec;
   color: #202124;
-  font-weight: 900;
   box-shadow: inset 0 0 0 1px #d8ded8;
 }
 
@@ -961,9 +965,14 @@ button {
 }
 
 .admin-list-header .focus-title {
-  line-height: 1;
+  line-height: 1.15;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.admin-list-header .button {
+  min-height: 38px;
+  display: inline-flex;
 }
 
 .admin-list-controls {
@@ -1049,6 +1058,11 @@ button {
   gap: var(--admin-space-region);
 }
 
+.admin-editor-form {
+  display: grid;
+  gap: var(--admin-space-field);
+}
+
 .admin-field-header {
   display: flex;
   align-items: center;
@@ -1072,16 +1086,15 @@ button {
   padding-bottom: var(--admin-space-field);
   resize: vertical;
   line-height: 1.45;
+  overflow-y: hidden;
 }
 
-.admin-reading-text-grid .admin-textarea {
-  min-height: 230px;
+.admin-field[data-field="Passage text"] .admin-textarea {
+  min-height: 260px;
   font-family: inherit;
-}
-
-.admin-reading-text-grid .admin-field:last-child .admin-textarea {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.6;
 }
 
 .admin-question-section {
@@ -1139,8 +1152,48 @@ button {
   background: #fbfbf8;
 }
 
-.admin-question-block .danger-button {
-  justify-self: start;
+.admin-question-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--admin-space-inline);
+}
+
+.admin-text-button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #4d555e;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-text-button:hover {
+  color: #202124;
+  text-decoration: underline;
+}
+
+.danger-text-button {
+  color: #8e2d23;
+}
+
+.admin-options-editor {
+  display: grid;
+  gap: var(--admin-space-inline);
+}
+
+.admin-option-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--admin-space-inline);
+}
+
+.admin-option-row input[type="radio"] {
+  margin-top: 15px;
 }
 
 .admin-ad-title {

@@ -26,6 +26,7 @@ const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
 const READING_GROUPS = ["general", "goethe"] as const;
 const GOETHE_PARTS = ["teil_1", "teil_2", "teil_3", "teil_4", "teil_5"] as const;
+let questionBlockId = 0;
 
 type AdminLevel = (typeof LEVELS)[number];
 type AdminReadingGroup = (typeof READING_GROUPS)[number];
@@ -421,7 +422,6 @@ function renderPassageEditor(
   const title = input("Title", state.selected.title);
   const passage = textarea("Passage text", state.selected.passage_text, 10);
   const questions = el("div", "admin-question-list");
-  const questionControls = state.selected.questions.map((question) => questionBlock(question));
   const firstQuestion = state.selected.questions[0] ?? emptyQuestion(0);
   const sourceSituation = textarea("Situation", firstQuestion.prompt, 3);
   const sourceExplanation = textarea("Explanation after answer", firstQuestion.explanation ?? "", 3);
@@ -432,6 +432,12 @@ function renderPassageEditor(
   const sourceChoicePanel = sourceChoiceSection(sourceSituation, sourceExplanation, correctSource, adControls);
   const preview = el("section", "admin-reading-preview");
   const formFields = el("div", "admin-form-fields");
+  const shape = (): ReadingShape =>
+    resolveReadingShape(state.activeGroup, level.value as AdminLevel, part.value as AdminGoethePart);
+  let questionControls = state.selected.questions.map((question) => questionBlockForShape(question, shape()));
+  if (questionControls.length === 0) {
+    questionControls = [questionBlockForShape(emptyQuestion(0), shape())];
+  }
   const renderQuestions = (): void => {
     questions.replaceChildren(
       ...questionControls.map((control, index) => {
@@ -447,16 +453,61 @@ function renderPassageEditor(
     );
   };
   renderQuestions();
+  const editorForm = document.createElement("form");
+  editorForm.className = "admin-editor-form";
+  editorForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+  });
   const status = el("p", "prompt");
   const metaGrid = el("div", "admin-reading-meta-grid");
   const resolvedType = el("span", "admin-resolved-type");
   const questionSectionNode = questionSection(questions, button("+ Add question", "button primary"));
-  const shape = (): ReadingShape =>
-    resolveReadingShape(state.activeGroup, level.value as AdminLevel, part.value as AdminGoethePart);
+
+  const sourceQuestions = (): AdminReadingQuestion[] => {
+    try {
+      return collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource);
+    } catch {
+      return [
+        {
+          prompt: sourceSituation.value,
+          explanation: sourceExplanation.value || null,
+          order_index: 0,
+          answers: [
+            { answer_text: "a)", is_correct: correctSource.value === "0", order_index: 0 },
+            { answer_text: "b)", is_correct: correctSource.value === "1", order_index: 1 },
+          ],
+        },
+      ];
+    }
+  };
+
+  const renderPreviewState = (): void => {
+    const activeShape = shape();
+    renderReadingPreview(preview, {
+      group: state.activeGroup,
+      level: level.value as AdminLevel,
+      part: state.activeGroup === "goethe" ? (part.value as AdminGoethePart) : null,
+      title: title.value,
+      passage_text: activeShape === "goethe_source_choice" ? "" : passage.value,
+      context_label: activeShape === "goethe_true_false_notice" ? contextLabel.value || null : null,
+      image_url: activeShape === "goethe_true_false_notice" ? imageUrl.value || null : null,
+      topic: state.activeGroup === "general" ? topic.value || null : null,
+      order_index: state.selected.order_index,
+      questions: activeShape === "goethe_source_choice" ? sourceQuestions() : collectQuestionBlocksSafely(questionControls),
+      ad_stimuli: activeShape === "goethe_source_choice" ? collectAdStimuliSafely(adControls) : [],
+    });
+  };
 
   const renderForm = (): void => {
     syncGoethePartOptions(part, level.value as AdminLevel);
     const activeShape = shape();
+    let questionShapeChanged = false;
+    questionControls = questionControls.map((control, index) => {
+      if (questionBlockMatchesShape(control, activeShape)) return control;
+      questionShapeChanged = true;
+      return questionBlockForShape(questionFromBlockSafely(control, index), activeShape);
+    });
+    if (questionShapeChanged) renderQuestions();
     resolvedType.textContent = `Type: ${resolvedExerciseLabel(activeShape)}`;
     const metaFields = [wordField(level, "Level")];
     if (state.activeGroup === "goethe") {
@@ -476,36 +527,7 @@ function renderPassageEditor(
       stimulusFields.push(wordField(passage), questionSectionNode);
     }
 
-    const sourceQuestions = (): AdminReadingQuestion[] => {
-      try {
-        return collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource);
-      } catch {
-        return [
-          {
-            prompt: sourceSituation.value,
-            explanation: sourceExplanation.value || null,
-            order_index: 0,
-            answers: [
-              { answer_text: "a)", is_correct: correctSource.value === "0", order_index: 0 },
-              { answer_text: "b)", is_correct: correctSource.value === "1", order_index: 1 },
-            ],
-          },
-        ];
-      }
-    };
-    renderReadingPreview(preview, {
-      group: state.activeGroup,
-      level: level.value as AdminLevel,
-      part: state.activeGroup === "goethe" ? (part.value as AdminGoethePart) : null,
-      title: title.value,
-      passage_text: activeShape === "goethe_source_choice" ? "" : passage.value,
-      context_label: activeShape === "goethe_true_false_notice" ? contextLabel.value || null : null,
-      image_url: activeShape === "goethe_true_false_notice" ? imageUrl.value || null : null,
-      topic: state.activeGroup === "general" ? topic.value || null : null,
-      order_index: state.selected.order_index,
-      questions: activeShape === "goethe_source_choice" ? sourceQuestions() : collectQuestionsSafely(questionControls),
-      ad_stimuli: activeShape === "goethe_source_choice" ? collectAdStimuliSafely(adControls) : [],
-    });
+    renderPreviewState();
     formFields.replaceChildren(...stimulusFields, preview);
   };
   let previousShape = shape();
@@ -535,12 +557,17 @@ function renderPassageEditor(
     renderForm();
   });
   for (const control of [title, passage, topic, contextLabel, imageUrl, sourceSituation, sourceExplanation]) {
-    control.addEventListener("input", renderForm);
+    control.addEventListener("input", renderPreviewState);
   }
-  correctSource.addEventListener("change", renderForm);
+  editorForm.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || (!event.metaKey && !event.ctrlKey)) return;
+    event.preventDefault();
+    save.click();
+  });
+  correctSource.addEventListener("change", renderPreviewState);
   for (const control of adControls) {
-    control.title.addEventListener("input", renderForm);
-    control.body.addEventListener("input", renderForm);
+    control.title.addEventListener("input", renderPreviewState);
+    control.body.addEventListener("input", renderPreviewState);
     control.title.addEventListener("input", () => updateCorrectSourceOptions(correctSource, adControls));
   }
   updateCorrectSourceOptions(correctSource, adControls);
@@ -566,7 +593,7 @@ function renderPassageEditor(
         ad_stimuli: activeShape === "goethe_source_choice" ? collectAdStimuli(adControls) : [],
         questions: activeShape === "goethe_source_choice"
           ? collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource)
-          : collectQuestions(questionControls),
+          : collectQuestionBlocks(questionControls),
       };
       state.selected = state.isNew
         ? await createAdminReadingPassage(token, payload)
@@ -582,7 +609,7 @@ function renderPassageEditor(
   const addTemplate = button("+ Add question", "button");
   addTemplate.className = "button primary";
   addTemplate.addEventListener("click", () => {
-    questionControls.push(questionBlock(emptyQuestion(questionControls.length)));
+    questionControls.push(questionBlockForShape(emptyQuestion(questionControls.length), shape()));
     renderQuestions();
     renderForm();
   });
@@ -609,12 +636,10 @@ function renderPassageEditor(
 
   const actions = el("div", "actions");
   actions.append(save, remove);
+  editorForm.append(metaGrid, formFields, actions, status);
   host.replaceChildren(
     el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title),
-    metaGrid,
-    formFields,
-    actions,
-    status,
+    editorForm,
   );
 }
 
@@ -637,9 +662,20 @@ type QuestionBlock = {
   node: HTMLElement;
   title: HTMLElement;
   prompt: HTMLTextAreaElement;
-  explanation: HTMLInputElement;
-  correct: HTMLInputElement;
-  incorrect: HTMLTextAreaElement;
+  explanation: HTMLTextAreaElement;
+  remove: HTMLButtonElement;
+  mode: "true_false" | "standard";
+  trueFalseAnswer?: () => TrueFalseAnswer;
+  options?: OptionEditor[];
+  addOption?: HTMLButtonElement;
+};
+
+type TrueFalseAnswer = "Richtig" | "Falsch";
+
+type OptionEditor = {
+  row: HTMLElement;
+  radio: HTMLInputElement;
+  text: HTMLTextAreaElement;
   remove: HTMLButtonElement;
 };
 
@@ -653,30 +689,134 @@ type AdStimulusBlock = {
 };
 
 function questionBlock(question: AdminReadingQuestion): QuestionBlock {
-  const correctAnswer = question.answers.find((answer) => answer.is_correct);
-  const incorrectAnswers = question.answers
-    .filter((answer) => !answer.is_correct)
-    .sort((first, second) => first.order_index - second.order_index)
-    .map((answer) => answer.answer_text)
-    .join("\n");
+  return standardQuestionBlock(question);
+}
+
+function questionBlockForShape(question: AdminReadingQuestion, shape: ReadingShape): QuestionBlock {
+  return isTrueFalseShape(shape) ? trueFalseQuestionBlock(question) : standardQuestionBlock(question);
+}
+
+function questionBlockMatchesShape(block: QuestionBlock, shape: ReadingShape): boolean {
+  return isTrueFalseShape(shape) ? block.mode === "true_false" : block.mode === "standard";
+}
+
+function isTrueFalseShape(shape: ReadingShape): boolean {
+  return shape === "goethe_true_false_text" || shape === "goethe_true_false_notice";
+}
+
+function trueFalseQuestionBlock(question: AdminReadingQuestion): QuestionBlock {
+  let selected: TrueFalseAnswer = canonicalTrueFalseAnswer(question);
+  const node = el("div", "admin-question-block");
+  const title = el("h3", "admin-question-title", "Question");
+  const prompt = textarea("Prompt", question.prompt, 3);
+  const explanation = textarea("Explanation after answer", question.explanation ?? "", 3);
+  const remove = button("Remove question", "admin-text-button danger-text-button");
+  const header = questionBlockHeader(title, remove);
+  const answer = segmentedControl<TrueFalseAnswer>({
+    label: "Correct answer",
+    value: selected,
+    options: [
+      { value: "Richtig", label: "Richtig" },
+      { value: "Falsch", label: "Falsch" },
+    ],
+    onChange: (value) => {
+      selected = value;
+    },
+  });
+
+  node.append(header, wordField(prompt), wordField(answer, "Correct answer"), wordField(explanation));
+  return { node, title, prompt, explanation, remove, mode: "true_false", trueFalseAnswer: () => selected };
+}
+
+function standardQuestionBlock(question: AdminReadingQuestion): QuestionBlock {
+  const sortedAnswers = question.answers.length > 0
+    ? [...question.answers].sort((first, second) => first.order_index - second.order_index)
+    : emptyQuestion(question.order_index).answers;
 
   const node = el("div", "admin-question-block");
   const title = el("h3", "admin-question-title", "Question");
-  const prompt = textarea("Main text", question.prompt, 3);
-  const correct = input("Correct answer", correctAnswer?.answer_text ?? "");
-  const incorrect = textarea("Incorrect answers, one per line", incorrectAnswers, 4);
-  const explanation = input("Explanation after answer", question.explanation ?? "");
-  const remove = button("Remove question", "button danger-button");
+  const prompt = textarea("Prompt", question.prompt, 3);
+  const explanation = textarea("Explanation after answer", question.explanation ?? "", 3);
+  const remove = button("Remove question", "admin-text-button danger-text-button");
+  const header = questionBlockHeader(title, remove);
+  const optionsWrap = el("div", "admin-options-editor");
+  const optionEditors: OptionEditor[] = [];
+  const radioName = `question-${++questionBlockId}-correct`;
+
+  const renderOptions = (): void => {
+    optionsWrap.replaceChildren(...optionEditors.map((option, index) => {
+      option.radio.value = String(index);
+      option.remove.disabled = optionEditors.length <= 2;
+      return option.row;
+    }));
+  };
+  const addOption = (answerText = "", isCorrect = false): void => {
+    const option = optionEditor(radioName, answerText, isCorrect);
+    option.remove.addEventListener("click", () => {
+      const index = optionEditors.indexOf(option);
+      if (index === -1 || optionEditors.length <= 2) return;
+      const wasCorrect = option.radio.checked;
+      optionEditors.splice(index, 1);
+      if (wasCorrect) optionEditors[0].radio.checked = true;
+      renderOptions();
+    });
+    optionEditors.push(option);
+    renderOptions();
+  };
+
+  for (const answer of sortedAnswers) {
+    addOption(answer.answer_text, answer.is_correct);
+  }
+  if (!optionEditors.some((option) => option.radio.checked)) {
+    optionEditors[0]?.radio.click();
+  }
+
+  const addOptionButton = button("+ Add option", "button compact-button");
+  addOptionButton.addEventListener("click", () => {
+    addOption();
+  });
 
   node.append(
-    title,
+    header,
     wordField(prompt),
-    wordField(correct),
-    wordField(incorrect),
+    wordField(optionsWrap, "Options"),
+    addOptionButton,
     wordField(explanation),
-    remove,
   );
-  return { node, title, prompt, explanation, correct, incorrect, remove };
+  return {
+    node,
+    title,
+    prompt,
+    explanation,
+    remove,
+    mode: "standard",
+    options: optionEditors,
+    addOption: addOptionButton,
+  };
+}
+
+function questionBlockHeader(title: HTMLElement, remove: HTMLButtonElement): HTMLElement {
+  const header = el("div", "admin-question-block-header");
+  header.append(title, remove);
+  return header;
+}
+
+function optionEditor(radioName: string, answerText: string, isCorrect: boolean): OptionEditor {
+  const row = el("div", "admin-option-row");
+  const radio = document.createElement("input");
+  radio.type = "radio";
+  radio.name = radioName;
+  radio.checked = isCorrect;
+  radio.ariaLabel = "Correct answer";
+  const text = textarea("Answer option", answerText, 2);
+  const remove = button("Remove", "admin-text-button");
+  row.append(radio, text, remove);
+  return { row, radio, text, remove };
+}
+
+function canonicalTrueFalseAnswer(question: AdminReadingQuestion): TrueFalseAnswer {
+  const correct = question.answers.find((answer) => answer.is_correct)?.answer_text.trim().toLocaleLowerCase("de-DE");
+  return correct === "falsch" || correct === "false" ? "Falsch" : "Richtig";
 }
 
 function adStimulusBlock(ad: AdminReadingAdStimulus, key: "a" | "b"): AdStimulusBlock {
@@ -748,45 +888,78 @@ function questionSection(questions: HTMLElement, addButton: HTMLButtonElement): 
   return wrap;
 }
 
-function collectQuestions(blocks: QuestionBlock[]): AdminReadingQuestion[] {
+function collectQuestionBlocks(blocks: QuestionBlock[]): AdminReadingQuestion[] {
   return blocks
     .map((block, index) => {
-      const correct = block.correct.value.trim();
-      const incorrect = block.incorrect.value
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
       if (!block.prompt.value.trim()) {
-        throw new Error(`Question ${index + 1} needs main text.`);
+        throw new Error(`Question ${index + 1} needs a prompt.`);
       }
-      if (!correct) {
-        throw new Error(`Question ${index + 1} needs a correct answer.`);
+      if (block.mode === "true_false") {
+        const correct = block.trueFalseAnswer?.() ?? "Richtig";
+        return {
+          prompt: block.prompt.value.trim(),
+          explanation: block.explanation.value.trim() || null,
+          order_index: index,
+          answers: trueFalseAnswers(correct),
+        };
       }
-      if (incorrect.length === 0) {
-        throw new Error(`Question ${index + 1} needs at least one incorrect answer.`);
+
+      const options = block.options ?? [];
+      const answers = options.map((option, answerIndex) => ({
+        answer_text: option.text.value.trim(),
+        is_correct: option.radio.checked,
+        order_index: answerIndex,
+      }));
+      if (answers.some((answer) => !answer.answer_text)) {
+        throw new Error(`Question ${index + 1} needs text for every option.`);
+      }
+      if (answers.length < 2) {
+        throw new Error(`Question ${index + 1} needs at least two options.`);
+      }
+      if (answers.filter((answer) => answer.is_correct).length !== 1) {
+        throw new Error(`Question ${index + 1} needs one correct option.`);
       }
       return {
         prompt: block.prompt.value.trim(),
         explanation: block.explanation.value.trim() || null,
         order_index: index,
-        answers: [
-          { answer_text: correct, is_correct: true, order_index: 0 },
-          ...incorrect.map((answer, answerIndex) => ({
-            answer_text: answer,
-            is_correct: false,
-            order_index: answerIndex + 1,
-          })),
-        ],
+        answers,
       };
     });
 }
 
-function collectQuestionsSafely(blocks: QuestionBlock[]): AdminReadingQuestion[] {
+function collectQuestionBlocksSafely(blocks: QuestionBlock[]): AdminReadingQuestion[] {
   try {
-    return collectQuestions(blocks);
+    return collectQuestionBlocks(blocks);
   } catch {
     return [];
   }
+}
+
+function questionFromBlockSafely(block: QuestionBlock, index: number): AdminReadingQuestion {
+  try {
+    return collectQuestionBlocks([block])[0];
+  } catch {
+    return {
+      prompt: block.prompt.value,
+      explanation: block.explanation.value || null,
+      order_index: index,
+      answers: block.mode === "true_false"
+        ? trueFalseAnswers(block.trueFalseAnswer?.() ?? "Richtig")
+        : (block.options ?? []).map((option, answerIndex) => ({
+          answer_text: option.text.value,
+          is_correct: option.radio.checked,
+          order_index: answerIndex,
+        })),
+    };
+  }
+}
+
+function trueFalseAnswers(correct: TrueFalseAnswer): AdminReadingQuestion["answers"] {
+  return [
+    { answer_text: "Richtig", is_correct: correct === "Richtig", order_index: 0 },
+    { answer_text: "Falsch", is_correct: correct === "Falsch", order_index: 1 },
+  ];
 }
 
 function collectSourceChoiceQuestion(
@@ -957,7 +1130,14 @@ function textarea(label: string, value: string, rows: number, placeholder = ""):
   node.value = value;
   node.rows = rows;
   node.className = "admin-input admin-textarea";
+  node.addEventListener("input", () => growTextarea(node));
+  window.requestAnimationFrame(() => growTextarea(node));
   return node;
+}
+
+function growTextarea(node: HTMLTextAreaElement): void {
+  node.style.height = "auto";
+  node.style.height = `${node.scrollHeight}px`;
 }
 
 function selectLevel(value: AdminLevel): HTMLSelectElement {
