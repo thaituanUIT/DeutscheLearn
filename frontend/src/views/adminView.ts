@@ -499,7 +499,7 @@ function renderPassageEditor(
   };
   renderQuestions();
   const editorForm = adminEditorForm();
-  const status = el("p", "prompt");
+  const status = el("p", "prompt admin-dirty-state");
   const metaGrid = el("div", "admin-reading-meta-grid");
   const resolvedType = el("span", "admin-resolved-type");
   const questionSectionNode = questionSection(questions, button("+ Add question", "button primary"));
@@ -574,7 +574,7 @@ function renderPassageEditor(
     }
 
     renderPreviewState();
-    formFields.replaceChildren(...stimulusFields, preview);
+    formFields.replaceChildren(...stimulusFields);
   };
   let previousShape = shape();
   let previousLevel = level.value;
@@ -611,6 +611,10 @@ function renderPassageEditor(
     control.editor.node.addEventListener("input", () => updateCorrectSourceOptions(correctSource, adControls));
   }
   updateCorrectSourceOptions(correctSource, adControls);
+
+  const markDirty = (): void => {
+    status.textContent = "Unsaved changes";
+  };
 
   const savePassage = async (): Promise<void> => {
     try {
@@ -658,6 +662,8 @@ function renderPassageEditor(
     event.preventDefault();
     void savePassage();
   });
+  editorForm.addEventListener("input", markDirty);
+  editorForm.addEventListener("change", markDirty);
 
   const save = button(state.isNew ? "Create passage" : "Save passage", "button primary");
   save.addEventListener("click", () => {
@@ -676,29 +682,43 @@ function renderPassageEditor(
     addTemplate,
   );
 
-  const remove = button("Delete", "button danger-button");
-  remove.disabled = state.isNew;
-  remove.addEventListener("click", async () => {
-    if (!state.selected.id || !window.confirm(`Delete ${state.selected.title}?`)) return;
-    try {
-      await deleteAdminReadingPassage(token, state.selected.id);
-      state.selected = emptyPassage(state.activeGroup);
-      state.isNew = true;
-      await onSaved();
-    } catch (error) {
-      status.replaceChildren(adminError(error));
-    }
+  const cancel = button("Cancel", "button");
+  cancel.addEventListener("click", () => {
+    state.selected = state.isNew ? emptyPassage(state.activeGroup) : state.selected;
+    renderPassageEditor(host, token, state, onSaved);
   });
 
   renderForm();
 
-  const actions = el("div", "actions");
-  actions.append(save, remove);
-  editorForm.append(metaGrid, formFields, actions, status);
-  host.replaceChildren(
-    el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title),
-    editorForm,
-  );
+  const header = el("div", "admin-editor-header");
+  header.append(el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title));
+  if (!state.isNew) {
+    const remove = button("Delete", "admin-text-button danger-text-button");
+    remove.addEventListener("click", async () => {
+      if (!state.selected.id || !window.confirm(`Delete ${state.selected.title}?`)) return;
+      try {
+        await deleteAdminReadingPassage(token, state.selected.id);
+        state.selected = emptyPassage(state.activeGroup);
+        state.isNew = true;
+        await onSaved();
+      } catch (error) {
+        status.replaceChildren(adminError(error));
+      }
+    });
+    header.append(remove);
+  }
+
+  const actions = el("div", "admin-action-bar");
+  const actionButtons = el("div", "admin-action-buttons");
+  actionButtons.append(cancel, save);
+  actions.append(status, actionButtons);
+  editorForm.append(metaGrid, formFields, actions);
+
+  const previewColumn = el("aside", "admin-preview-column");
+  previewColumn.append(preview);
+  const editorLayout = el("div", "admin-passage-editor");
+  editorLayout.append(editorForm, previewColumn);
+  host.replaceChildren(header, editorLayout);
 }
 
 function adminEditorForm(): HTMLFormElement {
@@ -875,7 +895,9 @@ function optionEditor(radioName: string, answerText: string, isCorrect: boolean)
   radio.checked = isCorrect;
   radio.ariaLabel = "Correct answer";
   const text = textarea("Answer option", answerText, 2);
-  const remove = button("Remove", "admin-text-button");
+  const remove = button("×", "admin-icon-button danger-icon-button");
+  remove.ariaLabel = "Remove option";
+  remove.title = "Remove option";
   row.append(radio, text, remove);
   return { row, radio, text, remove };
 }
@@ -1110,23 +1132,11 @@ function collectAdStimuliSafely(blocks: AdStimulusBlock[]): AdminReadingAdStimul
 
 function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): void {
   const isSourceChoice = passage.group === "goethe" && passage.part === "teil_2";
-  const isNotice = passage.group === "goethe" && passage.part === "teil_3";
-  const title = el("h3", "admin-section-title", "Preview");
+  const label = el("h3", "admin-preview-label", "Preview");
+  const frame = el("div", "admin-preview-frame");
   const text = el("div", "admin-preview-text");
-  text.append(el("strong", "", passage.title || "Untitled passage"));
-  if (passage.context_label) text.append(el("span", "", passage.context_label));
-  if (isNotice && passage.image_url) {
-    const image = document.createElement("img");
-    image.src = passage.image_url;
-    image.alt = passage.title || "Notice image";
-    text.append(image);
-  }
   if (!isSourceChoice) {
-    if (passage.render_kind !== "text") {
-      text.append(stimulusRenderer(stimulusFromPassage(passage)));
-    } else {
-      text.append(el("p", "", passage.passage_text || "Reading text appears here."));
-    }
+    text.append(stimulusRenderer(stimulusFromPassage(passage)));
   }
 
   const body = el("div", "admin-preview-body");
@@ -1149,7 +1159,12 @@ function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): 
     item.append(answers);
     body.append(item);
   }
-  host.replaceChildren(title, text, body);
+  if (!text.childElementCount && !body.childElementCount) {
+    frame.append(el("p", "admin-preview-empty", "Preview content appears here."));
+  } else {
+    frame.append(text, body);
+  }
+  host.replaceChildren(label, frame);
 }
 
 function emptyWord(): AdminWord {
