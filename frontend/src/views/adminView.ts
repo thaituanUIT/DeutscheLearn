@@ -33,11 +33,25 @@ const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
 const READING_GROUPS = ["general", "goethe"] as const;
 const GOETHE_PARTS = ["teil_1", "teil_2", "teil_3", "teil_4", "teil_5"] as const;
+const GERMAN_ARTICLES = ["der", "die", "das"] as const;
+const PARTS_OF_SPEECH = [
+  "noun",
+  "verb",
+  "adjective",
+  "adverb",
+  "preposition",
+  "conjunction",
+  "pronoun",
+  "phrase",
+] as const;
 let questionBlockId = 0;
+let adminControlId = 0;
 
 type AdminLevel = (typeof LEVELS)[number];
 type AdminReadingGroup = (typeof READING_GROUPS)[number];
 type AdminGoethePart = (typeof GOETHE_PARTS)[number];
+type GermanArticle = (typeof GERMAN_ARTICLES)[number];
+type AdminPartOfSpeech = (typeof PARTS_OF_SPEECH)[number];
 type ReadingShape =
   | "general_free_form"
   | "goethe_true_false_text"
@@ -140,10 +154,7 @@ function renderWordsAdmin(host: HTMLElement, token: string): void {
     search: "",
   };
 
-  const wrap = el("div", "admin-grid");
-  const listPanel = el("div", "admin-list");
-  const editor = el("div", "admin-editor");
-  wrap.append(listPanel, editor);
+  const { wrap, listPanel, editor } = adminMasterDetailLayout();
   host.replaceChildren(wrap);
 
   const reload = async (): Promise<void> => {
@@ -240,24 +251,24 @@ function renderWordEditor(
   const editorForm = adminEditorForm();
   const word = input("Word", state.selected.word);
   word.disabled = !state.isNew;
-  const article = input("Article", state.selected.article ?? "");
-  const partOfSpeech = input("Part of speech", state.selected.part_of_speech);
+  const partOfSpeech = selectPartOfSpeech(state.selected.part_of_speech);
+  const article = articleSegmentedControl(state.selected.article, partOfSpeech.value === "noun");
   const meaning = textarea("Meaning", state.selected.meaning, 5);
-  const focusEntries = textarea(
-    "Focus entries, one per line: LEVEL,topic",
-    formatFocusEntries(state.selected.focus_entries),
-    6,
-  );
-  const status = el("p", "prompt");
+  const focusEntries = focusEntriesRepeater(state.selected.focus_entries);
+  const status = el("p", "prompt admin-dirty-state");
+
+  const syncArticleState = (): void => {
+    article.setEnabled(partOfSpeech.value === "noun");
+  };
 
   const saveWord = async (): Promise<void> => {
     try {
       const payload = {
         word: word.value.trim(),
-        article: article.value.trim() || null,
+        article: partOfSpeech.value === "noun" ? article.value() : null,
         part_of_speech: partOfSpeech.value.trim(),
         meaning: meaning.value.trim(),
-        focus_entries: parseFocusEntries(focusEntries.value),
+        focus_entries: focusEntries.value(),
       };
       state.selected = state.isNew
         ? await createAdminWord(token, payload)
@@ -275,41 +286,51 @@ function renderWordEditor(
     event.preventDefault();
     void saveWord();
   });
+  editorForm.addEventListener("input", () => {
+    status.textContent = "Unsaved changes";
+  });
+  editorForm.addEventListener("change", () => {
+    status.textContent = "Unsaved changes";
+  });
+  partOfSpeech.addEventListener("change", syncArticleState);
 
   const save = button(state.isNew ? "Create word" : "Save word", "button primary");
   save.addEventListener("click", () => {
     void saveWord();
   });
 
-  const remove = button("Delete", "button danger-button");
-  remove.disabled = state.isNew;
-  remove.addEventListener("click", async () => {
-    if (!window.confirm(`Delete ${state.selected.word}?`)) return;
-    try {
-      await deleteAdminWord(token, state.selected.word);
-      state.selected = emptyWord();
-      state.isNew = true;
-      await onSaved();
-    } catch (error) {
-      status.replaceChildren(adminError(error));
-    }
+  const cancel = button("Cancel", "button");
+  cancel.addEventListener("click", () => {
+    state.selected = state.isNew ? emptyWord() : state.selected;
+    renderWordEditor(host, token, state, onSaved);
   });
 
-  const actions = el("div", "actions");
-  actions.append(save, remove);
-  editorForm.append(
-    wordField(word),
-    wordField(article),
-    wordField(partOfSpeech),
-    wordField(meaning),
-    focusEntriesField(focusEntries),
-    actions,
-    status,
-  );
-  host.replaceChildren(
-    el("h2", "focus-title", state.isNew ? "New word" : state.selected.word),
-    editorForm,
-  );
+  const metaGrid = el("div", "admin-vocab-meta-grid");
+  metaGrid.append(wordField(word), wordField(article.node, "Article"), wordField(partOfSpeech, "Part of speech"));
+  const formFields = el("div", "admin-form-fields");
+  formFields.append(metaGrid, wordField(meaning), focusEntries.node);
+
+  const actions = editorActionBar(status, cancel, save);
+  editorForm.append(formFields, actions);
+
+  const header = el("div", "admin-editor-header");
+  header.append(el("h2", "focus-title", state.isNew ? "New word" : state.selected.word));
+  if (!state.isNew) {
+    const remove = button("Delete", "admin-text-button danger-text-button");
+    remove.addEventListener("click", async () => {
+      if (!window.confirm(`Delete ${state.selected.word}?`)) return;
+      try {
+        await deleteAdminWord(token, state.selected.word);
+        state.selected = emptyWord();
+        state.isNew = true;
+        await onSaved();
+      } catch (error) {
+        status.replaceChildren(adminError(error));
+      }
+    });
+    header.append(remove);
+  }
+  host.replaceChildren(header, editorForm);
 }
 
 function renderReadingAdmin(host: HTMLElement, token: string): void {
@@ -321,10 +342,7 @@ function renderReadingAdmin(host: HTMLElement, token: string): void {
     search: "",
   };
 
-  const wrap = el("div", "admin-grid");
-  const listPanel = el("div", "admin-list");
-  const editor = el("div", "admin-editor");
-  wrap.append(listPanel, editor);
+  const { wrap, listPanel, editor } = adminMasterDetailLayout();
   host.replaceChildren(wrap);
 
   const reload = async (): Promise<void> => {
@@ -708,10 +726,7 @@ function renderPassageEditor(
     header.append(remove);
   }
 
-  const actions = el("div", "admin-action-bar");
-  const actionButtons = el("div", "admin-action-buttons");
-  actionButtons.append(cancel, save);
-  actions.append(status, actionButtons);
+  const actions = editorActionBar(status, cancel, save);
   editorForm.append(metaGrid, formFields, actions);
 
   const previewColumn = el("aside", "admin-preview-column");
@@ -728,6 +743,22 @@ function adminEditorForm(): HTMLFormElement {
     event.preventDefault();
   });
   return form;
+}
+
+function adminMasterDetailLayout(): { wrap: HTMLElement; listPanel: HTMLElement; editor: HTMLElement } {
+  const wrap = el("div", "admin-grid");
+  const listPanel = el("div", "admin-list");
+  const editor = el("div", "admin-editor");
+  wrap.append(listPanel, editor);
+  return { wrap, listPanel, editor };
+}
+
+function editorActionBar(status: HTMLElement, cancel: HTMLButtonElement, save: HTMLButtonElement): HTMLElement {
+  const actions = el("div", "admin-action-bar");
+  const actionButtons = el("div", "admin-action-buttons");
+  actionButtons.append(cancel, save);
+  actions.append(status, actionButtons);
+  return actions;
 }
 
 function readingGroupTabs(
@@ -1300,6 +1331,160 @@ function selectGoethePart(value: AdminGoethePart): HTMLSelectElement {
   return node;
 }
 
+function selectPartOfSpeech(value: string): HTMLSelectElement {
+  const node = document.createElement("select");
+  node.dataset.label = "Part of speech";
+  node.className = "admin-input";
+  const selectedValue = PARTS_OF_SPEECH.includes(value as AdminPartOfSpeech)
+    ? value
+    : "noun";
+  for (const part of PARTS_OF_SPEECH) {
+    const option = document.createElement("option");
+    option.value = part;
+    option.textContent = part;
+    option.selected = part === selectedValue;
+    node.append(option);
+  }
+  return node;
+}
+
+function articleSegmentedControl(
+  value: string | null,
+  enabled: boolean,
+): { node: HTMLElement; value: () => GermanArticle | null; setEnabled: (nextEnabled: boolean) => void } {
+  let selected = GERMAN_ARTICLES.includes(value as GermanArticle) ? (value as GermanArticle) : null;
+  const node = segmentedControl<GermanArticle>({
+    label: "Article",
+    value: selected ?? "der",
+    options: GERMAN_ARTICLES.map((article) => ({ value: article, label: article })),
+    onChange: (next) => {
+      selected = next;
+    },
+  });
+  node.classList.add("article-segmented-control");
+
+  const setEnabled = (nextEnabled: boolean): void => {
+    if (nextEnabled && selected === null) selected = "der";
+    if (!nextEnabled) selected = null;
+    node.dataset.disabled = nextEnabled ? "false" : "true";
+    for (const segment of Array.from(node.querySelectorAll<HTMLButtonElement>(".segmented-control__item"))) {
+      segment.disabled = !nextEnabled;
+      const isSelected = nextEnabled && segment.dataset.value === selected;
+      segment.setAttribute("aria-selected", isSelected ? "true" : "false");
+      segment.tabIndex = nextEnabled && isSelected ? 0 : -1;
+    }
+  };
+
+  setEnabled(enabled);
+  return {
+    node,
+    value: () => selected,
+    setEnabled,
+  };
+}
+
+type FocusEntriesRepeater = {
+  node: HTMLElement;
+  value: () => AdminFocusEntry[];
+};
+
+type FocusEntryRow = {
+  node: HTMLElement;
+  level: HTMLSelectElement;
+  topic: HTMLInputElement;
+  remove: HTMLButtonElement;
+};
+
+function focusEntriesRepeater(entries: AdminFocusEntry[]): FocusEntriesRepeater {
+  const wrap = el("section", "admin-focus-repeater");
+  const list = el("div", "admin-focus-repeater-list");
+  const datalistId = `focus-topics-${++adminControlId}`;
+  const topics = document.createElement("datalist");
+  topics.id = datalistId;
+  const rows: FocusEntryRow[] = [];
+
+  const renderRows = (): void => {
+    list.replaceChildren(...rows.map((row) => row.node));
+    for (const row of rows) {
+      row.remove.disabled = rows.length <= 1;
+    }
+  };
+
+  const addRow = (entry: AdminFocusEntry = { level: "A1", topic: "" }): void => {
+    const row = focusEntryRow(entry, datalistId);
+    row.remove.addEventListener("click", () => {
+      const index = rows.indexOf(row);
+      if (index === -1 || rows.length <= 1) return;
+      rows.splice(index, 1);
+      renderRows();
+    });
+    rows.push(row);
+    renderRows();
+  };
+
+  const add = button("+ Add focus entry", "button compact-button");
+  add.addEventListener("click", () => {
+    addRow();
+  });
+
+  for (const entry of entries.length ? entries : [{ level: "A1", topic: "" } as AdminFocusEntry]) {
+    addRow(entry);
+  }
+
+  setTopicOptions(topics, entries.map((entry) => ({ topic: entry.topic, label: entry.topic })));
+  void getFocusTopicAliases()
+    .then((aliases) => setTopicOptions(topics, aliases))
+    .catch(() => undefined);
+
+  const header = el("div", "admin-field-header");
+  header.append(el("span", "", "Focus entries"));
+  wrap.append(header, list, add, topics);
+  return {
+    node: wrap,
+    value: () =>
+      rows
+        .map((row) => ({
+          level: row.level.value as AdminLevel,
+          topic: row.topic.value.trim(),
+        }))
+        .filter((entry) => entry.topic),
+  };
+}
+
+function focusEntryRow(entry: AdminFocusEntry, datalistId: string): FocusEntryRow {
+  const node = el("div", "admin-focus-row");
+  const level = selectLevel(entry.level as AdminLevel);
+  level.ariaLabel = "Focus level";
+  const topic = input("Topic", entry.topic);
+  topic.setAttribute("list", datalistId);
+  topic.placeholder = "Topic";
+  const remove = button("×", "admin-icon-button danger-icon-button");
+  remove.type = "button";
+  remove.ariaLabel = "Remove focus entry";
+  remove.title = "Remove focus entry";
+  node.append(wordField(level, "Level"), wordField(topic, "Topic"), remove);
+  return { node, level, topic, remove };
+}
+
+function setTopicOptions(datalist: HTMLDataListElement, aliases: FocusTopicAlias[]): void {
+  const seen = new Set<string>();
+  datalist.replaceChildren(
+    ...aliases
+      .filter((alias) => {
+        const key = alias.topic.trim();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((alias) => {
+        const option = document.createElement("option");
+        option.value = alias.topic;
+        option.label = alias.label;
+        return option;
+      }),
+  );
+}
+
 function readingGroupLabel(group: AdminReadingGroup): string {
   return group === "goethe" ? "Goethe" : "General";
 }
@@ -1475,26 +1660,6 @@ function wordField(control: HTMLElement, fallbackLabel?: string): HTMLElement {
   return wrap;
 }
 
-function focusEntriesField(control: HTMLTextAreaElement): HTMLElement {
-  const wrap = el("label", "admin-field");
-  const header = el("span", "admin-field-header");
-  const topics = button("Topics", "button compact-button");
-  topics.type = "button";
-  topics.addEventListener("click", async (event) => {
-    event.preventDefault();
-    const modal = topicAliasModal();
-    document.body.append(modal.overlay);
-    try {
-      modal.render(await getFocusTopicAliases());
-    } catch (error) {
-      modal.body.replaceChildren(adminError(error));
-    }
-  });
-  header.append(el("span", "", control.dataset.label ?? "Focus entries"), topics);
-  wrap.append(header, control);
-  return wrap;
-}
-
 function matchesPassageSearch(passage: AdminReadingPassageSummary, search: string): boolean {
   const term = search.trim().toLowerCase();
   if (!term) return true;
@@ -1508,55 +1673,6 @@ function matchesPassageSearch(passage: AdminReadingPassageSummary, search: strin
     .join(" ")
     .toLowerCase();
   return haystack.includes(term);
-}
-
-function topicAliasModal(): {
-  overlay: HTMLElement;
-  body: HTMLElement;
-  render: (topics: FocusTopicAlias[]) => void;
-} {
-  const overlay = el("div", "modal-overlay");
-  const dialog = el("section", "modal-dialog topic-modal");
-  const body = el("div", "topic-alias-list");
-  body.append(el("p", "prompt", "Loading topics..."));
-  const close = button("Close", "button");
-  close.type = "button";
-  const dismiss = (): void => overlay.remove();
-  close.addEventListener("click", dismiss);
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay) dismiss();
-  });
-
-  const render = (topics: FocusTopicAlias[]): void => {
-    body.replaceChildren(
-      ...topics.map((topic) => {
-        const row = el("div", "topic-alias-row");
-        row.append(el("strong", "", topic.label), el("code", "", topic.topic));
-        return row;
-      }),
-    );
-  };
-
-  const header = el("div", "modal-header");
-  header.append(el("h3", "admin-section-title", "Current topics"), close);
-  dialog.append(header, body);
-  overlay.append(dialog);
-  return { overlay, body, render };
-}
-
-function parseFocusEntries(value: string): AdminFocusEntry[] {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [level, topic] = line.split(",").map((piece) => piece.trim());
-      return { level: level as AdminLevel, topic };
-    });
-}
-
-function formatFocusEntries(entries: AdminFocusEntry[]): string {
-  return entries.map((entry) => `${entry.level},${entry.topic}`).join("\n");
 }
 
 function adminError(error: unknown): HTMLElement {

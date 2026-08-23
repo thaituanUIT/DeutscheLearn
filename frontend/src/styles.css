@@ -900,6 +900,7 @@ button {
   --admin-space-group: 24px;
   --admin-space-region: 32px;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   gap: var(--admin-space-group);
   padding: 0;
@@ -910,6 +911,11 @@ button {
 
 .admin-shell .topbar {
   margin-bottom: 18px;
+}
+
+.admin-host {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .segmented-control {
@@ -966,17 +972,16 @@ button {
 .admin-editor {
   min-width: 0;
   min-height: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--admin-space-field);
 }
 
 .admin-list {
-  grid-template-rows: auto auto auto minmax(0, 1fr);
   overflow: hidden;
 }
 
 .admin-editor {
-  grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -1012,6 +1017,7 @@ button {
 }
 
 .admin-items {
+  flex: 1 1 auto;
   min-height: 0;
   display: grid;
   align-content: start;
@@ -1039,8 +1045,16 @@ button {
 }
 
 .admin-reading-meta-grid {
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
+  align-items: end;
+  gap: var(--admin-space-field);
+}
+
+.admin-vocab-meta-grid {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(150px, 190px) minmax(180px, 220px);
   align-items: end;
   gap: var(--admin-space-field);
 }
@@ -1081,6 +1095,7 @@ button {
 }
 
 .admin-editor-header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1089,23 +1104,26 @@ button {
 }
 
 .admin-passage-editor {
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
   gap: 24px;
   min-height: 0;
-  align-items: start;
+  overflow: hidden;
+  align-items: stretch;
 }
 
 .admin-editor-form {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
   gap: var(--admin-space-field);
   min-height: 0;
-  max-height: calc(100dvh - 106px);
   overflow: hidden;
 }
 
 .admin-form-fields {
+  flex: 1 1 auto;
   min-height: 0;
   padding-right: 4px;
   overflow-y: auto;
@@ -1286,6 +1304,33 @@ button {
   gap: var(--admin-space-group);
 }
 
+.article-segmented-control[data-disabled="true"] {
+  opacity: 0.52;
+}
+
+.article-segmented-control[data-disabled="true"] .segmented-control__item {
+  cursor: not-allowed;
+}
+
+.admin-focus-repeater,
+.admin-focus-repeater-list {
+  display: grid;
+  gap: var(--admin-space-inline);
+}
+
+.admin-focus-repeater {
+  color: #4d555e;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.admin-focus-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 120px) minmax(220px, 360px) auto;
+  align-items: end;
+  gap: var(--admin-space-inline);
+}
+
 .admin-reading-preview {
   display: grid;
   gap: var(--admin-space-inline);
@@ -1374,6 +1419,7 @@ button {
 }
 
 .admin-action-bar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1837,46 +1883,37 @@ button {
   border-radius: 8px;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1180px) {
   .admin-passage-editor {
     grid-template-columns: 1fr;
   }
 
   .admin-preview-column {
-    position: static;
-    max-height: none;
-    overflow: visible;
+    display: none;
   }
 }
 
 @media (max-width: 1024px) {
+  .admin-grid {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .admin-vocab-meta-grid {
+    grid-template-columns: minmax(140px, 1fr) minmax(128px, 160px) minmax(160px, 190px);
+  }
+
+  .admin-focus-row {
+    grid-template-columns: minmax(82px, 104px) minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 820px) {
   .admin-shell {
     height: auto;
     min-height: 100dvh;
     overflow: visible;
   }
 
-  .admin-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-list,
-  .admin-editor,
-  .admin-editor-form {
-    overflow: visible;
-  }
-
-  .admin-items,
-  .admin-form-fields {
-    overflow: visible;
-  }
-
-  .admin-editor-form {
-    max-height: none;
-  }
-}
-
-@media (max-width: 820px) {
   .shell {
     width: min(100% - 24px, 640px);
     padding: 20px 0;
@@ -1966,6 +2003,28 @@ button {
   .admin-preview-ad-grid,
   .admin-preview-options {
     grid-template-columns: 1fr;
+  }
+
+  .admin-grid,
+  .admin-vocab-meta-grid,
+  .admin-focus-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-list,
+  .admin-editor,
+  .admin-editor-form,
+  .admin-host {
+    overflow: visible;
+  }
+
+  .admin-items,
+  .admin-form-fields {
+    overflow: visible;
+  }
+
+  .admin-editor-form {
+    min-height: 0;
   }
 
   .stimulus-repeater-row,
