@@ -261,6 +261,7 @@ export type AdminReadingPassage = {
 export type StimulusRenderKind =
   | "text"
   | "image"
+  | "website_box"
   | "ad_box"
   | "hours_table"
   | "notice_sheet"

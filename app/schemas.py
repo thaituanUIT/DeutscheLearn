@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 RenderKind = Literal[
     "text",
     "image",
+    "website_box",
     "ad_box",
     "hours_table",
     "notice_sheet",
@@ -287,7 +288,7 @@ class AdminReadingAdIn(BaseModel):
     key: str = Field(pattern="^[ab]$")
     title: str = Field(min_length=1, max_length=160)
     body: str = Field(min_length=1)
-    render_kind: RenderKind = "ad_box"
+    render_kind: RenderKind = "website_box"
     content: dict[str, Any] | None = None
     image_path: str | None = Field(default=None, max_length=500)
     transcript: str | None = None
@@ -339,8 +340,8 @@ class AdminReadingPassageIn(BaseModel):
             raise ValueError("Goethe Teil 2 needs exactly two adverts.")
         if self.part == "teil_2":
             for ad in self.ad_stimuli:
-                if ad.render_kind != "image" and ad.render_kind != "ad_box":
-                    raise ValueError("Goethe Teil 2 adverts must use ad_box or image.")
+                if ad.render_kind not in {"image", "website_box", "ad_box"}:
+                    raise ValueError("Goethe Teil 2 stimuli must use website_box, ad_box, or image.")
             self.render_kind = "text"
             self.content = None
             self.image_path = None
@@ -422,9 +423,15 @@ def validate_stimulus_content(
     if image_path:
         raise ValueError("Template stimuli cannot have an image path.")
 
-    if render_kind == "ad_box":
-        _require_string(content, "business_name")
+    if render_kind == "website_box":
+        _require_string(content, "url")
         lines = _require_list(content, "lines", min_length=2, max_length=4)
+        for line in lines:
+            if not isinstance(line, str) or not line.strip():
+                raise ValueError("website_box lines must be non-empty strings.")
+        return
+    if render_kind == "ad_box":
+        lines = _require_list(content, "lines", min_length=1, max_length=4)
         for line in lines:
             if not isinstance(line, str) or not line.strip():
                 raise ValueError("ad_box lines must be non-empty strings.")

@@ -15,7 +15,7 @@ import type {
   StoryPassageSummary,
 } from "../api/types";
 import { button } from "../components/button";
-import { stimulusRenderer, type StimulusViewModel } from "../stimuli/templates";
+import { stimulusInstruction, stimulusRenderer, type StimulusViewModel } from "../stimuli/templates";
 import { el } from "../utils/dom";
 
 type StoryViewOptions = {
@@ -315,10 +315,14 @@ function sourceChoiceContent(passage: StoryPassage): HTMLElement {
   const sources = passage.questions[0]?.answers
     .map((answer) => answer.ref_stimulus)
     .filter((source) => source !== null) ?? [];
+  const instruction = stimulusInstruction(sources[0] ?? {
+    render_kind: "ad_box",
+    content: null,
+  });
   content.append(
     el("div", "question-type", `${passage.level} · ${partLabel(passage.part ?? "teil_2")}`),
     el("h2", "story-title", passage.title),
-    el("p", "goethe-task-prompt", passage.passage_text),
+    el("p", "goethe-task-prompt", instruction || passage.passage_text),
   );
 
   const grid = el("div", "source-card-grid");

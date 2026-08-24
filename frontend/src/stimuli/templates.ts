@@ -25,9 +25,11 @@ export type StimulusTemplate = {
   id: Exclude<StimulusRenderKind, "text" | "image">;
   label: string;
   teil: number[];
+  instruction: string;
   schema: FieldSchema[];
   createDefaultContent: () => StimulusContent;
   deriveText: (content: StimulusContent) => { title: string; body: string };
+  optionLabel: (content: StimulusContent, letter: string) => string;
   renderSurface: (content: StimulusContent) => HTMLElement;
 };
 
@@ -56,44 +58,65 @@ export type StimulusUploadHandler = (stimulusId: string, file: File) => Promise<
 
 export const stimulusTemplates: StimulusTemplate[] = [
   {
-    id: "ad_box",
-    label: "Classified advert",
+    id: "website_box",
+    label: "Website",
     teil: [2],
+    instruction: "Wo finden Sie Informationen?",
     schema: [
-      { kind: "string", key: "business_name", label: "Business name" },
-      { kind: "string", key: "tagline", label: "Tagline", optional: true },
-      { kind: "stringList", key: "lines", label: "Selling points", min: 2, max: 4 },
+      { kind: "string", key: "url", label: "URL" },
+      { kind: "stringList", key: "lines", label: "Information", min: 2, max: 4 },
+    ],
+    createDefaultContent: () => ({
+      url: "",
+      lines: ["", ""],
+    }),
+    deriveText: (content) => ({
+      title: stringValue(content.url) || "Website",
+      body: stringList(content.lines).filter(Boolean).join("\n"),
+    }),
+    optionLabel: (content, letter) => stringValue(content.url) || `${letter})`,
+    renderSurface: renderWebsiteBox,
+  },
+  {
+    id: "ad_box",
+    label: "Small advert",
+    teil: [2],
+    instruction: "Lesen Sie die Situation und die zwei Anzeigen.",
+    schema: [
+      { kind: "string", key: "business_name", label: "Business name", optional: true },
+      { kind: "stringList", key: "lines", label: "Details", min: 1, max: 4 },
       { kind: "string", key: "hours", label: "Hours", optional: true },
       { kind: "string", key: "address", label: "Address", optional: true },
-      { kind: "string", key: "phone", label: "Phone", optional: true },
+      { kind: "string", key: "contact", label: "Contact", optional: true },
       { kind: "string", key: "price", label: "Price", optional: true },
     ],
     createDefaultContent: () => ({
       business_name: "",
-      tagline: "",
       lines: ["", ""],
       hours: "",
       address: "",
-      phone: "",
+      contact: "",
       price: "",
     }),
     deriveText: (content) => ({
-      title: stringValue(content.business_name) || "Classified advert",
+      title: stringValue(content.contact) || stringValue(content.business_name) || "Small advert",
       body: [
-        stringValue(content.tagline),
         ...stringList(content.lines),
         stringValue(content.hours),
         stringValue(content.address),
-        stringValue(content.phone),
+        stringValue(content.contact),
         stringValue(content.price),
       ].filter(Boolean).join("\n"),
     }),
+    optionLabel: (content, letter) =>
+      stringValue(content.contact) || stringValue(content.business_name) || `${letter})`,
     renderSurface: renderAdBox,
   },
   {
     id: "hours_table",
     label: "Opening hours",
     teil: [3],
+    instruction: "",
     schema: [
       { kind: "string", key: "place_name", label: "Place name" },
       { kind: "objectList", key: "rows", label: "Rows", min: 2, fields: [
@@ -111,12 +134,14 @@ export const stimulusTemplates: StimulusTemplate[] = [
       title: stringValue(content.place_name) || "Opening hours",
       body: [...rowsText(content.rows, ["label", "value"]), stringValue(content.note)].filter(Boolean).join("\n"),
     }),
+    optionLabel: (_content, letter) => `${letter})`,
     renderSurface: renderHoursTable,
   },
   {
     id: "notice_sheet",
     label: "Printed notice",
     teil: [3],
+    instruction: "",
     schema: [
       { kind: "string", key: "heading", label: "Heading" },
       { kind: "stringList", key: "body_lines", label: "Body lines", min: 1 },
@@ -129,12 +154,14 @@ export const stimulusTemplates: StimulusTemplate[] = [
       body: [...stringList(content.body_lines), stringValue(content.signature), stringValue(content.date)]
         .filter(Boolean).join("\n"),
     }),
+    optionLabel: (_content, letter) => `${letter})`,
     renderSurface: renderNoticeSheet,
   },
   {
     id: "door_sign",
     label: "Door sign",
     teil: [3],
+    instruction: "",
     schema: [
       { kind: "string", key: "message", label: "Message" },
       { kind: "string", key: "sub_message", label: "Sub message", optional: true },
@@ -144,12 +171,14 @@ export const stimulusTemplates: StimulusTemplate[] = [
       title: stringValue(content.message) || "Door sign",
       body: [stringValue(content.message), stringValue(content.sub_message)].filter(Boolean).join("\n"),
     }),
+    optionLabel: (_content, letter) => `${letter})`,
     renderSurface: renderDoorSign,
   },
   {
     id: "timetable",
     label: "Timetable",
     teil: [3],
+    instruction: "",
     schema: [
       { kind: "string", key: "route_name", label: "Route name" },
       { kind: "string", key: "direction", label: "Direction", optional: true },
@@ -170,12 +199,14 @@ export const stimulusTemplates: StimulusTemplate[] = [
       body: [stringValue(content.direction), ...rowsText(content.rows, ["time", "note"]), stringValue(content.footnote)]
         .filter(Boolean).join("\n"),
     }),
+    optionLabel: (_content, letter) => `${letter})`,
     renderSurface: renderTimetable,
   },
   {
     id: "pictogram_sign",
     label: "Pictogram sign",
     teil: [3],
+    instruction: "",
     schema: [
       {
         kind: "enum",
@@ -191,6 +222,7 @@ export const stimulusTemplates: StimulusTemplate[] = [
       title: stringValue(content.message) || "Pictogram sign",
       body: [stringValue(content.message), stringValue(content.sub_message)].filter(Boolean).join("\n"),
     }),
+    optionLabel: (_content, letter) => `${letter})`,
     renderSurface: renderPictogramSign,
   },
 ];
@@ -202,6 +234,19 @@ export function templateForKind(kind: StimulusRenderKind): StimulusTemplate | un
 export function templatesForTeil(part: string | null): StimulusTemplate[] {
   const teil = Number((part ?? "").replace("teil_", ""));
   return stimulusTemplates.filter((template) => template.teil.includes(teil));
+}
+
+export function stimulusInstruction(stimulus: Pick<StimulusViewModel, "render_kind" | "content">): string {
+  const template = templateForKind(stimulus.render_kind);
+  return template && stimulus.content ? template.instruction : "";
+}
+
+export function stimulusOptionLabel(
+  stimulus: Pick<StimulusViewModel, "render_kind" | "content">,
+  letter: string,
+): string {
+  const template = templateForKind(stimulus.render_kind);
+  return template && stimulus.content ? template.optionLabel(stimulus.content, letter) : `${letter})`;
 }
 
 export function createStimulusEditor(
@@ -262,7 +307,11 @@ export function createStimulusEditor(
   const updateWarning = (): void => {
     const longFields = collectStrings(activeKind === "image" ? { transcript: transcript.value } : activeContent)
       .filter((value) => value.length > 60);
-    warning.textContent = longFields.length ? "Some fields are long for A1. Keep them only if the item needs it." : "";
+    const websiteLines = activeKind === "website_box" ? stringList(activeContent.lines) : [];
+    const tooManyWebsiteLines = websiteLines.length > 4;
+    warning.textContent = longFields.length || tooManyWebsiteLines
+      ? "Some fields are long for A1. Keep website information to two to four short lines."
+      : "";
   };
   const updateWarningAndNotify = (): void => {
     updateWarning();
@@ -351,17 +400,19 @@ function controlForField(field: FieldSchema, content: StimulusContent, onInput: 
     const control = field.multiline ? document.createElement("textarea") : document.createElement("input");
     control.className = field.multiline ? "admin-input admin-textarea" : "admin-input";
     control.dataset.label = field.label;
+    control.dataset.fieldKey = field.key;
     control.value = stringValue(content[field.key]);
     control.addEventListener("input", () => {
       content[field.key] = control.value;
       onInput();
     });
-    return fieldWrap(control, field.label);
+    return fieldWrap(control, field.label, !field.optional);
   }
   if (field.kind === "enum") {
     const select = document.createElement("select");
     select.className = "admin-input";
     select.dataset.label = field.label;
+    select.dataset.fieldKey = field.key;
     for (const value of field.options) {
       const option = document.createElement("option");
       option.value = value;
@@ -373,7 +424,7 @@ function controlForField(field: FieldSchema, content: StimulusContent, onInput: 
       content[field.key] = select.value;
       onInput();
     });
-    return fieldWrap(select, field.label);
+    return fieldWrap(select, field.label, true);
   }
   if (field.kind === "stringList") {
     return stringRepeater(field, content, onInput);
@@ -383,7 +434,9 @@ function controlForField(field: FieldSchema, content: StimulusContent, onInput: 
 
 function stringRepeater(field: Extract<FieldSchema, { kind: "stringList" }>, content: StimulusContent, onInput: () => void): HTMLElement {
   const wrap = el("div", "admin-field stimulus-repeater");
-  wrap.append(el("span", "", field.label));
+  wrap.dataset.field = field.label;
+  wrap.dataset.fieldKey = field.key;
+  wrap.append(fieldLabel(field.label, true));
   const list = el("div", "stimulus-repeater-list");
   const render = (): void => {
     const values = stringList(content[field.key]);
@@ -392,6 +445,7 @@ function stringRepeater(field: Extract<FieldSchema, { kind: "stringList" }>, con
       const row = el("div", "stimulus-repeater-row");
       const input = document.createElement("input");
       input.className = "admin-input";
+      input.dataset.fieldKey = field.key;
       input.value = value;
       input.addEventListener("input", () => {
         values[index] = input.value;
@@ -432,7 +486,9 @@ function stringRepeater(field: Extract<FieldSchema, { kind: "stringList" }>, con
 
 function objectRepeater(field: Extract<FieldSchema, { kind: "objectList" }>, content: StimulusContent, onInput: () => void): HTMLElement {
   const wrap = el("div", "admin-field stimulus-repeater");
-  wrap.append(el("span", "", field.label));
+  wrap.dataset.field = field.label;
+  wrap.dataset.fieldKey = field.key;
+  wrap.append(fieldLabel(field.label, true));
   const list = el("div", "stimulus-repeater-list");
   const render = (): void => {
     const rows = objectList(content[field.key], field.fields);
@@ -441,6 +497,7 @@ function objectRepeater(field: Extract<FieldSchema, { kind: "objectList" }>, con
       for (const child of field.fields) {
         const input = document.createElement("input");
         input.className = "admin-input";
+        input.dataset.fieldKey = child.key;
         input.placeholder = child.label;
         input.value = stringValue(rowValue[child.key]);
         input.addEventListener("input", () => {
@@ -483,12 +540,19 @@ function objectRepeater(field: Extract<FieldSchema, { kind: "objectList" }>, con
   return wrap;
 }
 
+function renderWebsiteBox(content: StimulusContent): HTMLElement {
+  const surface = el("div", "stimulus-surface stimulus-website-box");
+  surface.append(el("strong", "stimulus-website-url", stringValue(content.url)));
+  surface.append(detailList(stringList(content.lines)));
+  return surface;
+}
+
 function renderAdBox(content: StimulusContent): HTMLElement {
   const surface = el("div", "stimulus-surface stimulus-ad-box");
-  surface.append(el("strong", "stimulus-ad-name", stringValue(content.business_name)));
-  if (stringValue(content.tagline)) surface.append(el("p", "stimulus-ad-tagline", stringValue(content.tagline)));
+  const businessName = stringValue(content.business_name);
+  if (businessName) surface.append(el("strong", "stimulus-ad-name", businessName));
   surface.append(detailList(stringList(content.lines)));
-  const meta = [content.hours, content.address, content.phone, content.price].map(stringValue).filter(Boolean);
+  const meta = [content.hours, content.address, content.contact, content.price].map(stringValue).filter(Boolean);
   if (meta.length) surface.append(el("p", "stimulus-meta", meta.join(" · ")));
   return surface;
 }
@@ -626,11 +690,18 @@ function detailList(items: string[]): HTMLElement {
   return list;
 }
 
-function fieldWrap(control: HTMLElement, label: string): HTMLElement {
+function fieldWrap(control: HTMLElement, label: string, required = false): HTMLElement {
   const wrap = el("label", "admin-field");
   wrap.dataset.field = label;
-  wrap.append(el("span", "", label), control);
+  if (control.dataset.fieldKey) wrap.dataset.fieldKey = control.dataset.fieldKey;
+  wrap.append(fieldLabel(label, required), control);
   return wrap;
+}
+
+function fieldLabel(label: string, required: boolean): HTMLElement {
+  const node = el("span", "", label);
+  if (required) node.append(el("span", "required-marker", " required"));
+  return node;
 }
 
 function imageOption(selected: boolean): HTMLOptionElement {

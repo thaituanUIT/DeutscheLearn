@@ -494,7 +494,7 @@ button {
 }
 
 .source-card {
-  min-width: 0;
+  min-width: min(200px, 100%);
   display: grid;
   gap: 14px;
   padding: 18px;
@@ -1166,7 +1166,7 @@ button {
 .admin-passage-editor {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 480px);
   gap: 24px;
   min-height: 0;
   overflow: hidden;
@@ -1204,7 +1204,8 @@ button {
   top: 24px;
   min-height: 0;
   max-height: calc(100dvh - 106px);
-  overflow: auto;
+  overflow: hidden;
+  container: admin-preview / inline-size;
 }
 
 .admin-field-header {
@@ -1225,6 +1226,33 @@ button {
   font: inherit;
   font-size: 15px;
   font-weight: 400;
+}
+
+.admin-input:focus {
+  border-color: #33658a;
+  outline: 3px solid rgb(51 101 138 / 24%);
+  outline-offset: 1px;
+}
+
+.admin-input.field-error {
+  border-color: #c95b4d;
+}
+
+.admin-input.field-error:focus {
+  border-color: #c95b4d;
+  outline-color: rgb(201 91 77 / 26%);
+}
+
+.required-marker {
+  color: #8e2d23;
+  font-size: 12px;
+}
+
+.admin-field-error {
+  margin: 0;
+  color: #8e2d23;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .admin-textarea {
@@ -1406,6 +1434,9 @@ button {
 .admin-reading-preview {
   display: grid;
   gap: var(--admin-space-inline);
+  max-height: calc(100dvh - 106px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .admin-preview-label {
@@ -1471,6 +1502,16 @@ button {
   background: #ffffff;
 }
 
+.admin-preview-column .source-card-grid {
+  grid-template-columns: repeat(2, minmax(200px, 1fr));
+}
+
+@container admin-preview (max-width: 420px) {
+  .admin-preview-column .source-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .admin-preview-options {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1520,6 +1561,13 @@ button {
   height: 7px;
   border-radius: 999px;
   background: #d6a85f;
+}
+
+.admin-dirty-state[data-state="validation"] {
+  display: inline-flex;
+  align-items: center;
+  color: #687078;
+  cursor: pointer;
 }
 
 .admin-action-buttons {
@@ -1666,6 +1714,16 @@ button {
 .stimulus-ad-name {
   font-size: 1.08rem;
   line-height: 1.2;
+  hyphens: none;
+  overflow-wrap: normal;
+}
+
+.stimulus-website-url {
+  font-size: 1.05rem;
+  line-height: 1.2;
+  font-weight: 800;
+  hyphens: none;
+  overflow-wrap: anywhere;
 }
 
 .stimulus-ad-tagline,

@@ -23,6 +23,8 @@ import type {
 import { button } from "../components/button";
 import {
   createStimulusEditor,
+  stimulusInstruction,
+  stimulusOptionLabel,
   stimulusRenderer,
   type StimulusEditor,
   type StimulusViewModel,
@@ -58,6 +60,16 @@ type ReadingShape =
   | "goethe_source_choice"
   | "goethe_true_false_notice"
   | "goethe_standard";
+type FieldValidationIssue = {
+  field: string;
+  message: string;
+  control?: HTMLElement;
+};
+type ServerValidationIssue = {
+  type?: string;
+  loc?: Array<string | number>;
+  msg?: string;
+};
 
 const READING_SHAPE_TABLE: Record<AdminReadingGroup, Partial<Record<AdminLevel, Partial<Record<AdminGoethePart, ReadingShape>>>>> = {
   general: {},
@@ -523,20 +535,21 @@ function renderPassageEditor(
   const formScroll = el("div", "form-scroll");
   const resolvedType = el("span", "admin-resolved-type");
   const questionSectionNode = questionSection(questions, button("+ Add question", "button primary"));
+  const validation = createFormValidation(status);
+  validation.register("title", title);
+  validation.register("passage_text", passage);
+  validation.register("prompt", sourceSituation);
 
   const sourceQuestions = (): AdminReadingQuestion[] => {
     try {
-      return collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource);
+      return collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource, adControls);
     } catch {
       return [
         {
           prompt: sourceSituation.value,
           explanation: sourceExplanation.value || null,
           order_index: 0,
-          answers: [
-            { answer_text: "a)", is_correct: correctSource.value === "0", order_index: 0 },
-            { answer_text: "b)", is_correct: correctSource.value === "1", order_index: 1 },
-          ],
+          answers: sourceAnswerRows(correctSource, adControls),
         },
       ];
     }
@@ -549,7 +562,7 @@ function renderPassageEditor(
       level: level.value as AdminLevel,
       part: state.activeGroup === "goethe" ? (part.value as AdminGoethePart) : null,
       title: title.value,
-      passage_text: activeShape === "goethe_source_choice" ? "Lesen Sie die Situation und die zwei Anzeigen." : passage.value,
+      passage_text: activeShape === "goethe_source_choice" ? sourceChoiceInstruction(adControls) : passage.value,
       context_label: activeShape === "goethe_true_false_notice" ? contextLabel.value || null : null,
       image_url: state.selected.image_url,
       render_kind: activeShape === "goethe_true_false_notice" ? noticeEditor.getValue().render_kind : "text",
@@ -583,14 +596,14 @@ function renderPassageEditor(
     }
     metaGrid.replaceChildren(...metaFields);
 
-    const stimulusFields: HTMLElement[] = [wordField(title)];
+    const stimulusFields: HTMLElement[] = [wordField(title, undefined, true)];
     if (activeShape === "goethe_source_choice") {
       stimulusFields.push(sourceChoicePanel);
     } else {
       if (activeShape === "goethe_true_false_notice") {
         stimulusFields.push(wordField(contextLabel), noticeEditor.node);
       }
-      stimulusFields.push(wordField(passage), questionSectionNode);
+      stimulusFields.push(wordField(passage, undefined, true), questionSectionNode);
     }
 
     renderPreviewState();
@@ -641,6 +654,9 @@ function renderPassageEditor(
   const savePassage = async (): Promise<void> => {
     try {
       const activeShape = shape();
+      validation.clear();
+      const clientErrors = validatePassageClientFields(activeShape, title, passage, sourceSituation, adControls);
+      if (validation.show(clientErrors)) return;
       const noticeValue = noticeEditor.getValue();
       const payload: AdminReadingPassage = {
         id: state.selected.id,
@@ -651,7 +667,7 @@ function renderPassageEditor(
         title: title.value.trim(),
         passage_text:
           activeShape === "goethe_source_choice"
-            ? "Lesen Sie die Situation und die zwei Anzeigen."
+            ? sourceChoiceInstruction(adControls)
             : activeShape === "goethe_true_false_notice"
               ? noticeValue.body
               : passage.value.trim(),
@@ -665,7 +681,7 @@ function renderPassageEditor(
         status: state.selected.status,
         ad_stimuli: activeShape === "goethe_source_choice" ? collectAdStimuli(adControls) : [],
         questions: activeShape === "goethe_source_choice"
-          ? collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource)
+          ? collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource, adControls)
           : collectQuestionBlocks(questionControls),
       };
       state.selected = state.isNew
@@ -675,7 +691,7 @@ function renderPassageEditor(
       setSavedStatus(status);
       await onSaved();
     } catch (error) {
-      setErrorStatus(status, error);
+      if (!validation.show(fieldErrorsFromUnknown(error))) setErrorStatus(status, error);
     }
   };
 
@@ -988,7 +1004,7 @@ function sourceChoiceSection(
   adGrid.append(...ads.map((ad) => ad.node));
   wrap.append(
     el("h3", "admin-section-title", "Teil 2 source choice"),
-    wordField(situation),
+    wordField(situation, undefined, true),
     adGrid,
     wordField(correct, "Correct advert"),
     wordField(explanation),
@@ -1019,14 +1035,22 @@ function updateCorrectSourceOptions(select: HTMLSelectElement, ads: AdStimulusBl
 
 function advertOptionLabel(ad: AdStimulusBlock | undefined, index: number): string {
   const key = ad?.key ?? (index === 0 ? "a" : "b");
-  const name = businessNameFromAd(ad).trim();
-  return name ? `${key}) — ${truncateAdvertName(name)}` : `${key})`;
+  if (!ad) return `${key})`;
+  const label = sourceOptionText(ad, index);
+  return label === `${key})` ? label : `${key}) — ${truncateAdvertName(label)}`;
 }
 
-function businessNameFromAd(ad: AdStimulusBlock | undefined): string {
-  const content = ad?.editor.getValue().content;
-  const businessName = content && typeof content.business_name === "string" ? content.business_name : "";
-  return businessName;
+function sourceOptionText(ad: AdStimulusBlock, index: number): string {
+  const key = ad.key ?? (index === 0 ? "a" : "b");
+  const value = ad.editor.getValue();
+  return stimulusOptionLabel({ render_kind: value.render_kind, content: value.content }, key);
+}
+
+function sourceChoiceInstruction(ads: AdStimulusBlock[]): string {
+  const value = ads[0]?.editor.getValue();
+  if (!value) return "Wo finden Sie Informationen?";
+  return stimulusInstruction({ render_kind: value.render_kind, content: value.content })
+    || "Wo finden Sie Informationen?";
 }
 
 function truncateAdvertName(name: string): string {
@@ -1120,23 +1144,29 @@ function collectSourceChoiceQuestion(
   situation: HTMLTextAreaElement,
   explanation: HTMLTextAreaElement,
   correct: HTMLSelectElement,
+  ads: AdStimulusBlock[],
 ): AdminReadingQuestion[] {
   const prompt = situation.value.trim();
   if (!prompt) {
     throw new Error("Teil 2 needs a situation.");
   }
-  const correctIndex = Number(correct.value);
   return [
     {
       prompt,
       explanation: explanation.value.trim() || null,
       order_index: 0,
-      answers: [
-        { answer_text: "a)", is_correct: correctIndex === 0, order_index: 0 },
-        { answer_text: "b)", is_correct: correctIndex === 1, order_index: 1 },
-      ],
+      answers: sourceAnswerRows(correct, ads),
     },
   ];
+}
+
+function sourceAnswerRows(correct: HTMLSelectElement, ads: AdStimulusBlock[]): AdminReadingQuestion["answers"] {
+  const correctIndex = Number(correct.value);
+  return ads.map((ad, index) => ({
+    answer_text: sourceOptionText(ad, index),
+    is_correct: correctIndex === index,
+    order_index: index,
+  }));
 }
 
 function collectAdStimuli(blocks: AdStimulusBlock[]): AdminReadingAdStimulus[] {
@@ -1277,15 +1307,10 @@ function emptyAdStimulus(key: "a" | "b", orderIndex: number): AdminReadingAdStim
     key,
     title: "",
     body: "",
-    render_kind: "ad_box",
+    render_kind: "website_box",
     content: {
-      business_name: "",
-      tagline: "",
+      url: "",
       lines: ["", ""],
-      hours: "",
-      address: "",
-      phone: "",
-      price: "",
     },
     image_path: null,
     transcript: null,
@@ -1686,12 +1711,19 @@ function confirmDiscardingShapeData(
   return window.confirm("The two adverts you entered will not be saved in General.");
 }
 
-function wordField(control: HTMLElement, fallbackLabel?: string): HTMLElement {
+function wordField(control: HTMLElement, fallbackLabel?: string, required = false): HTMLElement {
   const wrap = el("label", "admin-field");
   const label = fallbackLabel ?? control.dataset.label ?? "Level";
   wrap.dataset.field = label;
-  wrap.append(el("span", "", label), control);
+  if (control.dataset.fieldKey) wrap.dataset.fieldKey = control.dataset.fieldKey;
+  wrap.append(fieldLabel(label, required), control);
   return wrap;
+}
+
+function fieldLabel(label: string, required: boolean): HTMLElement {
+  const node = el("span", "", label);
+  if (required) node.append(el("span", "required-marker", " required"));
+  return node;
 }
 
 function matchesPassageSearch(passage: AdminReadingPassageSummary, search: string): boolean {
@@ -1710,20 +1742,219 @@ function matchesPassageSearch(passage: AdminReadingPassageSummary, search: strin
 }
 
 function adminError(error: unknown): HTMLElement {
-  return el("div", "error", error instanceof Error ? error.message : "Admin request failed");
+  return el("div", "error", error instanceof Error ? humanErrorMessage(error) : "Admin request failed");
 }
 
 function setDirtyStatus(status: HTMLElement): void {
+  clearStatusAction(status);
   status.dataset.state = "dirty";
   status.textContent = "Unsaved changes";
 }
 
 function setSavedStatus(status: HTMLElement): void {
+  clearStatusAction(status);
   delete status.dataset.state;
   status.textContent = "Saved.";
 }
 
 function setErrorStatus(status: HTMLElement, error: unknown): void {
+  clearStatusAction(status);
   delete status.dataset.state;
   status.replaceChildren(adminError(error));
+}
+
+function clearStatusAction(status: HTMLElement): void {
+  status.onclick = null;
+  status.onkeydown = null;
+  status.removeAttribute("role");
+  status.tabIndex = -1;
+}
+
+function createFormValidation(status: HTMLElement): {
+  register: (field: string, control: HTMLElement) => void;
+  clear: () => void;
+  show: (issues: FieldValidationIssue[]) => boolean;
+} {
+  const fields = new Map<string, HTMLElement[]>();
+  const touchedControls = new Set<HTMLElement>();
+
+  const register = (field: string, control: HTMLElement): void => {
+    const controls = fields.get(field) ?? [];
+    controls.push(control);
+    fields.set(field, controls);
+  };
+
+  const clear = (): void => {
+    for (const control of touchedControls) clearFieldError(control);
+    touchedControls.clear();
+    if (status.dataset.state === "validation") {
+      delete status.dataset.state;
+      status.textContent = "";
+      clearStatusAction(status);
+    }
+  };
+
+  const show = (issues: FieldValidationIssue[]): boolean => {
+    clear();
+    const actionableIssues = issues
+      .map((issue) => ({ ...issue, control: issue.control ?? fields.get(issue.field)?.[0] }))
+      .filter((issue): issue is FieldValidationIssue & { control: HTMLElement } => Boolean(issue.control));
+    if (!actionableIssues.length) return false;
+
+    for (const issue of actionableIssues) {
+      showFieldError(issue.control, issue.message);
+      touchedControls.add(issue.control);
+    }
+    const first = actionableIssues[0].control;
+    setValidationStatus(status, actionableIssues.length, () => focusInvalidControl(first));
+    focusInvalidControl(first);
+    return true;
+  };
+
+  return { register, clear, show };
+}
+
+function validatePassageClientFields(
+  shape: ReadingShape,
+  title: HTMLInputElement,
+  passage: HTMLTextAreaElement,
+  sourceSituation: HTMLTextAreaElement,
+  ads: AdStimulusBlock[],
+): FieldValidationIssue[] {
+  const issues: FieldValidationIssue[] = [];
+  if (!title.value.trim()) issues.push({ field: "title", message: "Enter a title.", control: title });
+  if (shape === "goethe_source_choice") {
+    if (!sourceSituation.value.trim()) {
+      issues.push({ field: "prompt", message: "Enter the situation.", control: sourceSituation });
+    }
+    issues.push(...validateSourceStimuli(ads));
+  } else if (shape !== "goethe_true_false_notice" && !passage.value.trim()) {
+    issues.push({ field: "passage_text", message: "Enter the passage text.", control: passage });
+  }
+  return issues;
+}
+
+function validateSourceStimuli(ads: AdStimulusBlock[]): FieldValidationIssue[] {
+  return ads.flatMap((ad) => {
+    const value = ad.editor.getValue();
+    if (value.render_kind === "website_box" && !stringFromContent(value.content, "url")) {
+      return [{
+        field: "url",
+        message: `Enter the URL for ${ad.key}).`,
+        control: firstStimulusField(ad, "url"),
+      }];
+    }
+    if (value.render_kind === "ad_box") {
+      const lines = Array.isArray(value.content?.lines) ? value.content.lines : [];
+      if (!lines.some((line) => typeof line === "string" && line.trim())) {
+        return [{
+          field: "lines",
+          message: `Enter the advert details for ${ad.key}).`,
+          control: firstStimulusField(ad, "lines"),
+        }];
+      }
+    }
+    return [];
+  });
+}
+
+function firstStimulusField(ad: AdStimulusBlock, key: string): HTMLElement | undefined {
+  return ad.editor.node.querySelector<HTMLElement>(`[data-field-key="${key}"]`) ?? undefined;
+}
+
+function stringFromContent(content: Record<string, unknown> | null, key: string): string {
+  const value = content?.[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function fieldErrorsFromUnknown(error: unknown): FieldValidationIssue[] {
+  const payload = parseErrorPayload(error);
+  const detail = payload && typeof payload === "object" && "detail" in payload
+    ? (payload as { detail?: unknown }).detail
+    : undefined;
+  if (!Array.isArray(detail)) return [];
+  return detail.map((issue) => validationIssueToFieldError(issue)).filter(Boolean) as FieldValidationIssue[];
+}
+
+function validationIssueToFieldError(issue: unknown): FieldValidationIssue | null {
+  if (!issue || typeof issue !== "object") return null;
+  const validationIssue = issue as ServerValidationIssue;
+  const field = lastLocationPart(validationIssue.loc);
+  if (typeof field !== "string") return null;
+  return {
+    field,
+    message: validationInstruction(validationIssue),
+  };
+}
+
+function validationInstruction(issue: ServerValidationIssue): string {
+  const field = lastLocationPart(issue.loc);
+  if (field === "title") return "Enter a title.";
+  if (field === "passage_text") return "Enter the passage text.";
+  if (field === "prompt") return "Enter the question prompt.";
+  if (field === "url") return "Enter a URL.";
+  if (issue.type === "missing" || issue.type === "string_too_short") return `Enter ${readableFieldName(field)}.`;
+  if (issue.type === "list_too_short") return `Add more ${readableFieldName(field)}.`;
+  if (issue.type === "list_too_long") return `Remove extra ${readableFieldName(field)}.`;
+  return "Check this field.";
+}
+
+function parseErrorPayload(error: unknown): unknown {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  if (!message.trim().startsWith("{") && !message.trim().startsWith("[")) return null;
+  try {
+    return JSON.parse(message);
+  } catch {
+    return null;
+  }
+}
+
+function humanErrorMessage(error: Error): string {
+  return parseErrorPayload(error) ? "Check the highlighted fields." : error.message;
+}
+
+function readableFieldName(field: string): string {
+  return field.replace(/_/g, " ") || "this field";
+}
+
+function lastLocationPart(loc: Array<string | number> | undefined): string {
+  const part = loc && loc.length ? loc[loc.length - 1] : "";
+  return typeof part === "string" ? part : "";
+}
+
+function showFieldError(control: HTMLElement, message: string): void {
+  const field = control.closest<HTMLElement>(".admin-field");
+  if (!field) return;
+  field.classList.add("has-field-error");
+  control.classList.add("field-error");
+  control.setAttribute("aria-invalid", "true");
+  const error = field.querySelector<HTMLElement>(".admin-field-error") ?? el("p", "admin-field-error");
+  error.textContent = message;
+  field.append(error);
+}
+
+function clearFieldError(control: HTMLElement): void {
+  const field = control.closest<HTMLElement>(".admin-field");
+  field?.classList.remove("has-field-error");
+  field?.querySelector(".admin-field-error")?.remove();
+  control.classList.remove("field-error");
+  control.removeAttribute("aria-invalid");
+}
+
+function focusInvalidControl(control: HTMLElement): void {
+  control.scrollIntoView({ block: "center", behavior: "smooth" });
+  window.setTimeout(() => control.focus(), 120);
+}
+
+function setValidationStatus(status: HTMLElement, count: number, onClick: () => void): void {
+  status.dataset.state = "validation";
+  status.textContent = `${count} ${count === 1 ? "field needs" : "fields need"} attention`;
+  status.onclick = onClick;
+  status.setAttribute("role", "button");
+  status.tabIndex = 0;
+  status.onkeydown = (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onClick();
+  };
 }
