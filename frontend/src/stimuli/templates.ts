@@ -485,7 +485,7 @@ function objectRepeater(field: Extract<FieldSchema, { kind: "objectList" }>, con
 
 function renderAdBox(content: StimulusContent): HTMLElement {
   const surface = el("div", "stimulus-surface stimulus-ad-box");
-  surface.append(el("strong", "stimulus-ad-name", stringValue(content.business_name) || "Name"));
+  surface.append(el("strong", "stimulus-ad-name", stringValue(content.business_name)));
   if (stringValue(content.tagline)) surface.append(el("p", "stimulus-ad-tagline", stringValue(content.tagline)));
   surface.append(detailList(stringList(content.lines)));
   const meta = [content.hours, content.address, content.phone, content.price].map(stringValue).filter(Boolean);

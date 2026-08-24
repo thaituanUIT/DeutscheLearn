@@ -275,10 +275,10 @@ function renderWordEditor(
         ? await createAdminWord(token, payload)
         : await updateAdminWord(token, payload);
       state.isNew = false;
-      status.textContent = "Saved.";
+      setSavedStatus(status);
       await onSaved();
     } catch (error) {
-      status.replaceChildren(adminError(error));
+      setErrorStatus(status, error);
     }
   };
 
@@ -288,10 +288,10 @@ function renderWordEditor(
     void saveWord();
   });
   editorForm.addEventListener("input", () => {
-    status.textContent = "Unsaved changes";
+    setDirtyStatus(status);
   });
   editorForm.addEventListener("change", () => {
-    status.textContent = "Unsaved changes";
+    setDirtyStatus(status);
   });
   partOfSpeech.addEventListener("change", syncArticleState);
 
@@ -326,7 +326,7 @@ function renderWordEditor(
         state.isNew = true;
         await onSaved();
       } catch (error) {
-        status.replaceChildren(adminError(error));
+        setErrorStatus(status, error);
       }
     });
     header.append(remove);
@@ -520,6 +520,7 @@ function renderPassageEditor(
   const editorForm = adminEditorForm();
   const status = el("p", "prompt admin-dirty-state");
   const metaGrid = el("div", "admin-reading-meta-grid");
+  const formScroll = el("div", "form-scroll");
   const resolvedType = el("span", "admin-resolved-type");
   const questionSectionNode = questionSection(questions, button("+ Add question", "button primary"));
 
@@ -548,7 +549,7 @@ function renderPassageEditor(
       level: level.value as AdminLevel,
       part: state.activeGroup === "goethe" ? (part.value as AdminGoethePart) : null,
       title: title.value,
-      passage_text: activeShape === "goethe_source_choice" ? "" : passage.value,
+      passage_text: activeShape === "goethe_source_choice" ? "Lesen Sie die Situation und die zwei Anzeigen." : passage.value,
       context_label: activeShape === "goethe_true_false_notice" ? contextLabel.value || null : null,
       image_url: state.selected.image_url,
       render_kind: activeShape === "goethe_true_false_notice" ? noticeEditor.getValue().render_kind : "text",
@@ -628,11 +629,13 @@ function renderPassageEditor(
   for (const control of adControls) {
     control.editor.node.addEventListener("input", renderPreviewState);
     control.editor.node.addEventListener("input", () => updateCorrectSourceOptions(correctSource, adControls));
+    control.editor.node.addEventListener("change", renderPreviewState);
+    control.editor.node.addEventListener("change", () => updateCorrectSourceOptions(correctSource, adControls));
   }
   updateCorrectSourceOptions(correctSource, adControls);
 
   const markDirty = (): void => {
-    status.textContent = "Unsaved changes";
+    setDirtyStatus(status);
   };
 
   const savePassage = async (): Promise<void> => {
@@ -669,10 +672,10 @@ function renderPassageEditor(
         ? await createAdminReadingPassage(token, payload)
         : await updateAdminReadingPassage(token, payload);
       state.isNew = false;
-      status.textContent = "Saved.";
+      setSavedStatus(status);
       await onSaved();
     } catch (error) {
-      status.replaceChildren(adminError(error));
+      setErrorStatus(status, error);
     }
   };
 
@@ -721,14 +724,15 @@ function renderPassageEditor(
         state.isNew = true;
         await onSaved();
       } catch (error) {
-        status.replaceChildren(adminError(error));
+        setErrorStatus(status, error);
       }
     });
     header.append(remove);
   }
 
   const actions = editorActionBar(status, cancel, save);
-  editorForm.append(metaGrid, formFields, actions);
+  formScroll.append(metaGrid, formFields);
+  editorForm.append(formScroll, actions);
 
   const previewColumn = el("aside", "admin-preview-column");
   previewColumn.append(preview);
@@ -1009,8 +1013,25 @@ function selectSourceAnswer(question: AdminReadingQuestion): HTMLSelectElement {
 function updateCorrectSourceOptions(select: HTMLSelectElement, ads: AdStimulusBlock[]): void {
   for (const [index, option] of Array.from(select.options).entries()) {
     const ad = ads[index];
-    option.textContent = ad?.editor.getValue().title.trim() || `${ad?.key ?? index + 1})`;
+    option.textContent = advertOptionLabel(ad, index);
   }
+}
+
+function advertOptionLabel(ad: AdStimulusBlock | undefined, index: number): string {
+  const key = ad?.key ?? (index === 0 ? "a" : "b");
+  const name = businessNameFromAd(ad).trim();
+  return name ? `${key}) — ${truncateAdvertName(name)}` : `${key})`;
+}
+
+function businessNameFromAd(ad: AdStimulusBlock | undefined): string {
+  const content = ad?.editor.getValue().content;
+  const businessName = content && typeof content.business_name === "string" ? content.business_name : "";
+  return businessName;
+}
+
+function truncateAdvertName(name: string): string {
+  const limit = 40;
+  return name.length > limit ? `${name.slice(0, limit - 1)}…` : name;
 }
 
 function questionSection(questions: HTMLElement, addButton: HTMLButtonElement): HTMLElement {
@@ -1173,20 +1194,32 @@ function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): 
 
   const body = el("div", "admin-preview-body");
   if (isSourceChoice) {
-    const adGrid = el("div", "admin-preview-ad-grid");
+    const exercise = el("article", "story-passage goethe-exercise source-choice-exercise admin-source-preview");
+    exercise.append(
+      el("div", "question-type", `${passage.level} · ${partLabel(passage.part ?? "teil_2")}`),
+      el("h2", "story-title", passage.title),
+      el("p", "goethe-task-prompt", passage.passage_text),
+    );
+    const adGrid = el("div", "source-card-grid");
     for (const ad of passage.ad_stimuli) {
-      const card = el("article", "admin-preview-ad");
-      card.append(el("strong", "", `${ad.key})`), stimulusRenderer(stimulusFromAd(ad)));
+      const card = el("section", "source-card");
+      card.append(el("span", "source-pill", ad.key), stimulusRenderer(stimulusFromAd(ad)));
       adGrid.append(card);
     }
-    body.append(adGrid);
+    exercise.append(adGrid);
+    body.append(exercise);
   }
   for (const question of passage.questions) {
-    const item = el("div", "admin-preview-question");
-    item.append(el("p", "", question.prompt || "Question prompt appears here."));
-    const answers = el("div", "admin-preview-options");
+    const item = el("div", "story-question-block admin-preview-question");
+    item.append(
+      el("div", "question-type", "Question 1"),
+      el("h3", "story-question-title", question.prompt),
+    );
+    const answers = el("div", "story-answer-list");
     for (const answer of question.answers) {
-      answers.append(el("span", "", answer.answer_text || "Option"));
+      const option = button(answer.answer_text, "answer-option");
+      option.type = "button";
+      answers.append(option);
     }
     item.append(answers);
     body.append(item);
@@ -1678,4 +1711,19 @@ function matchesPassageSearch(passage: AdminReadingPassageSummary, search: strin
 
 function adminError(error: unknown): HTMLElement {
   return el("div", "error", error instanceof Error ? error.message : "Admin request failed");
+}
+
+function setDirtyStatus(status: HTMLElement): void {
+  status.dataset.state = "dirty";
+  status.textContent = "Unsaved changes";
+}
+
+function setSavedStatus(status: HTMLElement): void {
+  delete status.dataset.state;
+  status.textContent = "Saved.";
+}
+
+function setErrorStatus(status: HTMLElement, error: unknown): void {
+  delete status.dataset.state;
+  status.replaceChildren(adminError(error));
 }

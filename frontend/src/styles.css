@@ -1143,7 +1143,8 @@ button {
   display: grid;
   align-content: start;
   gap: var(--admin-space-field);
-  width: min(720px, 100%);
+  width: 100%;
+  min-width: 0;
 }
 
 .admin-editor-header {
@@ -1177,16 +1178,25 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--admin-space-field);
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
-.admin-form-fields {
+.form-scroll {
   flex: 1 1 auto;
   min-height: 0;
+  width: 100%;
+  max-width: 100%;
   padding-right: 4px;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
+}
+
+.form-scroll > .admin-reading-meta-grid,
+.form-scroll > .admin-form-fields {
+  max-width: 720px;
 }
 
 .admin-preview-column {
@@ -1363,6 +1373,7 @@ button {
 .admin-source-choice-section {
   display: grid;
   gap: var(--admin-space-group);
+  min-width: 0;
 }
 
 .article-segmented-control[data-disabled="true"] {
@@ -1427,6 +1438,7 @@ button {
 
 .admin-ad-block,
 .admin-preview-ad {
+  min-width: 0;
   display: grid;
   gap: var(--admin-space-field);
   padding: var(--admin-space-field);
@@ -1493,6 +1505,21 @@ button {
 
 .admin-action-bar .prompt {
   margin: 0;
+}
+
+.admin-dirty-state[data-state="dirty"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #687078;
+}
+
+.admin-dirty-state[data-state="dirty"]::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #d6a85f;
 }
 
 .admin-action-buttons {
@@ -2080,7 +2107,8 @@ button {
   }
 
   .admin-items,
-  .admin-form-fields {
+  .admin-form-fields,
+  .form-scroll {
     overflow: visible;
   }
 
