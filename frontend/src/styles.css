@@ -20,6 +20,288 @@ button {
   font: inherit;
 }
 
+.grammar-widget {
+  --grammar-keyboard-offset: 0px;
+  position: fixed;
+  right: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 50;
+}
+
+.grammar-launcher {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #1f2937;
+  border-radius: 50%;
+  background: #263238;
+  color: #ffffff;
+  font-size: 1.35rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 14px 34px rgb(32 33 36 / 18%);
+}
+
+.grammar-panel {
+  position: absolute;
+  right: 0;
+  bottom: 72px;
+  width: 380px;
+  height: min(520px, calc(100dvh - 120px));
+  display: none;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid #d7ddd7;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #202124;
+  box-shadow: 0 22px 60px rgb(32 33 36 / 20%);
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.grammar-widget[data-state="open"] .grammar-panel,
+.grammar-widget[data-state="sending"] .grammar-panel,
+.grammar-widget[data-state="waking"] .grammar-panel,
+.grammar-widget[data-state="answered"] .grammar-panel,
+.grammar-widget[data-state="no-match"] .grammar-panel,
+.grammar-widget[data-state="error"] .grammar-panel {
+  display: grid;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.grammar-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid #e6e9e6;
+}
+
+.grammar-panel-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grammar-level-label {
+  display: inline-flex;
+  min-width: 34px;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef6f1;
+  color: #23604f;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.grammar-close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d7ddd7;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #202124;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.grammar-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.grammar-message {
+  max-width: 88%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.grammar-message-learner {
+  align-self: flex-end;
+  background: #33658a;
+  color: #ffffff;
+  white-space: pre-wrap;
+}
+
+.grammar-message-assistant {
+  align-self: flex-start;
+  border: 1px solid #e0e3df;
+  background: #f8faf8;
+  color: #202124;
+}
+
+.grammar-markdown {
+  display: grid;
+  gap: 8px;
+}
+
+.grammar-markdown p {
+  margin: 0;
+}
+
+.grammar-markdown code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #eef0f2;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.grammar-example {
+  border-left: 3px solid #d6a642;
+  padding-left: 9px;
+  color: #263238;
+  font-weight: 700;
+}
+
+.grammar-citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.grammar-citation {
+  min-width: 0;
+}
+
+.grammar-citation-chip,
+.grammar-chip {
+  border: 1px solid #cfd7d1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #2d4c5e;
+  padding: 6px 9px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.grammar-citation-source {
+  display: none;
+  width: 100%;
+  margin: 6px 0 0;
+  padding: 8px;
+  border-left: 3px solid #2f6f5e;
+  background: #ffffff;
+  color: #4d555e;
+  white-space: pre-wrap;
+}
+
+.grammar-citation.expanded {
+  flex-basis: 100%;
+}
+
+.grammar-citation.expanded .grammar-citation-source {
+  display: block;
+}
+
+.grammar-no-match {
+  border-color: #ead7a4;
+  background: #fffaf0;
+}
+
+.grammar-search-meta {
+  display: inline-block;
+  margin-top: 6px;
+  color: #696f76;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.grammar-error-message {
+  border-color: #f0c8c2;
+  background: #fff6f4;
+}
+
+.grammar-loading {
+  color: #4d555e;
+}
+
+.grammar-empty {
+  display: grid;
+  gap: 12px;
+  padding: 4px;
+}
+
+.grammar-empty p {
+  margin: 0;
+  color: #4d555e;
+}
+
+.grammar-suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.grammar-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  padding: 12px 14px 14px;
+  border-top: 1px solid #e6e9e6;
+  background: #ffffff;
+}
+
+.grammar-input {
+  min-height: 42px;
+  max-height: 112px;
+  resize: none;
+  border: 1px solid #cfd7d1;
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+  line-height: 1.35;
+}
+
+.grammar-input:focus {
+  outline: 3px solid rgb(51 101 138 / 18%);
+  border-color: #33658a;
+}
+
+.grammar-counter {
+  grid-column: 1 / 2;
+  min-height: 16px;
+  color: #696f76;
+  font-size: 0.76rem;
+}
+
+.grammar-send {
+  grid-column: 2 / 3;
+  grid-row: 1 / 3;
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 14px;
+  background: #2f6f5e;
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.grammar-send:disabled {
+  background: #aab6b0;
+  cursor: not-allowed;
+}
+
 .shell {
   width: min(1280px, calc(100vw - 32px));
   margin: 0 auto;
@@ -2231,5 +2513,52 @@ button {
   .admin-preview-ad-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .grammar-widget {
+    right: 0;
+    bottom: calc(env(safe-area-inset-bottom) + var(--grammar-keyboard-offset));
+    left: 0;
+  }
+
+  .grammar-launcher {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+  }
+
+  .grammar-panel {
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: min(100dvh, calc(100dvh - var(--grammar-keyboard-offset)));
+    max-height: none;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 16px 16px 0 0;
+    transform: translateY(16px);
+  }
+
+  .grammar-message {
+    max-width: 94%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grammar-panel {
+    transition: opacity 120ms ease;
+    transform: none;
+  }
+
+  .grammar-widget[data-state="open"] .grammar-panel,
+  .grammar-widget[data-state="sending"] .grammar-panel,
+  .grammar-widget[data-state="waking"] .grammar-panel,
+  .grammar-widget[data-state="answered"] .grammar-panel,
+  .grammar-widget[data-state="no-match"] .grammar-panel,
+  .grammar-widget[data-state="error"] .grammar-panel {
+    transform: none;
   }
 }

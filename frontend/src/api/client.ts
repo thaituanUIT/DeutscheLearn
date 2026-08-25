@@ -9,6 +9,7 @@ import type {
   FocusRevisionQuestion,
   FocusTopic,
   FocusTopicAlias,
+  GrammarAskResponse,
   LeaderboardEntry,
   Player,
   PracticeAnswer,
@@ -206,6 +207,23 @@ export function submitStoryAnswer(questionId: string, answerId: string): Promise
     body: JSON.stringify({
       question_id: questionId,
       answer_id: answerId,
+    }),
+  });
+}
+
+export function askGrammar(payload: {
+  question: string;
+  level: "A1" | "A2" | "B1";
+  topic?: string | null;
+  learner_id?: string | null;
+}): Promise<GrammarAskResponse> {
+  return request<GrammarAskResponse>("/api/grammar/ask", {
+    method: "POST",
+    body: JSON.stringify({
+      question: payload.question,
+      level: payload.level,
+      topic: payload.topic ?? null,
+      learner_id: payload.learner_id ?? null,
     }),
   });
 }

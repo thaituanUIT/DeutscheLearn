@@ -1,6 +1,7 @@
 import { getCurrentPlayer, getLeaderboard, getWordOfDay } from "../api/client";
 import type { LeaderboardEntry, Player, WordOfDay } from "../api/types";
 import { button } from "../components/button";
+import { mountGrammarWidget } from "../components/grammarWidget";
 import { setPlayer } from "../state/playerStore";
 import { clear, el } from "../utils/dom";
 import { focusView } from "./focusView";
@@ -44,6 +45,7 @@ function draw(
 ): void {
   let leaderboard = initialLeaderboard;
   let bestScore = player.best_endless_score;
+  let grammarWidget: ReturnType<typeof mountGrammarWidget> | null = null;
 
   const shell = el("div", "shell");
   const header = el("header", "topbar");
@@ -62,6 +64,7 @@ function draw(
 
   const showHome = (syncRoute = true): void => {
     if (syncRoute) writeRoute("home");
+    grammarWidget?.updateContext({ route: "home", level: "A1", topic: null });
     layout.className = "layout home-layout";
     headerStart.replaceChildren(el("h1", "brand", "German Word Quiz"));
     mainHost.replaceChildren(homeView({ onSelectMode: showMode }));
@@ -77,6 +80,7 @@ function draw(
 
   const showMode = (mode: HomeMode, syncRoute = true): void => {
     if (syncRoute) writeRoute(mode);
+    grammarWidget?.updateContext({ route: mode, level: mode === "story" ? "A2" : "A1", topic: null });
     layout.className = mode === "story" ? "layout mode-layout story-mode-layout" : "layout mode-layout";
     layout.replaceChildren(mainHost);
     renderHeaderBack(showHome);
@@ -137,10 +141,12 @@ function draw(
 
   window.addEventListener("hashchange", renderRoute);
   window.addEventListener("popstate", renderRoute);
-  renderRoute();
   shell.replaceChildren(header, layout);
   clear(root);
   root.append(shell);
+  grammarWidget = mountGrammarWidget(root, player);
+  grammarWidget.updateContext({ route: readRoute() });
+  renderRoute();
 }
 
 function readRoute(): AppRoute {

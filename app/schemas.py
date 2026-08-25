@@ -402,6 +402,36 @@ class StimulusImageUploadUrlOut(BaseModel):
     upload_url: str
 
 
+class GrammarAskIn(BaseModel):
+    question: str = Field(min_length=1, max_length=1200)
+    level: str = Field(pattern="^(A1|A2|B1)$")
+    topic: str | None = Field(default=None, max_length=120)
+    learner_id: str | None = Field(default=None, max_length=120)
+    include_debug: bool = False
+
+
+class GrammarCitationOut(BaseModel):
+    chunk_id: str
+    title: str
+    section: str
+    content: str
+    level: str
+    topic: str
+    similarity: float
+    source_path: str
+    source_kind: str
+    page_start: int | None = None
+    page_end: int | None = None
+
+
+class GrammarAskOut(BaseModel):
+    status: Literal["answered", "no_match"]
+    answer: str | None = None
+    citations: list[GrammarCitationOut] = Field(default_factory=list)
+    retrieval_debug: dict[str, Any] | None = None
+    cached: bool = False
+
+
 def validate_stimulus_content(
     render_kind: str,
     content: dict[str, Any] | None,

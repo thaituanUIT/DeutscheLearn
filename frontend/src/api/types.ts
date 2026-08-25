@@ -183,6 +183,28 @@ export type StoryAnswer = {
   explanation: string | null;
 };
 
+export type GrammarCitation = {
+  chunk_id: string;
+  title: string;
+  section: string;
+  content: string;
+  level: "A1" | "A2" | "B1";
+  topic: string;
+  similarity: number;
+  source_path: string;
+  source_kind: string;
+  page_start: number | null;
+  page_end: number | null;
+};
+
+export type GrammarAskResponse = {
+  status: "answered" | "no_match";
+  answer: string | null;
+  citations: GrammarCitation[];
+  retrieval_debug: Record<string, unknown> | null;
+  cached: boolean;
+};
+
 export type AdminFocusEntry = {
   id?: string;
   level: "A1" | "A2" | "B1" | "B2";

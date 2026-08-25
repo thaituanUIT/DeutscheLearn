@@ -320,6 +320,67 @@ class Upload(Base):
     delete_after_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
+class GrammarDocument(Base):
+    __tablename__ = "grammar_documents"
+
+    id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    level: Mapped[str] = mapped_column(String(8), nullable=False, index=True)
+    topic: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    source_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(20), default="markdown", nullable=False)
+    metadata_json: Mapped[str | None] = mapped_column(Text)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+
+class GrammarChunk(Base):
+    __tablename__ = "grammar_chunks"
+
+    id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    document_id: Mapped[str] = mapped_column(ForeignKey("grammar_documents.id"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    section: Mapped[str] = mapped_column(String(200), nullable=False)
+    level: Mapped[str] = mapped_column(String(8), nullable=False, index=True)
+    topic: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    source_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(20), default="markdown", nullable=False)
+    page_start: Mapped[int | None] = mapped_column(Integer)
+    page_end: Mapped[int | None] = mapped_column(Integer)
+    metadata_json: Mapped[str | None] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+
+class GrammarAnswerCache(Base):
+    __tablename__ = "grammar_answer_cache"
+    __table_args__ = (
+        UniqueConstraint("question_hash", "level", name="uq_grammar_answer_cache_question_level"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    question_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    level: Mapped[str] = mapped_column(String(8), nullable=False, index=True)
+    normalized_question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    citations_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+
 def _options_look_true_false(options: list[ItemOption]) -> bool:
     labels = {option.label.casefold() for option in options}
     return labels <= {"richtig", "falsch", "true", "false"} and len(labels) == 2
