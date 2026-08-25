@@ -1,16 +1,15 @@
-# German Word Quiz
+# DeutscheLearn
 
-Anonymous German word quiz with an endless mode leaderboard.
+Anonymous German language learning app with multiple learning modes.
 
 ## Features
 
 - Cookie-based anonymous player identity.
 - Random generated display names.
-- Server-validated endless quiz attempts.
-- Leaderboard for best endless streaks.
+- Multiple learning modes: flashcards, Goethe-Institut styled exercises, and grammar assistant.
 - Modular TypeScript frontend with Vite.
 - FastAPI backend with SQLAlchemy.
-- Render deployment config with Postgres.
+- Render deployment config with Supabase Postgres.
 
 ## Local Development
 
