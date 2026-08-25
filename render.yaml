@@ -16,6 +16,16 @@ services:
         value: "true"
       - key: ADMIN_TOKEN
         sync: false
+      - key: COHERE_API_KEY
+        sync: false
+      - key: COHERE_EMBEDDING_MODEL
+        value: embed-multilingual-v3.0
+      - key: COHERE_EMBEDDING_DIMENSION
+        value: "1024"
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_CHAT_MODEL
+        value: google/gemma-4-31b-it:free
 
 databases:
   - name: german-word-quiz-db

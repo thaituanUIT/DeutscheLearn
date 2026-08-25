@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "scripts": {
+    "eval": "UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/eval_grammar.py"
+  }
+}

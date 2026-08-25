@@ -3,7 +3,7 @@ from secrets import compare_digest
 from urllib import request as urlrequest
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -42,6 +42,9 @@ from app.schemas import (
     FocusRevisionQuestionOut,
     FocusTopicAliasOut,
     FocusTopicOut,
+    GrammarAskIn,
+    GrammarAskOut,
+    GrammarCitationOut,
     LeaderboardEntry,
     PlayerOut,
     PracticeAnswerOut,
@@ -68,6 +71,12 @@ from app.services.focus import (
     get_focus_levels,
     get_focus_revision_questions,
     get_focus_topics,
+)
+from app.services.grammar import (
+    GrammarServiceError,
+    GrammarUnavailableError,
+    answer_grammar_question,
+    check_rate_limit,
 )
 from app.services.quiz import create_question
 from app.services.story import (
@@ -97,9 +106,71 @@ def require_admin(authorization: str | None = Header(default=None)) -> None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
 
 
+def _has_admin_bearer(authorization: str | None) -> bool:
+    settings = get_settings()
+    if not settings.admin_token:
+        return False
+    scheme, _, token = (authorization or "").partition(" ")
+    return scheme.casefold() == "bearer" and compare_digest(token, settings.admin_token)
+
+
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.post("/grammar/ask", response_model=GrammarAskOut)
+def grammar_ask(
+    payload: GrammarAskIn,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> GrammarAskOut:
+    include_debug = payload.include_debug and _has_admin_bearer(authorization)
+    client_ip = request.client.host if request.client else "unknown"
+    try:
+        check_rate_limit(payload.learner_id, client_ip)
+        result = answer_grammar_question(
+            db=db,
+            question=payload.question.strip(),
+            level=payload.level,
+            topic=payload.topic,
+            include_debug=include_debug,
+        )
+    except PermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="You've asked a lot of questions. Try again in a few minutes.",
+        ) from None
+    except GrammarUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The grammar assistant is unavailable right now.",
+        ) from exc
+    except GrammarServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Something went wrong while answering.",
+        ) from exc
+    return GrammarAskOut(
+        status=result.status,
+        answer=result.answer,
+        citations=[
+            GrammarCitationOut(
+                chunk_id=citation.chunk_id,
+                title=citation.title,
+                section=citation.section,
+                content=citation.content,
+                level=citation.level,
+                topic=citation.topic,
+                similarity=citation.similarity,
+                source_path=citation.source_path,
+            )
+            for citation in result.citations
+        ],
+        retrieval_debug=result.retrieval_debug,
+        cached=result.cached,
+    )
 
 
 @router.get("/players/me", response_model=PlayerOut)

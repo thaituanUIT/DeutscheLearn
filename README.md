@@ -47,6 +47,11 @@ DATABASE_URL=sqlite:///./quiz.db
 COOKIE_SECURE=false
 COOKIE_SAMESITE=lax
 SEED_ON_STARTUP=true
+COHERE_API_KEY=
+COHERE_EMBEDDING_MODEL=embed-multilingual-v3.0
+COHERE_EMBEDDING_DIMENSION=1024
+OPENROUTER_API_KEY=
+OPENROUTER_CHAT_MODEL=google/gemma-4-31b-it:free
 ```
 
 On Render, use the included `render.yaml`. It provisions a web service plus Postgres and sets `COOKIE_SECURE=true`.
@@ -72,6 +77,39 @@ with SSL enabled, then run:
 ```bash
 DATABASE_URL="postgresql://..." uv run alembic upgrade head
 ```
+
+## Grammar RAG
+
+The grammar assistant uses a Render-friendly split:
+
+- Render serves the public API and widget only.
+- Grammar notes live in `data/grammar`.
+- Local/dev ingestion embeds notes with Cohere `embed-multilingual-v3.0` and writes chunks to the
+  same Supabase Postgres database used by `DATABASE_URL`.
+- OpenRouter generates answers with `google/gemma-4-31b-it:free`.
+
+The embedding model is pinned to Cohere `embed-multilingual-v3.0` at 1024 dimensions. Changing
+the model is a schema migration plus full re-embed, not an environment-only change.
+
+Set `DATABASE_URL` to the Supabase Postgres URL, run migrations there, then ingest:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache uv run alembic upgrade head
+UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/ingest_grammar.py --changed-only
+```
+
+Use `--dry-run` to inspect chunks and `--delete-missing` after removing corpus files. Ingestion
+must not run on Render free tier.
+
+Run the retrieval harness with:
+
+```bash
+npm run eval
+```
+
+The current golden set is a starter set and should grow toward roughly 60 items. Before relying
+on an LLM judge for answer quality, hand-score 20 generation outputs and record the agreement
+rate here.
 
 The app still creates missing tables on startup for local development, but production database
 schema changes should be applied with Alembic before deploying application code that depends on

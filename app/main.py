@@ -37,7 +37,7 @@ def create_app() -> FastAPI:
 
     dist = Path("frontend/dist")
     assets = dist / "assets"
-    if assets.exists():
+    if settings.static_assets_enabled and assets.exists():
         api.mount("/assets", StaticFiles(directory=assets), name="assets")
 
     @api.get("/{path:path}", include_in_schema=False)
