@@ -3,8 +3,8 @@ services:
     name: german-word-quiz
     env: python
     plan: free
-    buildCommand: uv sync && npm install --prefix frontend && npm run build --prefix frontend
-    startCommand: uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: uv sync --locked --no-dev && npm install --prefix frontend && npm run build --prefix frontend
+    startCommand: uv run --no-sync alembic upgrade head && uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ENVIRONMENT
         value: production

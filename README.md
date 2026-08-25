@@ -17,7 +17,7 @@ Anonymous German word quiz with an endless mode leaderboard.
 Install dependencies:
 
 ```bash
-uv sync
+uv sync --locked
 npm install --prefix frontend
 ```
 
@@ -36,9 +36,13 @@ npm run dev --prefix frontend
 For a production-style local run:
 
 ```bash
+uv sync --locked --no-dev
 npm run build --prefix frontend
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+Production installs use `uv sync --locked --no-dev` to skip local-only tooling such as tests,
+crawling, and PDF ingestion. Use the default `uv sync --locked` for development.
 
 ## Environment
 

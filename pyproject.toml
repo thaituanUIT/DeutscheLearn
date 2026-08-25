@@ -5,21 +5,23 @@ description = "Anonymous German word quiz with endless leaderboard"
 requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.16.0",
-    "beautifulsoup4>=4.12.0",
     "duden>=0.19.2",
     "fastapi>=0.116.0",
     "psycopg[binary]>=3.2.0",
-    "pymupdf4llm>=0.0.27",
     "pydantic-settings>=2.10.0",
+    "requests>=2.32.0",
     "sqlalchemy>=2.0.0",
-    "uvicorn[standard]>=0.35.0",
+    "uvicorn>=0.35.0",
 ]
 
 [dependency-groups]
 dev = [
+    "beautifulsoup4>=4.12.0",
     "httpx>=0.28.0",
+    "pymupdf4llm>=0.0.27",
     "pytest>=8.0.0",
     "ruff>=0.12.0",
+    "uvicorn[standard]>=0.35.0",
 ]
 
 [tool.uv]
