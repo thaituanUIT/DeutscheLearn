@@ -48,9 +48,10 @@ button {
   right: 0;
   bottom: 72px;
   width: 380px;
-  height: min(520px, calc(100dvh - 120px));
+  height: auto;
+  max-height: min(420px, calc(100dvh - 120px));
   display: none;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
   overflow: hidden;
   border: 1px solid #d7ddd7;
   border-radius: 8px;
@@ -62,6 +63,11 @@ button {
   transition:
     opacity 140ms ease,
     transform 140ms ease;
+}
+
+.grammar-widget[data-has-messages="true"] .grammar-panel {
+  height: min(420px, calc(100dvh - 120px));
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .grammar-widget[data-state="open"] .grammar-panel,
@@ -88,19 +94,6 @@ button {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.grammar-level-label {
-  display: inline-flex;
-  min-width: 34px;
-  justify-content: center;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #eef6f1;
-  color: #23604f;
-  font-size: 0.78rem;
-  font-weight: 800;
 }
 
 .grammar-close {
@@ -119,9 +112,13 @@ button {
   flex-direction: column;
   gap: 10px;
   min-height: 0;
-  padding: 14px;
+  padding: 14px 14px 28px;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.grammar-widget[data-has-messages="true"] .grammar-message-list {
+  padding-bottom: 14px;
 }
 
 .grammar-message {
@@ -217,14 +214,6 @@ button {
   background: #fffaf0;
 }
 
-.grammar-search-meta {
-  display: inline-block;
-  margin-top: 6px;
-  color: #696f76;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
 .grammar-error-message {
   border-color: #f0c8c2;
   background: #fff6f4;
@@ -265,6 +254,7 @@ button {
   min-height: 42px;
   max-height: 112px;
   resize: none;
+  overflow: hidden;
   border: 1px solid #cfd7d1;
   border-radius: 8px;
   padding: 10px;
@@ -298,7 +288,8 @@ button {
 }
 
 .grammar-send:disabled {
-  background: #aab6b0;
+  background: #d7dce0;
+  color: #777f86;
   cursor: not-allowed;
 }
 
@@ -2533,13 +2524,17 @@ button {
     right: 0;
     bottom: 0;
     width: 100%;
-    height: min(100dvh, calc(100dvh - var(--grammar-keyboard-offset)));
+    height: auto;
     max-height: none;
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
     border-radius: 16px 16px 0 0;
     transform: translateY(16px);
+  }
+
+  .grammar-widget[data-has-messages="true"] .grammar-panel {
+    height: min(100dvh, calc(100dvh - var(--grammar-keyboard-offset)));
   }
 
   .grammar-message {

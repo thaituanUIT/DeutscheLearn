@@ -369,12 +369,11 @@ class GrammarChunk(Base):
 class GrammarAnswerCache(Base):
     __tablename__ = "grammar_answer_cache"
     __table_args__ = (
-        UniqueConstraint("question_hash", "level", name="uq_grammar_answer_cache_question_level"),
+        UniqueConstraint("question_hash", name="uq_grammar_answer_cache_question_hash"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     question_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    level: Mapped[str] = mapped_column(String(8), nullable=False, index=True)
     normalized_question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     citations_json: Mapped[str] = mapped_column(Text, nullable=False)

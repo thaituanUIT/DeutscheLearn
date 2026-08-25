@@ -1,7 +1,11 @@
 import { getCurrentPlayer, getLeaderboard, getWordOfDay } from "../api/client";
 import type { LeaderboardEntry, Player, WordOfDay } from "../api/types";
 import { button } from "../components/button";
-import { mountGrammarWidget } from "../components/grammarWidget";
+import {
+  mountGrammarWidget,
+  type GrammarPassageContext,
+  type GrammarWrongAnswerContext,
+} from "../components/grammarWidget";
 import { setPlayer } from "../state/playerStore";
 import { clear, el } from "../utils/dom";
 import { focusView } from "./focusView";
@@ -64,7 +68,7 @@ function draw(
 
   const showHome = (syncRoute = true): void => {
     if (syncRoute) writeRoute("home");
-    grammarWidget?.updateContext({ route: "home", level: "A1", topic: null });
+    grammarWidget?.updateContext({ route: "home", passage: null, wrongAnswer: null });
     layout.className = "layout home-layout";
     headerStart.replaceChildren(el("h1", "brand", "German Word Quiz"));
     mainHost.replaceChildren(homeView({ onSelectMode: showMode }));
@@ -80,7 +84,7 @@ function draw(
 
   const showMode = (mode: HomeMode, syncRoute = true): void => {
     if (syncRoute) writeRoute(mode);
-    grammarWidget?.updateContext({ route: mode, level: mode === "story" ? "A2" : "A1", topic: null });
+    grammarWidget?.updateContext({ route: mode, passage: null, wrongAnswer: null });
     layout.className = mode === "story" ? "layout mode-layout story-mode-layout" : "layout mode-layout";
     layout.replaceChildren(mainHost);
     renderHeaderBack(showHome);
@@ -101,6 +105,10 @@ function draw(
           onBack: showHome,
           onBackChange: renderHeaderBack,
           onError: showError,
+          onGrammarContextChange: (context: {
+            passage?: GrammarPassageContext | null;
+            wrongAnswer?: GrammarWrongAnswerContext | null;
+          }) => grammarWidget?.updateContext(context),
         }),
       );
       return;
@@ -119,6 +127,8 @@ function draw(
         },
         onBack: showHome,
         onRender: () => undefined,
+        onGrammarContextChange: (context: { wrongAnswer?: GrammarWrongAnswerContext | null }) =>
+          grammarWidget?.updateContext(context),
         onError: showError,
       }),
     );

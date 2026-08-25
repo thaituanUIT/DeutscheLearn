@@ -14,6 +14,7 @@ import type {
   TimedStart,
 } from "../api/types";
 import { button } from "../components/button";
+import type { GrammarWrongAnswerContext } from "../components/grammarWidget";
 import { scoreBadge } from "../components/scoreBadge";
 import { advanceQuestion, finishAttempt, getQuizState, startAttempt } from "../state/quizStore";
 import { el } from "../utils/dom";
@@ -27,6 +28,7 @@ type QuizViewOptions = {
   onBack: () => void;
   onRender: () => void;
   onError: (message: string) => void;
+  onGrammarContextChange: (context: { wrongAnswer?: GrammarWrongAnswerContext | null }) => void;
 };
 
 let timedTimerId: number | null = null;
@@ -41,6 +43,7 @@ export function quizView(options: QuizViewOptions): HTMLElement {
 function renderStart(section: HTMLElement, options: QuizViewOptions): void {
   stopTimedTimer();
   pendingAnswerKey = null;
+  options.onGrammarContextChange({ wrongAnswer: null });
   section.replaceChildren();
   const config = modeConfig(options.mode);
   const intro = el("div");
@@ -73,6 +76,7 @@ function renderQuestion(
 ): void {
   const state = getQuizState();
   pendingAnswerKey = null;
+  options.onGrammarContextChange({ wrongAnswer: null });
   section.replaceChildren();
   if (options.mode === "timed") startTimedTimer(section, options);
 
@@ -117,6 +121,14 @@ async function handleAnswer(
         questionId,
         choice,
       );
+      if (!answer.correct && state.currentQuestion) {
+        options.onGrammarContextChange({
+          wrongAnswer: {
+            question: state.currentQuestion.prompt,
+            learnerAnswer: choice,
+          },
+        });
+      }
       advanceQuestion(answer.next_question, answer.score, answer.total_questions);
       renderPracticeFeedback(section, answer.correct, answer.correct_answer, answer.next_question, options);
       return;
@@ -154,6 +166,14 @@ async function handleAnswer(
     }
 
     finishAttempt(answer.score);
+    if (state.currentQuestion) {
+      options.onGrammarContextChange({
+        wrongAnswer: {
+          question: state.currentQuestion.prompt,
+          learnerAnswer: choice,
+        },
+      });
+    }
     await options.onLeaderboardRefresh();
     renderResult(
       section,

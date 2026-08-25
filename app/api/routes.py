@@ -133,8 +133,6 @@ def grammar_ask(
         result = answer_grammar_question(
             db=db,
             question=payload.question.strip(),
-            level=payload.level,
-            topic=payload.topic,
             include_debug=include_debug,
         )
     except PermissionError:

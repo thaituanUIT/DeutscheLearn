@@ -3,7 +3,6 @@ import type { GrammarCitation, GrammarAskResponse, Player } from "../api/types";
 import { button } from "./button";
 import { clear, el } from "../utils/dom";
 
-type GrammarLevel = "A1" | "A2" | "B1";
 type WidgetStatus = "closed" | "open" | "sending" | "waking" | "answered" | "no-match" | "error";
 
 type ChatMessage =
@@ -18,15 +17,23 @@ type ChatMessage =
       role: "assistant";
       status: "no_match";
       text: string;
-      level: GrammarLevel;
-      topic: string | null;
     }
   | { role: "assistant"; status: "error"; text: string; canRetry: boolean };
 
+export type GrammarPassageContext = {
+  title: string;
+  text: string;
+};
+
+export type GrammarWrongAnswerContext = {
+  question: string;
+  learnerAnswer: string;
+};
+
 type GrammarWidgetContext = {
-  level: GrammarLevel;
-  topic: string | null;
   route: string;
+  passage: GrammarPassageContext | null;
+  wrongAnswer: GrammarWrongAnswerContext | null;
 };
 
 export type GrammarWidgetHandle = {
@@ -35,12 +42,27 @@ export type GrammarWidgetHandle = {
 
 const MAX_MESSAGES = 20;
 const MAX_QUESTION_LENGTH = 1200;
-const DEFAULT_CONTEXT: GrammarWidgetContext = { level: "A1", topic: null, route: "home" };
+const DEFAULT_CONTEXT: GrammarWidgetContext = {
+  route: "home",
+  passage: null,
+  wrongAnswer: null,
+};
 
 const SUGGESTIONS = [
-  { label: "Why mit dem Auto?", question: "Why is it mit dem Auto and not mit das Auto?", level: "A2" },
-  { label: "Akkusativ articles", question: "When does der become den?", level: "A1" },
-  { label: "Verb position", question: "Why is the verb second in Heute lerne ich Deutsch?", level: "A1" },
+  {
+    label: { en: "Akkusativ articles", vi: "Mạo từ Akkusativ" },
+    question: {
+      en: "When does der become den in Akkusativ?",
+      vi: "Khi nào der đổi thành den trong Akkusativ?",
+    },
+  },
+  {
+    label: { en: "Verb position", vi: "Vị trí Verb" },
+    question: {
+      en: "Why is the verb second in Heute lerne ich Deutsch?",
+      vi: "Tại sao Verb đứng thứ hai trong Heute lerne ich Deutsch?",
+    },
+  },
 ] as const;
 
 export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWidgetHandle {
@@ -65,10 +87,9 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
 
   const header = el("div", "grammar-panel-header");
   const title = el("div", "grammar-panel-title");
-  const levelLabel = el("span", "grammar-level-label", context.level);
   const close = button("×", "grammar-close");
   close.setAttribute("aria-label", "Close grammar assistant");
-  title.append(el("strong", "", "Grammar assistant"), levelLabel);
+  title.append(el("strong", "", "Grammar assistant"));
   header.append(title, close);
 
   const list = el("div", "grammar-message-list");
@@ -113,12 +134,10 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
     try {
       const response = await askGrammar({
         question,
-        level: context.level,
-        topic: context.topic,
         learner_id: player.player_id,
       });
       clearLoadingTimers();
-      messages = [...messages, messageFromResponse(response, context)].slice(-MAX_MESSAGES);
+      messages = [...messages, messageFromResponse(response)].slice(-MAX_MESSAGES);
       status = response.status === "no_match" ? "no-match" : "answered";
     } catch (error) {
       clearLoadingTimers();
@@ -144,10 +163,10 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
 
   const renderMessages = (): void => {
     clear(list);
+    host.dataset.hasMessages = messages.length > 0 || inFlight ? "true" : "false";
     if (messages.length === 0) {
-      renderEmptyState(list, context, (question, level) => {
-        context.level = level;
-        levelLabel.textContent = level;
+      renderEmptyState(list, context, (question, source) => {
+        console.info("grammar_suggestion_tapped", source);
         textarea.value = question;
         updateComposer();
         textarea.focus();
@@ -245,7 +264,6 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
   return {
     updateContext(next) {
       context = { ...context, ...next };
-      levelLabel.textContent = context.level;
       renderMessages();
     },
   };
@@ -254,22 +272,30 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
 function renderEmptyState(
   host: HTMLElement,
   context: GrammarWidgetContext,
-  onPick: (question: string, level: GrammarLevel) => void,
+  onPick: (question: string, source: string) => void,
 ): void {
+  const language = interfaceLanguage();
   const wrap = el("div", "grammar-empty");
-  wrap.append(el("p", "", "Ask about grammar in the lesson you are studying."));
+  wrap.append(el("p", "", language === "vi" ? "Hỏi về ngữ pháp tiếng Đức." : "Ask about German grammar."));
   const chips = el("div", "grammar-suggestion-list");
-  if (context.route === "story") {
-    const chip = button("Ask about this passage", "grammar-chip");
-    chip.addEventListener("click", () => onPick("Can you explain the grammar in this passage?", context.level));
+  if (context.passage) {
+    const passage = context.passage;
+    const chip = button(language === "vi" ? "Hỏi về đoạn đọc này" : "Ask about this passage", "grammar-chip");
+    chip.addEventListener("click", () => onPick(passageQuestion(passage, language), "passage_context"));
+    chips.append(chip);
+  }
+  if (context.wrongAnswer) {
+    const wrongAnswer = context.wrongAnswer;
+    const chip = button(
+      language === "vi" ? "Vì sao câu trả lời của tôi sai?" : "Why was my answer wrong?",
+      "grammar-chip",
+    );
+    chip.addEventListener("click", () => onPick(wrongAnswerQuestion(wrongAnswer, language), "wrong_answer_context"));
     chips.append(chip);
   }
   for (const suggestion of SUGGESTIONS) {
-    const chip = button(suggestion.label, "grammar-chip");
-    chip.addEventListener("click", () => {
-      console.info("grammar_suggestion_tapped", suggestion.label);
-      onPick(suggestion.question, suggestion.level);
-    });
+    const chip = button(suggestion.label[language], "grammar-chip");
+    chip.addEventListener("click", () => onPick(suggestion.question[language], suggestion.label.en));
     chips.append(chip);
   }
   wrap.append(chips);
@@ -288,10 +314,7 @@ function renderMessage(message: ChatMessage, onRetry: () => void): HTMLElement {
   }
   if (message.status === "no_match") {
     bubble.classList.add("grammar-no-match");
-    bubble.append(
-      el("p", "", message.text),
-      el("span", "grammar-search-meta", `Searched ${message.level}${message.topic ? ` · ${message.topic}` : ""}`),
-    );
+    bubble.append(el("p", "", message.text));
     return bubble;
   }
   bubble.classList.add("grammar-error-message");
@@ -364,7 +387,7 @@ function citationLabel(citation: GrammarCitation): string {
       : citation.page_start === citation.page_end
         ? ` · p. ${citation.page_start}`
         : ` · pp. ${citation.page_start}-${citation.page_end}`;
-  return `${citation.title}: ${citation.section}${page}`;
+  return `${citation.level} · ${topicLabel(citation.topic)} · ${citation.title}: ${citation.section}${page}`;
 }
 
 function renderLoading(): HTMLElement {
@@ -381,14 +404,12 @@ function renderLoading(): HTMLElement {
   return node;
 }
 
-function messageFromResponse(response: GrammarAskResponse, context: GrammarWidgetContext): ChatMessage {
+function messageFromResponse(response: GrammarAskResponse): ChatMessage {
   if (response.status === "no_match") {
     return {
       role: "assistant",
       status: "no_match",
       text: "This isn't in the grammar notes yet.",
-      level: context.level,
-      topic: context.topic,
     };
   }
   return {
@@ -397,6 +418,31 @@ function messageFromResponse(response: GrammarAskResponse, context: GrammarWidge
     text: response.answer ?? "",
     citations: response.citations,
   };
+}
+
+function interfaceLanguage(): "en" | "vi" {
+  return document.documentElement.lang.toLowerCase().startsWith("vi") ? "vi" : "en";
+}
+
+function passageQuestion(passage: GrammarPassageContext, language: "en" | "vi"): string {
+  if (language === "vi") {
+    return `Bạn có thể giải thích ngữ pháp trong đoạn đọc này không?\n\nTiêu đề: ${passage.title}\n\nĐoạn đọc:\n${passage.text}`;
+  }
+  return `Can you explain the grammar in this passage?\n\nTitle: ${passage.title}\n\nPassage:\n${passage.text}`;
+}
+
+function wrongAnswerQuestion(context: GrammarWrongAnswerContext, language: "en" | "vi"): string {
+  if (language === "vi") {
+    return `Vì sao câu trả lời của tôi sai?\n\nCâu hỏi: ${context.question}\nCâu trả lời của tôi: ${context.learnerAnswer}`;
+  }
+  return `Why was my answer wrong?\n\nQuestion: ${context.question}\nMy answer: ${context.learnerAnswer}`;
+}
+
+function topicLabel(topic: string): string {
+  return topic
+    .split("_")
+    .map((piece) => piece.charAt(0).toUpperCase() + piece.slice(1))
+    .join(" ");
 }
 
 function mapGrammarError(error: unknown): string {

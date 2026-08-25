@@ -81,14 +81,12 @@ def check_rate_limit(
 def answer_grammar_question(
     db: Session,
     question: str,
-    level: str,
-    topic: str | None = None,
     include_debug: bool = False,
     settings: Settings | None = None,
 ) -> GrammarAnswer:
     settings = settings or get_settings()
     normalized = normalize_question(question)
-    cached = _get_cached_answer(db, normalized, level)
+    cached = _get_cached_answer(db, normalized)
     if cached is not None:
         answer, citations = cached
         return GrammarAnswer(
@@ -103,9 +101,6 @@ def answer_grammar_question(
     retrieved = retrieve_grammar_chunks(
         db=db,
         embedding=query_embedding,
-        level=level,
-        topic=topic,
-        settings=settings,
     )
     accepted = [
         citation
@@ -124,8 +119,8 @@ def answer_grammar_question(
     if not accepted:
         return GrammarAnswer(status="no_match", answer=None, citations=[], retrieval_debug=debug)
 
-    answer = generate_answer(question=question, level=level, citations=accepted, settings=settings)
-    _store_cached_answer(db, normalized, level, answer, accepted)
+    answer = generate_answer(question=question, citations=accepted, settings=settings)
+    _store_cached_answer(db, normalized, answer, accepted)
     return GrammarAnswer(status="answered", answer=answer, citations=accepted, retrieval_debug=debug)
 
 
@@ -160,15 +155,10 @@ def embed_texts(texts: list[str], input_type: str, settings: Settings | None = N
 def retrieve_grammar_chunks(
     db: Session,
     embedding: list[float],
-    level: str,
-    topic: str | None,
-    settings: Settings | None = None,
 ) -> list[GrammarCitation]:
-    settings = settings or get_settings()
     if db.bind is None or db.bind.dialect.name != "postgresql":
         raise GrammarUnavailableError("Grammar retrieval requires a Postgres pgvector database")
     embedding_literal = "[" + ",".join(f"{value:.8f}" for value in embedding) + "]"
-    allowed_levels = _levels_up_to(level)
     rows = db.execute(
         text(
             """
@@ -183,27 +173,13 @@ def retrieve_grammar_chunks(
                 source_kind,
                 page_start,
                 page_end,
-                1 - (embedding <=> cast(:embedding as extensions.vector)) as similarity,
-                (
-                    1 - (embedding <=> cast(:embedding as extensions.vector))
-                    + case
-                        when cast(:topic as text) is not null and topic = cast(:topic as text)
-                        then :topic_boost
-                        else 0
-                    end
-                ) as score
+                1 - (embedding <=> cast(:embedding as extensions.vector)) as similarity
             from grammar_chunks
-            where level = any(cast(:levels as text[]))
-            order by score desc
+            order by embedding <=> cast(:embedding as extensions.vector)
             limit 12
             """
         ),
-        {
-            "embedding": embedding_literal,
-            "levels": allowed_levels,
-            "topic": topic,
-            "topic_boost": settings.grammar_topic_boost,
-        },
+        {"embedding": embedding_literal},
     ).mappings()
     return [
         GrammarCitation(
@@ -223,16 +199,8 @@ def retrieve_grammar_chunks(
     ]
 
 
-def _levels_up_to(level: str) -> list[str]:
-    levels = ["A1", "A2", "B1"]
-    if level not in levels:
-        return [level]
-    return levels[: levels.index(level) + 1]
-
-
 def generate_answer(
     question: str,
-    level: str,
     citations: list[GrammarCitation],
     settings: Settings | None = None,
 ) -> str:
@@ -250,13 +218,15 @@ def generate_answer(
                 "role": "system",
                 "content": (
                     "You are a German grammar tutor. Answer only from the provided grammar notes. "
-                    "Use concise English unless the learner asks in Vietnamese, then answer in Vietnamese. "
-                    "Include short German examples. If the notes do not support the answer, say it is not covered."
+                    "Answer in the language the learner asked in. Explain in plain terms suited to a beginner. "
+                    "Keep German grammar terms in German. Give at least one German example sentence. "
+                    "If a rule has a simple case and an advanced exception, lead with the simple case. "
+                    "If the notes do not support the answer, say it is not covered."
                 ),
             },
             {
                 "role": "user",
-                "content": f"Learner level: {level}\nQuestion: {question}\n\nGrammar notes:\n{context}",
+                "content": f"Question: {question}\n\nGrammar notes:\n{context}",
             },
         ],
         "temperature": 0.2,
@@ -283,12 +253,10 @@ def generate_answer(
 def _get_cached_answer(
     db: Session,
     normalized_question: str,
-    level: str,
 ) -> tuple[str, list[GrammarCitation]] | None:
     row = db.scalar(
         select(GrammarAnswerCache).where(
             GrammarAnswerCache.question_hash == question_hash(normalized_question),
-            GrammarAnswerCache.level == level,
         )
     )
     if row is None:
@@ -299,13 +267,11 @@ def _get_cached_answer(
 def _store_cached_answer(
     db: Session,
     normalized_question: str,
-    level: str,
     answer: str,
     citations: list[GrammarCitation],
 ) -> None:
     row = GrammarAnswerCache(
         question_hash=question_hash(normalized_question),
-        level=level,
         normalized_question=normalized_question,
         answer=answer,
         citations_json=json.dumps([_citation_to_dict(citation) for citation in citations]),

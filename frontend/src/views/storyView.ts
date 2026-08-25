@@ -7,6 +7,10 @@ import {
   submitStoryAnswer,
 } from "../api/client";
 import type {
+  GrammarPassageContext,
+  GrammarWrongAnswerContext,
+} from "../components/grammarWidget";
+import type {
   StoryAnswer,
   StoryGroup,
   StoryLevel,
@@ -22,6 +26,10 @@ type StoryViewOptions = {
   onBack: () => void;
   onBackChange: (handler: () => void) => void;
   onError: (message: string) => void;
+  onGrammarContextChange: (context: {
+    passage?: GrammarPassageContext | null;
+    wrongAnswer?: GrammarWrongAnswerContext | null;
+  }) => void;
 };
 
 type StorySession = {
@@ -42,6 +50,7 @@ export function storyView(options: StoryViewOptions): HTMLElement {
 
 async function renderStoryGroups(section: HTMLElement, options: StoryViewOptions): Promise<void> {
   section.className = "panel story-card";
+  options.onGrammarContextChange({ passage: null, wrongAnswer: null });
   options.onBackChange(options.onBack);
   section.replaceChildren(el("p", "prompt", "Loading story topics..."));
   try {
@@ -69,6 +78,7 @@ async function renderStoryLevels(
   options: StoryViewOptions,
 ): Promise<void> {
   section.className = "panel story-card";
+  options.onGrammarContextChange({ passage: null, wrongAnswer: null });
   options.onBackChange(() => renderStoryGroups(section, options));
   section.replaceChildren(el("p", "prompt", "Loading story levels..."));
   try {
@@ -100,6 +110,7 @@ async function renderStoryParts(
   options: StoryViewOptions,
 ): Promise<void> {
   section.className = "panel story-card";
+  options.onGrammarContextChange({ passage: null, wrongAnswer: null });
   options.onBackChange(() => renderStoryLevels(section, "goethe", options));
   section.replaceChildren(el("p", "prompt", "Loading Goethe parts..."));
   try {
@@ -129,6 +140,7 @@ async function renderStoryPassages(
   options: StoryViewOptions,
 ): Promise<void> {
   section.className = "panel story-card";
+  options.onGrammarContextChange({ passage: null, wrongAnswer: null });
   options.onBackChange(() =>
     part ? renderStoryParts(section, level, options) : renderStoryLevels(section, group, options),
   );
@@ -174,6 +186,10 @@ async function renderStoryReader(
   section.replaceChildren(el("p", "prompt", "Loading story..."));
   try {
     const passage = await getStoryPassage(passageId);
+    options.onGrammarContextChange({
+      passage: { title: passage.title, text: passage.passage_text },
+      wrongAnswer: null,
+    });
     renderStoryPractice(section, { passage, selections: {}, results: null }, options);
   } catch (error) {
     options.onError(error instanceof Error ? error.message : "Could not load story");
@@ -198,6 +214,11 @@ function renderStoryPractice(
   }
 
   const isReviewed = session.results !== null;
+  if (isReviewed) {
+    options.onGrammarContextChange({ wrongAnswer: firstWrongAnswerContext(session) });
+  } else {
+    options.onGrammarContextChange({ wrongAnswer: null });
+  }
   const answeredCount = Object.keys(session.selections).length;
   const score = session.results
     ? Object.values(session.results).filter((result) => result.correct).length
@@ -374,6 +395,21 @@ function storyPracticeLayout(passage: StoryPassage, questionPanel: HTMLElement):
   );
   layout.append(storyContent(passage), questionPanel);
   return layout;
+}
+
+function firstWrongAnswerContext(session: StorySession): GrammarWrongAnswerContext | null {
+  if (!session.results) return null;
+  for (const question of session.passage.questions) {
+    const result = session.results[question.id];
+    if (!result || result.correct) continue;
+    const selected = question.answers.find((answer) => answer.id === result.selected_answer_id);
+    if (!selected) continue;
+    return {
+      question: question.prompt,
+      learnerAnswer: selected.answer_text,
+    };
+  }
+  return null;
 }
 
 function groupCard(group: StoryGroup, onClick: () => void): HTMLButtonElement {

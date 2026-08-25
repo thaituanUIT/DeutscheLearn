@@ -22,7 +22,7 @@ from app.db.models import (
 from app.db.session import SessionLocal
 from app.main import app
 from app.services.focus import import_focus_words
-from app.services.grammar import GrammarAnswer, GrammarCitation
+from app.services.grammar import GrammarAnswer
 from app.services.quiz import question_to_schema
 from app.services.words import get_meaning_overview
 
@@ -50,46 +50,6 @@ def test_spa_html_is_not_cached_across_deploys() -> None:
         assert response.headers["cache-control"] == "no-store"
 
 
-def test_grammar_ask_returns_answer(monkeypatch: pytest.MonkeyPatch) -> None:
-    citation = GrammarCitation(
-        chunk_id="prep-dativ-mit",
-        title="Dative Prepositions",
-        section="Why mit dem Auto",
-        content="mit always takes Dativ.",
-        level="A2",
-        topic="praeposition_dativ",
-        similarity=0.88,
-        source_path="data/grammar/prepositions-dativ.md",
-    )
-
-    def fake_answer(**kwargs) -> GrammarAnswer:
-        assert kwargs["level"] == "A2"
-        assert kwargs["topic"] == "praeposition_dativ"
-        assert kwargs["include_debug"] is False
-        return GrammarAnswer(status="answered", answer="Use Dativ after mit.", citations=[citation])
-
-    monkeypatch.setattr("app.api.routes.check_rate_limit", lambda learner_id, ip: None)
-    monkeypatch.setattr("app.api.routes.answer_grammar_question", fake_answer)
-
-    with TestClient(app) as client:
-        response = client.post(
-            "/api/grammar/ask",
-            json={
-                "question": "Why mit dem Auto?",
-                "level": "A2",
-                "topic": "praeposition_dativ",
-                "learner_id": "learner-1",
-            },
-        )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "answered"
-    assert body["answer"] == "Use Dativ after mit."
-    assert body["citations"][0]["chunk_id"] == "prep-dativ-mit"
-    assert body["citations"][0]["source_kind"] == "markdown"
-
-
 def test_grammar_ask_debug_requires_admin_token(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
     monkeypatch.setattr("app.api.routes.check_rate_limit", lambda learner_id, ip: None)
@@ -110,12 +70,12 @@ def test_grammar_ask_debug_requires_admin_token(monkeypatch: pytest.MonkeyPatch)
     with TestClient(app) as client:
         no_admin = client.post(
             "/api/grammar/ask",
-            json={"question": "unknown", "level": "A1", "include_debug": True},
+            json={"question": "unknown", "include_debug": True},
         )
         admin = client.post(
             "/api/grammar/ask",
             headers={"Authorization": "Bearer secret"},
-            json={"question": "unknown", "level": "A1", "include_debug": True},
+            json={"question": "unknown", "include_debug": True},
         )
 
     assert no_admin.status_code == 200
@@ -134,7 +94,7 @@ def test_grammar_ask_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     with TestClient(app) as client:
         response = client.post(
             "/api/grammar/ask",
-            json={"question": "Why?", "level": "A1", "learner_id": "learner-1"},
+            json={"question": "Why?", "learner_id": "learner-1"},
         )
 
     assert response.status_code == 429

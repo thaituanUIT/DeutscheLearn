@@ -27,7 +27,6 @@ class Settings(BaseSettings):
     openrouter_app_title: str = "German Word Quiz"
     grammar_rate_limit_per_hour: int = 10
     grammar_similarity_threshold: float = 0.40
-    grammar_topic_boost: float = 0.04
     static_assets_enabled: bool = True
 
     @model_validator(mode="after")

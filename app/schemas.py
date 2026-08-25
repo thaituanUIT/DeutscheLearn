@@ -404,8 +404,6 @@ class StimulusImageUploadUrlOut(BaseModel):
 
 class GrammarAskIn(BaseModel):
     question: str = Field(min_length=1, max_length=1200)
-    level: str = Field(pattern="^(A1|A2|B1)$")
-    topic: str | None = Field(default=None, max_length=120)
     learner_id: str | None = Field(default=None, max_length=120)
     include_debug: bool = False
 
