@@ -94,14 +94,18 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
 
   const list = el("div", "grammar-message-list");
   const composer = el("div", "grammar-composer");
+  const inputWrap = el("div", "grammar-input-wrap");
   const textarea = document.createElement("textarea");
   textarea.className = "grammar-input";
   textarea.placeholder = "Ask a grammar question";
   textarea.rows = 1;
   textarea.maxLength = MAX_QUESTION_LENGTH;
   const counter = el("span", "grammar-counter");
-  const send = button("Send", "grammar-send");
-  composer.append(textarea, counter, send);
+  const send = button("↑", "grammar-send");
+  send.setAttribute("aria-label", "Send");
+  send.title = "Send";
+  inputWrap.append(textarea, counter, send);
+  composer.append(inputWrap);
   panel.append(header, list, composer);
   host.append(launcher, panel);
   root.append(host);
