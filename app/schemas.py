@@ -419,6 +419,9 @@ class GrammarCitationOut(BaseModel):
     topic: str
     similarity: float
     source_path: str
+    source_kind: str
+    page_start: int | None = None
+    page_end: int | None = None
 
 
 class GrammarAskOut(BaseModel):

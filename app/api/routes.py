@@ -165,6 +165,9 @@ def grammar_ask(
                 topic=citation.topic,
                 similarity=citation.similarity,
                 source_path=citation.source_path,
+                source_kind=citation.source_kind,
+                page_start=citation.page_start,
+                page_end=citation.page_end,
             )
             for citation in result.citations
         ],

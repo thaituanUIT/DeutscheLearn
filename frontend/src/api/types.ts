@@ -192,6 +192,9 @@ export type GrammarCitation = {
   topic: string;
   similarity: number;
   source_path: string;
+  source_kind: string;
+  page_start: number | null;
+  page_end: number | null;
 };
 
 export type GrammarAskResponse = {

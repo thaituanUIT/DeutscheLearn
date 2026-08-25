@@ -87,6 +87,7 @@ def test_grammar_ask_returns_answer(monkeypatch: pytest.MonkeyPatch) -> None:
     assert body["status"] == "answered"
     assert body["answer"] == "Use Dativ after mit."
     assert body["citations"][0]["chunk_id"] == "prep-dativ-mit"
+    assert body["citations"][0]["source_kind"] == "markdown"
 
 
 def test_grammar_ask_debug_requires_admin_token(monkeypatch: pytest.MonkeyPatch) -> None:

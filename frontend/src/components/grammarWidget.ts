@@ -348,13 +348,23 @@ function renderCitations(citations: GrammarCitation[]): HTMLElement {
   const wrap = el("div", "grammar-citations");
   for (const citation of citations) {
     const item = el("div", "grammar-citation");
-    const chip = button(`${citation.title}: ${citation.section}`, "grammar-citation-chip");
+    const chip = button(citationLabel(citation), "grammar-citation-chip");
     const source = el("p", "grammar-citation-source", citation.content);
     chip.addEventListener("click", () => item.classList.toggle("expanded"));
     item.append(chip, source);
     wrap.append(item);
   }
   return wrap;
+}
+
+function citationLabel(citation: GrammarCitation): string {
+  const page =
+    citation.page_start === null || citation.page_end === null
+      ? ""
+      : citation.page_start === citation.page_end
+        ? ` · p. ${citation.page_start}`
+        : ` · pp. ${citation.page_start}-${citation.page_end}`;
+  return `${citation.title}: ${citation.section}${page}`;
 }
 
 function renderLoading(): HTMLElement {

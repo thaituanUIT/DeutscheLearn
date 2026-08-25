@@ -34,6 +34,9 @@ class GrammarCitation:
     topic: str
     similarity: float
     source_path: str
+    source_kind: str = "markdown"
+    page_start: int | None = None
+    page_end: int | None = None
 
 
 @dataclass(frozen=True)
@@ -165,6 +168,7 @@ def retrieve_grammar_chunks(
     if db.bind is None or db.bind.dialect.name != "postgresql":
         raise GrammarUnavailableError("Grammar retrieval requires a Postgres pgvector database")
     embedding_literal = "[" + ",".join(f"{value:.8f}" for value in embedding) + "]"
+    allowed_levels = _levels_up_to(level)
     rows = db.execute(
         text(
             """
@@ -176,20 +180,27 @@ def retrieve_grammar_chunks(
                 level,
                 topic,
                 source_path,
+                source_kind,
+                page_start,
+                page_end,
                 1 - (embedding <=> cast(:embedding as extensions.vector)) as similarity,
                 (
                     1 - (embedding <=> cast(:embedding as extensions.vector))
-                    + case when :topic is not null and topic = :topic then :topic_boost else 0 end
+                    + case
+                        when cast(:topic as text) is not null and topic = cast(:topic as text)
+                        then :topic_boost
+                        else 0
+                    end
                 ) as score
             from grammar_chunks
-            where level = :level
+            where level = any(cast(:levels as text[]))
             order by score desc
             limit 12
             """
         ),
         {
             "embedding": embedding_literal,
-            "level": level,
+            "levels": allowed_levels,
             "topic": topic,
             "topic_boost": settings.grammar_topic_boost,
         },
@@ -204,9 +215,19 @@ def retrieve_grammar_chunks(
             topic=str(row["topic"]),
             similarity=float(row["similarity"]),
             source_path=str(row["source_path"]),
+            source_kind=str(row["source_kind"]),
+            page_start=int(row["page_start"]) if row["page_start"] is not None else None,
+            page_end=int(row["page_end"]) if row["page_end"] is not None else None,
         )
         for row in rows
     ]
+
+
+def _levels_up_to(level: str) -> list[str]:
+    levels = ["A1", "A2", "B1"]
+    if level not in levels:
+        return [level]
+    return levels[: levels.index(level) + 1]
 
 
 def generate_answer(
@@ -219,7 +240,7 @@ def generate_answer(
     if not settings.openrouter_api_key:
         raise GrammarUnavailableError("OPENROUTER_API_KEY is not configured")
     context = "\n\n".join(
-        f"[{index}] {citation.title} / {citation.section}\n{citation.content}"
+        f"[{index}] {citation_label(citation)}\n{citation.content}"
         for index, citation in enumerate(citations, start=1)
     )
     payload = {
@@ -328,6 +349,9 @@ def _citation_to_dict(citation: GrammarCitation) -> dict[str, Any]:
         "topic": citation.topic,
         "similarity": citation.similarity,
         "source_path": citation.source_path,
+        "source_kind": citation.source_kind,
+        "page_start": citation.page_start,
+        "page_end": citation.page_end,
     }
 
 
@@ -341,6 +365,9 @@ def _citation_from_dict(data: dict[str, Any]) -> GrammarCitation:
         topic=str(data["topic"]),
         similarity=float(data.get("similarity", 1.0)),
         source_path=str(data.get("source_path", "")),
+        source_kind=str(data.get("source_kind", "markdown")),
+        page_start=int(data["page_start"]) if data.get("page_start") is not None else None,
+        page_end=int(data["page_end"]) if data.get("page_end") is not None else None,
     )
 
 
@@ -348,3 +375,13 @@ def _citation_debug(citation: GrammarCitation) -> dict[str, Any]:
     data = _citation_to_dict(citation)
     data["content"] = citation.content[:240]
     return data
+
+
+def citation_label(citation: GrammarCitation) -> str:
+    page_label = ""
+    if citation.page_start is not None and citation.page_end is not None:
+        if citation.page_start == citation.page_end:
+            page_label = f" · p. {citation.page_start}"
+        else:
+            page_label = f" · pp. {citation.page_start}-{citation.page_end}"
+    return f"{citation.title} / {citation.section}{page_label}"
