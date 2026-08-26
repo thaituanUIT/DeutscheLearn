@@ -26,3 +26,5 @@ services:
         sync: false
       - key: OPENROUTER_CHAT_MODEL
         value: google/gemma-4-31b-it:free
+      - key: DATABASE_URL
+        sync: false
