@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = "German Word Quiz"
+    app_name: str = "DeutscheLearn"
     database_url: str = "sqlite:///./quiz.db"
     environment: str = "development"
     cookie_secure: bool = False
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str | None = None
     openrouter_chat_model: str = "google/gemma-4-31b-it:free"
     openrouter_http_referer: str | None = None
-    openrouter_app_title: str = "German Word Quiz"
+    openrouter_app_title: str = "DeutscheLearn"
     grammar_rate_limit_per_hour: int = 10
     grammar_similarity_threshold: float = 0.40
     static_assets_enabled: bool = True

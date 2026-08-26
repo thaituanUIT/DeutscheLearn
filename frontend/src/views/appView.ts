@@ -34,7 +34,7 @@ export async function renderApp(root: HTMLElement): Promise<void> {
     clear(root);
     const shell = el("div", "shell");
     shell.append(
-      el("h1", "brand", "German Word Quiz"),
+      el("h1", "brand", "DeutscheLearn"),
       el("div", "error", error instanceof Error ? error.message : "Could not load app"),
     );
     root.append(shell);
@@ -70,7 +70,7 @@ function draw(
     if (syncRoute) writeRoute("home");
     grammarWidget?.updateContext({ route: "home", passage: null, wrongAnswer: null });
     layout.className = "layout home-layout";
-    headerStart.replaceChildren(el("h1", "brand", "German Word Quiz"));
+    headerStart.replaceChildren(el("h1", "brand", "DeutscheLearn"));
     mainHost.replaceChildren(homeView({ onSelectMode: showMode }));
     sidebar.replaceChildren(wordOfDayView(wordOfDay), leaderboardHost);
     layout.replaceChildren(mainHost, sidebar);

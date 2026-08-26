@@ -1,7 +1,7 @@
 [project]
-name = "german-word-quiz"
+name = "deutschelearn"
 version = "0.1.0"
-description = "Anonymous German word quiz with endless leaderboard"
+description = "Anonymous German language learning app with multiple learning modes"
 requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.16.0",

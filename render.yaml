@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: german-word-quiz
+    name: deutschelearn
     env: python
     plan: free
     buildCommand: uv sync --locked --no-dev && npm install --prefix frontend && npm run build --prefix frontend
@@ -26,7 +26,3 @@ services:
         sync: false
       - key: OPENROUTER_CHAT_MODEL
         value: google/gemma-4-31b-it:free
-
-databases:
-  - name: german-word-quiz-db
-    plan: free
