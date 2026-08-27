@@ -14,6 +14,7 @@ import type {
   GrammarPassageContext,
   GrammarWrongAnswerContext,
 } from "../components/grammarWidget";
+import { readingText } from "../components/readingText";
 import type {
   StoryAnswer,
   StoryGroup,
@@ -335,7 +336,7 @@ function storyContent(passage: StoryPassage): HTMLElement {
   content.append(
     el("div", "question-type", passage.topic ? `${passage.level} · ${topicLabel(passage.topic)}` : passage.level),
     el("h2", "story-title", passage.title),
-    el("p", "story-text", passage.passage_text),
+    readingText(passage.passage_text),
   );
   return content;
 }
@@ -366,7 +367,7 @@ function sourceChoiceContent(passage: StoryPassage): HTMLElement {
   });
 
   if (sources.length === 0) {
-    grid.append(el("p", "story-text", passage.passage_text));
+    grid.append(readingText(passage.passage_text));
   }
   content.append(grid);
   return content;

@@ -733,7 +733,9 @@ function renderPassageEditor(
   renderForm();
 
   const header = el("div", "admin-editor-header");
-  header.append(el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title));
+  const heading = el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title);
+  heading.contentEditable = "false";
+  header.append(heading);
   if (!state.isNew) {
     const remove = button("Delete", "admin-text-button danger-text-button");
     remove.addEventListener("click", async () => {
@@ -1244,10 +1246,10 @@ function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): 
     exercise.append(adGrid);
     body.append(exercise);
   }
-  for (const question of passage.questions) {
+  for (const [index, question] of passage.questions.entries()) {
     const item = el("div", "story-question-block admin-preview-question");
     item.append(
-      el("div", "question-type", "Question 1"),
+      el("div", "question-type", `Question ${index + 1}`),
       el("h3", "story-question-title", question.prompt),
     );
     const answers = el("div", "story-answer-list");

@@ -1,5 +1,6 @@
 import type { StimulusContent, StimulusRenderKind } from "../api/types";
 import { button } from "../components/button";
+import { readingText } from "../components/readingText";
 import { el } from "../utils/dom";
 import { prepareStimulusImage, uploadPreparedStimulusImage } from "./uploads";
 
@@ -390,7 +391,7 @@ export function stimulusRenderer(stimulus: StimulusViewModel): HTMLElement {
   }
 
   const fallback = el("div", "stimulus-surface stimulus-legacy");
-  fallback.append(el("strong", "", stimulus.title), el("p", "", stimulus.body));
+  fallback.append(el("strong", "", stimulus.title), readingText(stimulus.body, "stimulus-reading-text"));
   figure.append(fallback);
   return figure;
 }
