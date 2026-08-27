@@ -126,14 +126,18 @@ def get_focus_topics(db: Session, level: str) -> list[dict[str, int | str]]:
     ]
 
 
-def get_focus_cards(db: Session, level: str, topic: str) -> list[dict[str, str | None]]:
-    rows = db.execute(
+def get_focus_cards(db: Session, level: str | None = None, topic: str | None = None) -> list[dict[str, str | None]]:
+    query = (
         select(WordFocus, Word, Topic)
         .join(Word, Word.id == WordFocus.word_id)
         .join(Topic, Topic.id == WordFocus.topic_id)
-        .where(WordFocus.level == level, Topic.slug == topic)
         .order_by(Word.lemma)
-    ).all()
+    )
+    if level:
+        query = query.where(WordFocus.level == level)
+    if topic:
+        query = query.where(Topic.slug == topic)
+    rows = db.execute(query).all()
     return [
         {
             "word": word.word,

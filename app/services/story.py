@@ -143,7 +143,7 @@ def get_goethe_parts(db: Session, level: str) -> list[dict[str, int | str]]:
 
 def get_story_passages(
     db: Session,
-    level: str,
+    level: str | None = None,
     group: str = "general",
     part: str | None = None,
 ) -> list[dict[str, int | str | None]]:
@@ -152,14 +152,17 @@ def get_story_passages(
         .group_by(Item.stimulus_id)
         .subquery()
     )
-    rows = db.execute(
+    query = (
         select(Stimulus, func.coalesce(question_counts.c.question_count, 0))
         .outerjoin(question_counts, question_counts.c.stimulus_id == Stimulus.id)
-        .where(Stimulus.collection == group, Stimulus.level == level, Stimulus.kind != "ad")
+        .where(Stimulus.collection == group, Stimulus.kind != "ad")
         .where(Stimulus.status == "published")
         .where(Stimulus.teil == part if part else Stimulus.teil.is_(None))
         .order_by(Stimulus.sort_order, Stimulus.title)
-    ).all()
+    )
+    if level:
+        query = query.where(Stimulus.level == level)
+    rows = db.execute(query).all()
     return [
         {
             "id": passage.id,
@@ -174,6 +177,29 @@ def get_story_passages(
         }
         for passage, question_count in rows
     ]
+
+
+def get_all_story_passages(
+    db: Session,
+    level: str | None = None,
+    group: str | None = None,
+    part: str | None = None,
+) -> list[Stimulus]:
+    query = (
+        select(Stimulus)
+        .options(selectinload(Stimulus.items).selectinload(Item.options).selectinload(ItemOption.ref_stimulus))
+        .where(Stimulus.kind != "ad", Stimulus.status == "published")
+        .order_by(Stimulus.collection, Stimulus.level, Stimulus.teil, Stimulus.sort_order, Stimulus.title)
+    )
+    if group:
+        query = query.where(Stimulus.collection == group)
+    if level:
+        query = query.where(Stimulus.level == level)
+    if part:
+        query = query.where(Stimulus.teil == part)
+    elif group == "general":
+        query = query.where(Stimulus.teil.is_(None))
+    return list(db.scalars(query).all())
 
 
 def get_story_passage(db: Session, passage_id: str) -> Stimulus | None:

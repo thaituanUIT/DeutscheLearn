@@ -1,4 +1,11 @@
-import { getFocusCards, getFocusLevels, getFocusRevision, getFocusTopics } from "../api/client";
+import {
+  focusCardsFromWords,
+  focusLevelsFromWords,
+  focusRevisionFromWords,
+  focusTopicsFromWords,
+  getFocusWordsCorpus,
+  shuffle,
+} from "../api/queryClient";
 import type { FocusCard, FocusLevel, FocusRevisionQuestion, FocusTopic } from "../api/types";
 import { button } from "../components/button";
 import { el } from "../utils/dom";
@@ -19,7 +26,7 @@ async function renderLevels(section: HTMLElement, options: FocusViewOptions): Pr
   options.onBackChange(options.onBack);
   section.replaceChildren(el("p", "prompt", "Loading focus levels..."));
   try {
-    const levels = await getFocusLevels();
+    const levels = focusLevelsFromWords(await getFocusWordsCorpus());
     const intro = el("div");
     intro.append(
       el("div", "question-type", "Focus mode"),
@@ -45,7 +52,7 @@ async function renderTopics(
   options.onBackChange(() => renderLevels(section, options));
   section.replaceChildren(el("p", "prompt", "Loading topics..."));
   try {
-    const topics = await getFocusTopics(level);
+    const topics = focusTopicsFromWords(await getFocusWordsCorpus(), level);
     const intro = el("div");
     intro.append(
       el("div", "question-type", level),
@@ -72,7 +79,7 @@ async function renderFlashcards(
   options.onBackChange(() => renderTopics(section, level, options));
   section.replaceChildren(el("p", "prompt", "Loading flashcards..."));
   try {
-    const cards = await getFocusCards(level, topic.topic);
+    const cards = shuffle(focusCardsFromWords(await getFocusWordsCorpus(), level, topic.topic));
     renderFlashcard(section, cards, 0, level, topic, options);
   } catch (error) {
     options.onError(error instanceof Error ? error.message : "Could not load flashcards");
@@ -88,7 +95,8 @@ async function renderRevision(
   options.onBackChange(() => renderFlashcards(section, level, topic, options));
   section.replaceChildren(el("p", "prompt", "Loading revision quiz..."));
   try {
-    const questions = await getFocusRevision(level, topic.topic);
+    const words = await getFocusWordsCorpus();
+    const questions = focusRevisionFromWords(focusCardsFromWords(words, level, topic.topic), words);
     renderRevisionQuestion(section, questions, 0, 0, () =>
       renderRevision(section, level, topic, options),
     );

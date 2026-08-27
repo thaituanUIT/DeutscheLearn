@@ -1,11 +1,15 @@
 import {
-  getStoryGroups,
-  getStoryLevels,
-  getStoryParts,
-  getStoryPassage,
-  getStoryPassages,
   submitStoryAnswer,
 } from "../api/client";
+import {
+  getCachedStoryPassages,
+  getStoryCorpus,
+  storyGroupsFromCorpus,
+  storyLevelsFromCorpus,
+  storyPartsFromCorpus,
+  storyPassageFromCorpus,
+  storyPassageSummariesFromCorpus,
+} from "../api/queryClient";
 import type {
   GrammarPassageContext,
   GrammarWrongAnswerContext,
@@ -54,7 +58,7 @@ async function renderStoryGroups(section: HTMLElement, options: StoryViewOptions
   options.onBackChange(options.onBack);
   section.replaceChildren(el("p", "prompt", "Loading story topics..."));
   try {
-    const groups = await getStoryGroups();
+    const groups = storyGroupsFromCorpus(await getStoryCorpus());
     const intro = el("div");
     intro.append(
       el("div", "question-type", "Story mode"),
@@ -82,7 +86,7 @@ async function renderStoryLevels(
   options.onBackChange(() => renderStoryGroups(section, options));
   section.replaceChildren(el("p", "prompt", "Loading story levels..."));
   try {
-    const levels = await getStoryLevels(group);
+    const levels = storyLevelsFromCorpus(await getStoryCorpus(), group);
     const intro = el("div");
     intro.append(
       el("div", "question-type", groupLabel(group)),
@@ -114,7 +118,7 @@ async function renderStoryParts(
   options.onBackChange(() => renderStoryLevels(section, "goethe", options));
   section.replaceChildren(el("p", "prompt", "Loading Goethe parts..."));
   try {
-    const parts = await getStoryParts(level);
+    const parts = storyPartsFromCorpus(await getStoryCorpus(), level);
     const intro = el("div");
     intro.append(
       el("div", "question-type", `Goethe-Institut · ${level}`),
@@ -144,14 +148,18 @@ async function renderStoryPassages(
   options.onBackChange(() =>
     part ? renderStoryParts(section, level, options) : renderStoryLevels(section, group, options),
   );
-  section.replaceChildren(el("p", "prompt", "Loading stories..."));
+  const intro = storyPassagesIntro(group, level, part);
+  const hasPreviousList = section.querySelector(".topics-grid") !== null;
+  if (!getCachedStoryPassages()) {
+    if (hasPreviousList) {
+      section.classList.add("story-list-updating");
+    } else {
+      section.replaceChildren(intro, passageSkeletonGrid());
+    }
+  }
   try {
-    const passages = await getStoryPassages(level, group, part ?? undefined);
-    const intro = el("div");
-    intro.append(
-      el("div", "question-type", part ? `${groupLabel(group)} · ${level} · ${partLabel(part)}` : level),
-      el("h2", "focus-title", group === "goethe" ? "Choose an Übung" : "Choose a story"),
-    );
+    const passages = storyPassageSummariesFromCorpus(await getStoryCorpus(), group, level, part);
+    section.classList.remove("story-list-updating");
 
     const grid = el("div", "focus-grid topics-grid");
     for (const passage of passages) {
@@ -185,7 +193,8 @@ async function renderStoryReader(
   options.onBackChange(() => renderStoryPassages(section, group, level, part, options));
   section.replaceChildren(el("p", "prompt", "Loading story..."));
   try {
-    const passage = await getStoryPassage(passageId);
+    const passage = storyPassageFromCorpus(await getStoryCorpus(), passageId);
+    if (!passage) throw new Error("Story passage not found");
     options.onGrammarContextChange({
       passage: { title: passage.title, text: passage.passage_text },
       wrongAnswer: null,
@@ -460,6 +469,33 @@ function passageCard(passage: StoryPassageSummary, onClick: () => void): HTMLBut
     el("span", "", `${passage.question_count} questions`),
   );
   return card;
+}
+
+function storyPassagesIntro(
+  group: StoryGroup["group"],
+  level: StoryLevel["level"],
+  part: StoryPart["part"] | null,
+): HTMLElement {
+  const intro = el("div");
+  intro.append(
+    el("div", "question-type", part ? `${groupLabel(group)} · ${level} · ${partLabel(part)}` : level),
+    el("h2", "focus-title", group === "goethe" ? "Choose an Übung" : "Choose a story"),
+  );
+  return intro;
+}
+
+function passageSkeletonGrid(): HTMLElement {
+  const grid = el("div", "focus-grid topics-grid story-skeleton-grid");
+  for (let index = 0; index < 4; index += 1) {
+    const card = el("div", "focus-option topic-option story-option passage-card-skeleton");
+    card.append(
+      el("span", "skeleton-line skeleton-title"),
+      el("span", "skeleton-line skeleton-meta"),
+      el("span", "skeleton-line skeleton-meta short"),
+    );
+    grid.append(card);
+  }
+  return grid;
 }
 
 function groupLabel(group: StoryGroup["group"]): string {

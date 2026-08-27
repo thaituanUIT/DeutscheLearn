@@ -1,6 +1,6 @@
+import mimetypes
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-import mimetypes
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException

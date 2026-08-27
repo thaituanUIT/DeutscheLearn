@@ -1,4 +1,5 @@
 import { getCurrentPlayer, getLeaderboard, getWordOfDay } from "../api/client";
+import { prefetchFocusWords, prefetchStoryPassages } from "../api/queryClient";
 import type { LeaderboardEntry, Player, WordOfDay } from "../api/types";
 import { button } from "../components/button";
 import {
@@ -21,6 +22,8 @@ const appRoutes = new Set<AppRoute>(["home", "endless", "practice", "timed", "fo
 export async function renderApp(root: HTMLElement): Promise<void> {
   clear(root);
   root.append(el("div", "shell", "Loading..."));
+  void prefetchStoryPassages();
+  void prefetchFocusWords();
 
   try {
     const [player, leaderboard, wordOfDay] = await Promise.all([

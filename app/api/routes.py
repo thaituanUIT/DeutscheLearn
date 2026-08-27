@@ -59,7 +59,6 @@ from app.schemas import (
     StoryOptionStimulusOut,
     StoryPartOut,
     StoryPassageOut,
-    StoryPassageSummaryOut,
     StoryQuestionOut,
     TimedAnswerOut,
     TimedStartOut,
@@ -81,12 +80,12 @@ from app.services.grammar import (
 from app.services.quiz import create_question
 from app.services.story import (
     get_correct_story_answer,
+    get_all_story_passages,
     get_goethe_parts,
     get_story_answer,
     get_story_groups,
     get_story_levels,
     get_story_passage,
-    get_story_passages,
 )
 from app.services.words import get_meaning_overview, get_word_of_day
 
@@ -219,8 +218,8 @@ def focus_topic_aliases() -> list[FocusTopicAliasOut]:
 
 @router.get("/focus/cards", response_model=list[FocusCardOut])
 def focus_cards(
-    level: str = Query(pattern="^(A1|A2|B1|B2)$"),
-    topic: str = Query(min_length=1, max_length=80),
+    level: str | None = Query(default=None, pattern="^(A1|A2|B1|B2)$"),
+    topic: str | None = Query(default=None, min_length=1, max_length=80),
     db: Session = Depends(get_db),
 ) -> list[FocusCardOut]:
     return [FocusCardOut(**card) for card in get_focus_cards(db, level, topic)]
@@ -259,17 +258,14 @@ def story_parts(
     return [StoryPartOut(**part) for part in get_goethe_parts(db, level)]
 
 
-@router.get("/story/passages", response_model=list[StoryPassageSummaryOut])
+@router.get("/story/passages", response_model=list[StoryPassageOut])
 def story_passages(
-    group: str = Query(default="general", pattern="^(general|goethe)$"),
-    level: str = Query(pattern="^(A1|A2|B1|B2)$"),
+    group: str | None = Query(default=None, pattern="^(general|goethe)$"),
+    level: str | None = Query(default=None, pattern="^(A1|A2|B1|B2)$"),
     part: str | None = Query(default=None, pattern="^teil_[1-5]$"),
     db: Session = Depends(get_db),
-) -> list[StoryPassageSummaryOut]:
-    return [
-        StoryPassageSummaryOut(**passage)
-        for passage in get_story_passages(db, level, group, part)
-    ]
+) -> list[StoryPassageOut]:
+    return [_story_passage_out(passage) for passage in get_all_story_passages(db, level, group, part)]
 
 
 @router.get("/story/passages/{passage_id}", response_model=StoryPassageOut)

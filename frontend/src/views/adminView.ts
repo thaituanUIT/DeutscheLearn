@@ -11,6 +11,7 @@ import {
   updateAdminReadingPassage,
   updateAdminWord,
 } from "../api/client";
+import { invalidateFocusWords, invalidateStoryPassages } from "../api/queryClient";
 import type {
   AdminFocusEntry,
   AdminReadingAdStimulus,
@@ -286,6 +287,7 @@ function renderWordEditor(
       state.selected = state.isNew
         ? await createAdminWord(token, payload)
         : await updateAdminWord(token, payload);
+      await invalidateFocusWords();
       state.isNew = false;
       setSavedStatus(status);
       await onSaved();
@@ -334,6 +336,7 @@ function renderWordEditor(
       if (!window.confirm(`Delete ${state.selected.word}?`)) return;
       try {
         await deleteAdminWord(token, state.selected.word);
+        await invalidateFocusWords();
         state.selected = emptyWord();
         state.isNew = true;
         await onSaved();
@@ -687,6 +690,7 @@ function renderPassageEditor(
       state.selected = state.isNew
         ? await createAdminReadingPassage(token, payload)
         : await updateAdminReadingPassage(token, payload);
+      await invalidateStoryPassages();
       state.isNew = false;
       setSavedStatus(status);
       await onSaved();
@@ -736,6 +740,7 @@ function renderPassageEditor(
       if (!state.selected.id || !window.confirm(`Delete ${state.selected.title}?`)) return;
       try {
         await deleteAdminReadingPassage(token, state.selected.id);
+        await invalidateStoryPassages();
         state.selected = emptyPassage(state.activeGroup);
         state.isNew = true;
         await onSaved();

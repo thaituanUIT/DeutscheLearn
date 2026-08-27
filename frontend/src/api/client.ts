@@ -165,6 +165,10 @@ export function getFocusTopicAliases(): Promise<FocusTopicAlias[]> {
   return request<FocusTopicAlias[]>("/api/focus/topic-aliases");
 }
 
+export function fetchAllWords(): Promise<FocusCard[]> {
+  return request<FocusCard[]>("/api/focus/cards");
+}
+
 export function getFocusCards(level: string, topic: string): Promise<FocusCard[]> {
   const params = new URLSearchParams({ level, topic });
   return request<FocusCard[]>(`/api/focus/cards?${params.toString()}`);
@@ -185,6 +189,10 @@ export function getStoryLevels(group = "general"): Promise<StoryLevel[]> {
 
 export function getStoryParts(level: string): Promise<StoryPart[]> {
   return request<StoryPart[]>(`/api/story/parts?level=${encodeURIComponent(level)}`);
+}
+
+export function fetchAllPassages(): Promise<StoryPassage[]> {
+  return request<StoryPassage[]>("/api/story/passages");
 }
 
 export function getStoryPassages(
