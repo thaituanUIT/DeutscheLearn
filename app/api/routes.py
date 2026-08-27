@@ -79,8 +79,8 @@ from app.services.grammar import (
 )
 from app.services.quiz import create_question
 from app.services.story import (
-    get_correct_story_answer,
     get_all_story_passages,
+    get_correct_story_answer,
     get_goethe_parts,
     get_story_answer,
     get_story_groups,
