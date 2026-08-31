@@ -1613,6 +1613,7 @@ button {
   align-content: start;
   gap: 8px;
   padding-block: 16px;
+  padding-inline: 0;
   scroll-padding-block: 16px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1624,13 +1625,24 @@ button {
   align-content: start;
   width: 100%;
   min-height: 0;
-  padding: 10px;
+  padding: 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   color: var(--text);
+  font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.admin-item[data-selected="true"] {
+  border-color: var(--brand-secondary);
+  background: color-mix(in srgb, var(--accent-subtle) 64%, var(--surface));
+}
+
+.admin-item:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--focus-ring) 25%, var(--transparent));
+  outline-offset: 2px;
 }
 
 .admin-item-meta {
@@ -1810,7 +1822,7 @@ button {
 .admin-textarea {
   margin: 0;
   padding-bottom: var(--admin-space-field);
-  resize: vertical;
+  resize: none;
   line-height: 1.45;
   overflow-y: hidden;
 }
@@ -2159,6 +2171,7 @@ button {
   font-size: 15px;
   line-height: 1.25;
   font-weight: 400;
+  white-space: normal;
 }
 
 .admin-item-title-text,

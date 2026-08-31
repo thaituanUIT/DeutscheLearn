@@ -82,6 +82,12 @@ type ServerValidationIssue = {
   loc?: Array<string | number>;
   msg?: string;
 };
+type ListCardProps = {
+  title: string;
+  meta: string;
+  selected: boolean;
+  onSelect: () => void;
+};
 
 const READING_SHAPE_TABLE: Record<AdminReadingGroup, Partial<Record<AdminLevel, Partial<Record<AdminGoethePart, ReadingShape>>>>> = {
   general: {},
@@ -256,21 +262,19 @@ function renderWordList(
 
   const list = el("div", "admin-items");
   for (const word of state.words) {
-    const item = button("", "admin-item");
-    const focusCount = formatCount(word.focus_entries.length, "focus entry", {
-      plural: "focus entries",
-      zeroLabel: "No",
-    });
-    item.append(
-      adminItemTitle(word.article ? `${word.article} ${word.word}` : word.word, null, "Untitled word"),
-      el("span", "admin-item-meta", `${word.part_of_speech} · ${focusCount}`),
+    const focusCount = word.focus_entries.length;
+    list.append(
+      ListCard({
+        title: word.article ? `${word.article} ${word.word}` : word.word,
+        meta: `${word.part_of_speech} · ${pluralize(focusCount, "focus entry", "focus entries")}`,
+        selected: !state.isNew && state.selected.word === word.word,
+        onSelect: () => {
+          state.selected = cloneWord(word);
+          state.isNew = false;
+          onSelect();
+        },
+      }),
     );
-    item.addEventListener("click", () => {
-      state.selected = cloneWord(word);
-      state.isNew = false;
-      onSelect();
-    });
-    list.append(item);
   }
 
   if (state.words.length === 0) {
@@ -473,24 +477,21 @@ function renderPassageList(
   const list = el("div", "admin-items");
   const filteredPassages = state.passages.filter((passage) => matchesPassageSearch(passage, state.search));
   for (const passage of filteredPassages) {
-    const item = button("", "admin-item");
     const questionCount = formatCount(passage.question_count, "question", { zeroLabel: "No" });
-    item.append(
-      adminItemTitle(passage.title, passage.status),
-      el(
-        "span",
-        "admin-item-meta",
-        `${readingGroupLabel(passage.group)} · ${passage.level}${
+    list.append(
+      ListCard({
+        title: passage.title,
+        meta: `${readingGroupLabel(passage.group)} · ${passage.level}${
           passage.part ? ` · ${partLabel(passage.part)}` : ""
         } · ${questionCount}`,
-      ),
+        selected: !state.isNew && state.selected.id === passage.id,
+        onSelect: async () => {
+          state.selected = await getAdminReadingPassage(token, passage.id);
+          state.isNew = false;
+          onSelect();
+        },
+      }),
     );
-    item.addEventListener("click", async () => {
-      state.selected = await getAdminReadingPassage(token, passage.id);
-      state.isNew = false;
-      onSelect();
-    });
-    list.append(item);
   }
 
   const header = el("div", "admin-list-header");
@@ -1283,12 +1284,13 @@ function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): 
   const label = el("h3", "admin-preview-label", "Preview");
   const frame = el("div", "admin-preview-frame");
   const text = el("div", "admin-preview-text");
-  if (!isSourceChoice) {
+  if (!isSourceChoice && hasStimulusContent(stimulusFromPassage(passage))) {
     text.append(stimulusRenderer(stimulusFromPassage(passage)));
   }
 
   const body = el("div", "admin-preview-body");
-  if (isSourceChoice) {
+  const meaningfulQuestions = passage.questions.filter(hasQuestionContent);
+  if (isSourceChoice && hasSourceChoicePreviewContent(passage, meaningfulQuestions)) {
     const exercise = el("article", "story-passage goethe-exercise source-choice-exercise admin-source-preview");
     exercise.append(
       el("div", "question-type", `${passage.level} · ${partLabel(passage.part ?? "teil_2")}`),
@@ -1296,31 +1298,31 @@ function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): 
       el("p", "goethe-task-prompt", passage.passage_text),
     );
     const adGrid = el("div", "source-card-grid");
-    for (const ad of passage.ad_stimuli) {
+    for (const ad of passage.ad_stimuli.filter((ad) => hasStimulusContent(stimulusFromAd(ad)))) {
       const card = el("section", "source-card");
       card.append(el("span", "source-pill", ad.key), stimulusRenderer(stimulusFromAd(ad)));
       adGrid.append(card);
     }
-    exercise.append(adGrid);
+    if (adGrid.childElementCount) exercise.append(adGrid);
     body.append(exercise);
   }
-  for (const [index, question] of passage.questions.entries()) {
+  for (const [index, question] of meaningfulQuestions.entries()) {
     const item = el("div", "story-question-block admin-preview-question");
     item.append(
       el("div", "question-type", `Question ${index + 1}`),
       el("h3", "story-question-title", question.prompt),
     );
     const answers = el("div", "story-answer-list");
-    for (const answer of question.answers) {
+    for (const answer of question.answers.filter((answer) => answer.answer_text.trim())) {
       const option = button(answer.answer_text, "answer-option");
       option.type = "button";
       answers.append(option);
     }
-    item.append(answers);
+    if (answers.childElementCount) item.append(answers);
     body.append(item);
   }
   if (!text.childElementCount && !body.childElementCount) {
-    frame.append(el("p", "admin-preview-empty", "Preview content appears here."));
+    frame.append(el("p", "admin-preview-empty", "Preview appears here as the passage is written."));
   } else {
     frame.append(text, body);
   }
@@ -1698,6 +1700,21 @@ function segmentedControl<T extends string>({
   return wrap;
 }
 
+function ListCard({ title, meta, selected, onSelect }: ListCardProps): HTMLButtonElement {
+  const item = button("", "admin-item");
+  item.type = "button";
+  item.dataset.selected = selected ? "true" : "false";
+  item.append(adminItemTitle(title, null), el("span", "admin-item-meta", meta));
+  item.addEventListener("click", () => {
+    void onSelect();
+  });
+  return item;
+}
+
+function pluralize(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 function partLabel(part: AdminGoethePart): string {
   return part.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -1755,6 +1772,45 @@ function stimulusFromAd(ad: AdminReadingAdStimulus): StimulusViewModel {
     image_path: ad.image_path,
     transcript: ad.transcript,
   };
+}
+
+function hasStimulusContent(stimulus: StimulusViewModel): boolean {
+  return Boolean(
+    stimulus.title.trim()
+      || stimulus.body.trim()
+      || stimulus.context_label?.trim()
+      || stimulus.image_url?.trim()
+      || stimulus.image_path?.trim()
+      || stimulus.transcript?.trim()
+      || Object.values(stimulus.content ?? {}).some((value) => hasRenderableValue(value)),
+  );
+}
+
+function hasRenderableValue(value: unknown): boolean {
+  if (typeof value === "string") return Boolean(value.trim());
+  if (Array.isArray(value)) return value.some(hasRenderableValue);
+  if (value && typeof value === "object") return Object.values(value).some(hasRenderableValue);
+  return value !== null && value !== undefined;
+}
+
+function hasQuestionContent(question: AdminReadingQuestion): boolean {
+  return Boolean(
+    question.prompt.trim()
+      || question.explanation?.trim()
+      || question.answers.some((answer) => answer.answer_text.trim()),
+  );
+}
+
+function hasSourceChoicePreviewContent(
+  passage: AdminReadingPassage,
+  meaningfulQuestions: AdminReadingQuestion[],
+): boolean {
+  return Boolean(
+    passage.title.trim()
+      || passage.passage_text.trim()
+      || meaningfulQuestions.length
+      || passage.ad_stimuli.some((ad) => hasStimulusContent(stimulusFromAd(ad))),
+  );
 }
 
 function confirmShapeSwitch(
