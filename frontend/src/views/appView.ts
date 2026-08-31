@@ -1,13 +1,13 @@
 import { getCurrentPlayer, getLeaderboard, getWordOfDay } from "../api/client";
 import { prefetchFocusWords, prefetchStoryPassages } from "../api/queryClient";
 import type { LeaderboardEntry, Player, WordOfDay } from "../api/types";
+import { appHeader } from "../components/appHeader";
 import { button } from "../components/button";
 import {
   mountGrammarWidget,
   type GrammarPassageContext,
   type GrammarWrongAnswerContext,
 } from "../components/grammarWidget";
-import { themeToggle } from "../components/themeToggle";
 import { setPlayer } from "../state/playerStore";
 import { clear, el } from "../utils/dom";
 import { focusView } from "./focusView";
@@ -56,13 +56,9 @@ function draw(
   let grammarWidget: ReturnType<typeof mountGrammarWidget> | null = null;
 
   const shell = el("div", "shell");
-  const header = el("header", "topbar");
-  const headerStart = el("div", "header-start");
-  const headerEnd = el("div", "header-end");
   const playerNode = el("div", "player");
   playerNode.append(el("span", "muted", "Anonymous learner"), el("strong", "", player.display_name));
-  headerEnd.append(themeToggle(), playerNode);
-  header.append(headerStart, headerEnd);
+  const { header, headerStart } = appHeader("DeutscheLearn", playerNode);
 
   const layout = el("div", "layout");
   const mainHost = el("div");

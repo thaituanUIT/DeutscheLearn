@@ -1,3 +1,5 @@
+import { QueryObserver, keepPreviousData } from "@tanstack/query-core";
+
 import {
   createAdminReadingPassage,
   createAdminWord,
@@ -11,7 +13,13 @@ import {
   updateAdminReadingPassage,
   updateAdminWord,
 } from "../api/client";
-import { invalidateFocusWords, invalidateStoryPassages } from "../api/queryClient";
+import {
+  PASSAGES_QUERY_KEY,
+  WORDS_QUERY_KEY,
+  invalidateFocusWords,
+  invalidateStoryPassages,
+  queryClient,
+} from "../api/queryClient";
 import type {
   AdminFocusEntry,
   AdminReadingAdStimulus,
@@ -21,6 +29,7 @@ import type {
   AdminWord,
   FocusTopicAlias,
 } from "../api/types";
+import { appHeader } from "../components/appHeader";
 import { button } from "../components/button";
 import {
   createStimulusEditor,
@@ -37,6 +46,7 @@ const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
 const READING_GROUPS = ["general", "goethe"] as const;
 const GOETHE_PARTS = ["teil_1", "teil_2", "teil_3", "teil_4", "teil_5"] as const;
+const ADMIN_STALE_TIME = 30_000;
 const GERMAN_ARTICLES = ["der", "die", "das"] as const;
 const PARTS_OF_SPEECH = [
   "noun",
@@ -107,16 +117,16 @@ export function renderAdminApp(root: HTMLElement): void {
 }
 
 function adminHeader(token: string): HTMLElement {
-  const header = el("header", "topbar");
-  header.append(el("h1", "brand", "Admin"));
+  const actions = el("div", "admin-header-actions");
   if (token) {
     const clearToken = button("Clear token", "button");
     clearToken.addEventListener("click", () => {
       localStorage.removeItem(ADMIN_TOKEN_KEY);
       window.location.reload();
     });
-    header.append(clearToken);
+    actions.append(clearToken);
   }
+  const { header } = appHeader("Admin", actions);
   return header;
 }
 
@@ -133,14 +143,17 @@ function adminWorkspace(token: string): HTMLElement {
   const panel = el("section", "panel admin-panel");
   const host = el("div", "admin-host");
   let activeTab: "words" | "reading" = "words";
+  let disposeActiveTab = (): void => undefined;
 
   const showWords = (): void => {
     activeTab = "words";
-    renderWordsAdmin(host, token);
+    disposeActiveTab();
+    disposeActiveTab = renderWordsAdmin(host, token);
   };
   const showReading = (): void => {
     activeTab = "reading";
-    renderReadingAdmin(host, token);
+    disposeActiveTab();
+    disposeActiveTab = renderReadingAdmin(host, token);
   };
 
   const tabs = segmentedControl({
@@ -161,7 +174,7 @@ function adminWorkspace(token: string): HTMLElement {
   return panel;
 }
 
-function renderWordsAdmin(host: HTMLElement, token: string): void {
+function renderWordsAdmin(host: HTMLElement, token: string): () => void {
   const state = {
     words: [] as AdminWord[],
     selected: emptyWord(),
@@ -172,32 +185,41 @@ function renderWordsAdmin(host: HTMLElement, token: string): void {
   const { wrap, listPanel, editor } = adminMasterDetailLayout();
   host.replaceChildren(wrap);
 
-  const reload = async (): Promise<void> => {
-    listPanel.replaceChildren(el("p", "prompt", "Loading words..."));
-    try {
-      state.words = await getAdminWords(token, { search: state.search.trim() });
-      renderWordList(listPanel, state, renderEditor, reload);
-    } catch (error) {
-      listPanel.replaceChildren(adminError(error));
-    }
+  const renderEditor = (): void => {
+    renderWordEditor(editor, token, state, () => invalidateAdminWords());
   };
 
-  const renderEditor = (): void => {
-    renderWordEditor(editor, token, state, async () => {
-      await reload();
-      renderEditor();
-    });
+  const wordsObserver = new QueryObserver<AdminWord[], Error>(queryClient, adminWordsQueryOptions(token, state.search));
+  const applyWordsQuery = (): void => {
+    wordsObserver.setOptions(adminWordsQueryOptions(token, state.search));
   };
+  const invalidateAdminWords = async (): Promise<void> => {
+    await invalidateFocusWords();
+  };
+  const unsubscribe = wordsObserver.subscribe((result) => {
+    if (result.data) {
+      state.words = result.data;
+      renderWordList(listPanel, state, renderEditor, applyWordsQuery, result.isFetching);
+      return;
+    }
+    if (result.error) {
+      listPanel.replaceChildren(adminError(result.error));
+      return;
+    }
+    listPanel.replaceChildren(el("p", "prompt", "Loading words..."));
+  });
 
   renderEditor();
-  void reload();
+  applyWordsQuery();
+  return unsubscribe;
 }
 
 function renderWordList(
   host: HTMLElement,
   state: { words: AdminWord[]; selected: AdminWord; isNew: boolean; search: string },
   onSelect: () => void,
-  onSearch: () => Promise<void>,
+  onSearch: () => void,
+  isFetching = false,
 ): void {
   let searchTimer: number | undefined;
   const newButton = button("New word", "button primary");
@@ -218,7 +240,7 @@ function renderWordList(
       window.clearTimeout(searchTimer);
     }
     searchTimer = window.setTimeout(() => {
-      void onSearch();
+      onSearch();
     }, 250);
   });
 
@@ -226,7 +248,7 @@ function renderWordList(
   clearSearch.disabled = !state.search.trim();
   clearSearch.addEventListener("click", () => {
     state.search = "";
-    void onSearch();
+    onSearch();
   });
 
   const controls = el("div", "admin-list-controls");
@@ -240,8 +262,8 @@ function renderWordList(
       zeroLabel: "No",
     });
     item.append(
-      el("strong", "", word.article ? `${word.article} ${word.word}` : word.word),
-      el("span", "", `${word.part_of_speech} · ${focusCount}`),
+      adminItemTitle(word.article ? `${word.article} ${word.word}` : word.word, null, "Untitled word"),
+      el("span", "admin-item-meta", `${word.part_of_speech} · ${focusCount}`),
     );
     item.addEventListener("click", () => {
       state.selected = cloneWord(word);
@@ -257,7 +279,9 @@ function renderWordList(
 
   const header = el("div", "admin-list-header");
   header.append(el("h2", "focus-title", "Words"), newButton);
-  host.replaceChildren(header, controls, list);
+  const children = [header, controls, list];
+  if (isFetching) children.push(el("p", "prompt admin-list-status", "Refreshing..."));
+  host.replaceChildren(...children);
 }
 
 function renderWordEditor(
@@ -281,6 +305,7 @@ function renderWordEditor(
 
   const saveWord = async (): Promise<void> => {
     try {
+      const wasNew = state.isNew;
       const payload = {
         word: word.value.trim(),
         article: partOfSpeech.value === "noun" ? article.value() : null,
@@ -291,10 +316,10 @@ function renderWordEditor(
       state.selected = state.isNew
         ? await createAdminWord(token, payload)
         : await updateAdminWord(token, payload);
-      await invalidateFocusWords();
       state.isNew = false;
       setSavedStatus(status);
       await onSaved();
+      if (wasNew) renderWordEditor(host, token, state, onSaved);
     } catch (error) {
       setErrorStatus(status, error);
     }
@@ -340,10 +365,10 @@ function renderWordEditor(
       if (!window.confirm(`Delete ${state.selected.word}?`)) return;
       try {
         await deleteAdminWord(token, state.selected.word);
-        await invalidateFocusWords();
         state.selected = emptyWord();
         state.isNew = true;
         await onSaved();
+        renderWordEditor(host, token, state, onSaved);
       } catch (error) {
         setErrorStatus(status, error);
       }
@@ -353,7 +378,7 @@ function renderWordEditor(
   host.replaceChildren(header, editorForm);
 }
 
-function renderReadingAdmin(host: HTMLElement, token: string): void {
+function renderReadingAdmin(host: HTMLElement, token: string): () => void {
   const state = {
     activeGroup: "general" as AdminReadingGroup,
     passages: [] as AdminReadingPassageSummary[],
@@ -365,26 +390,37 @@ function renderReadingAdmin(host: HTMLElement, token: string): void {
   const { wrap, listPanel, editor } = adminMasterDetailLayout();
   host.replaceChildren(wrap);
 
-  const reload = async (): Promise<void> => {
-    listPanel.replaceChildren(el("p", "prompt", "Loading passages..."));
-    try {
-      state.passages = await getAdminReadingPassages(token, { group: state.activeGroup });
-      renderPassageList(listPanel, token, state, renderEditor);
-    } catch (error) {
-      listPanel.replaceChildren(adminError(error));
-    }
-  };
-
   const renderEditor = (): void => {
     state.selected.group = state.activeGroup;
-    renderPassageEditor(editor, token, state, async () => {
-      await reload();
-      renderEditor();
-    });
+    renderPassageEditor(editor, token, state, () => invalidateAdminPassages());
   };
 
+  const passagesObserver = new QueryObserver<AdminReadingPassageSummary[], Error>(
+    queryClient,
+    adminPassagesQueryOptions(token, state.activeGroup),
+  );
+  const applyPassagesQuery = (): void => {
+    passagesObserver.setOptions(adminPassagesQueryOptions(token, state.activeGroup));
+  };
+  const invalidateAdminPassages = async (): Promise<void> => {
+    await invalidateStoryPassages();
+  };
+  const unsubscribe = passagesObserver.subscribe((result) => {
+    if (result.data) {
+      state.passages = result.data;
+      renderPassageList(listPanel, token, state, renderEditor, applyPassagesQuery, result.isFetching);
+      return;
+    }
+    if (result.error) {
+      listPanel.replaceChildren(adminError(result.error));
+      return;
+    }
+    listPanel.replaceChildren(el("p", "prompt", "Loading passages..."));
+  });
+
   renderEditor();
-  void reload();
+  applyPassagesQuery();
+  return unsubscribe;
 }
 
 function renderPassageList(
@@ -398,6 +434,8 @@ function renderPassageList(
     search: string;
   },
   onSelect: () => void,
+  onGroupChange: () => void,
+  isFetching = false,
 ): void {
   const newButton = button("New passage", "button primary");
   newButton.textContent = "+ New";
@@ -414,27 +452,20 @@ function renderPassageList(
     state.selected = emptyPassage(group);
     state.isNew = true;
     onSelect();
-    void getAdminReadingPassages(token, { group })
-      .then((passages) => {
-        state.passages = passages;
-        renderPassageList(host, token, state, onSelect);
-      })
-      .catch((error) => {
-        host.replaceChildren(adminError(error));
-      });
+    onGroupChange();
     return true;
   });
   const search = input("Search passages", state.search);
   search.autocomplete = "off";
   search.addEventListener("input", () => {
     state.search = search.value;
-    renderPassageList(host, token, state, onSelect);
+    renderPassageList(host, token, state, onSelect, onGroupChange, isFetching);
   });
   const clearSearch = button("Clear", "button compact-button");
   clearSearch.disabled = !state.search.trim();
   clearSearch.addEventListener("click", () => {
     state.search = "";
-    renderPassageList(host, token, state, onSelect);
+    renderPassageList(host, token, state, onSelect, onGroupChange, isFetching);
   });
   const controls = el("div", "admin-list-controls");
   controls.append(search, clearSearch);
@@ -448,7 +479,7 @@ function renderPassageList(
       adminItemTitle(passage.title, passage.status),
       el(
         "span",
-        "",
+        "admin-item-meta",
         `${readingGroupLabel(passage.group)} · ${passage.level}${
           passage.part ? ` · ${partLabel(passage.part)}` : ""
         } · ${questionCount}`,
@@ -464,7 +495,9 @@ function renderPassageList(
 
   const header = el("div", "admin-list-header");
   header.append(el("h2", "focus-title", "Passages"), newButton);
-  host.replaceChildren(header, tabs, controls, list);
+  const children = [header, tabs, controls, list];
+  if (isFetching) children.push(el("p", "prompt admin-list-status", "Refreshing..."));
+  host.replaceChildren(...children);
 }
 
 function renderPassageEditor(
@@ -660,6 +693,7 @@ function renderPassageEditor(
 
   const savePassage = async (): Promise<void> => {
     try {
+      const wasNew = state.isNew;
       const activeShape = shape();
       validation.clear();
       const clientErrors = validatePassageClientFields(activeShape, title, passage, sourceSituation, adControls);
@@ -694,10 +728,11 @@ function renderPassageEditor(
       state.selected = state.isNew
         ? await createAdminReadingPassage(token, payload)
         : await updateAdminReadingPassage(token, payload);
-      await invalidateStoryPassages();
       state.isNew = false;
+      heading.textContent = state.selected.title || "Untitled passage";
       setSavedStatus(status);
       await onSaved();
+      if (wasNew) renderPassageEditor(host, token, state, onSaved);
     } catch (error) {
       if (!validation.show(fieldErrorsFromUnknown(error))) setErrorStatus(status, error);
     }
@@ -746,10 +781,10 @@ function renderPassageEditor(
       if (!state.selected.id || !window.confirm(`Delete ${state.selected.title}?`)) return;
       try {
         await deleteAdminReadingPassage(token, state.selected.id);
-        await invalidateStoryPassages();
         state.selected = emptyPassage(state.activeGroup);
         state.isNew = true;
         await onSaved();
+        renderPassageEditor(host, token, state, onSaved);
       } catch (error) {
         setErrorStatus(status, error);
       }
@@ -783,6 +818,25 @@ function adminMasterDetailLayout(): { wrap: HTMLElement; listPanel: HTMLElement;
   const editor = el("div", "admin-editor");
   wrap.append(listPanel, editor);
   return { wrap, listPanel, editor };
+}
+
+function adminWordsQueryOptions(token: string, search: string) {
+  const trimmedSearch = search.trim();
+  return {
+    queryKey: [...WORDS_QUERY_KEY, "admin", { search: trimmedSearch }] as const,
+    queryFn: () => getAdminWords(token, { search: trimmedSearch }),
+    staleTime: ADMIN_STALE_TIME,
+    placeholderData: keepPreviousData,
+  };
+}
+
+function adminPassagesQueryOptions(token: string, group: AdminReadingGroup) {
+  return {
+    queryKey: [...PASSAGES_QUERY_KEY, "admin", { group }] as const,
+    queryFn: () => getAdminReadingPassages(token, { group }),
+    staleTime: ADMIN_STALE_TIME,
+    placeholderData: keepPreviousData,
+  };
 }
 
 function editorActionBar(status: HTMLElement, cancel: HTMLButtonElement, save: HTMLButtonElement): HTMLElement {
@@ -1656,9 +1710,14 @@ function resolvedExerciseLabel(shape: ReadingShape): string {
   return "Standard questions";
 }
 
-function adminItemTitle(title: string, status: "draft" | "published"): HTMLElement {
+function adminItemTitle(title: string, status: "draft" | "published" | null, fallback = "Untitled passage"): HTMLElement {
   const wrap = el("strong", "admin-item-title");
-  wrap.append(document.createTextNode(title));
+  const trimmedTitle = title.trim();
+  if (trimmedTitle) {
+    wrap.append(el("span", "admin-item-title-text", trimmedTitle));
+  } else {
+    wrap.append(el("em", "admin-item-untitled", fallback));
+  }
   if (status === "draft") wrap.append(el("span", "draft-badge", "Draft"));
   return wrap;
 }
@@ -1723,13 +1782,16 @@ function wordField(control: HTMLElement, fallbackLabel?: string, required = fals
   const label = fallbackLabel ?? control.dataset.label ?? "Level";
   wrap.dataset.field = label;
   if (control.dataset.fieldKey) wrap.dataset.fieldKey = control.dataset.fieldKey;
+  if (required) control.setAttribute("aria-required", "true");
   wrap.append(fieldLabel(label, required), control);
   return wrap;
 }
 
 function fieldLabel(label: string, required: boolean): HTMLElement {
   const node = el("span", "", label);
-  if (required) node.append(el("span", "required-marker", " required"));
+  if (required) {
+    node.append(el("span", "required-marker", "*"), el("span", "sr-only", " required"));
+  }
   return node;
 }
 

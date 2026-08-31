@@ -695,13 +695,16 @@ function fieldWrap(control: HTMLElement, label: string, required = false): HTMLE
   const wrap = el("label", "admin-field");
   wrap.dataset.field = label;
   if (control.dataset.fieldKey) wrap.dataset.fieldKey = control.dataset.fieldKey;
+  if (required) control.setAttribute("aria-required", "true");
   wrap.append(fieldLabel(label, required), control);
   return wrap;
 }
 
 function fieldLabel(label: string, required: boolean): HTMLElement {
   const node = el("span", "", label);
-  if (required) node.append(el("span", "required-marker", " required"));
+  if (required) {
+    node.append(el("span", "required-marker", "*"), el("span", "sr-only", " required"));
+  }
   return node;
 }
 
