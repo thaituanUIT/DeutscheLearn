@@ -26,6 +26,7 @@ import type {
 import { button } from "../components/button";
 import { stimulusInstruction, stimulusRenderer, type StimulusViewModel } from "../stimuli/templates";
 import { el } from "../utils/dom";
+import { formatCount } from "../utils/format";
 
 type StoryViewOptions = {
   onBack: () => void;
@@ -100,7 +101,7 @@ async function renderStoryLevels(
         group === "goethe"
           ? () => renderStoryParts(section, level.level, options)
           : () => renderStoryPassages(section, group, level.level, null, options);
-      grid.append(levelCard(level, onClick, { disabledWhenEmpty: group === "general", itemLabel: itemLabel(group) }));
+      grid.append(levelCard(level, onClick, { disabledWhenEmpty: group === "general", group }));
     }
 
     section.replaceChildren(intro, grid);
@@ -428,7 +429,7 @@ function groupCard(group: StoryGroup, onClick: () => void): HTMLButtonElement {
   card.append(
     el("strong", "", group.label),
     el("span", "", group.group === "general" ? "A1, A2, B1, B2 stories" : "Exam-style reading practice"),
-    el("span", "", `${group.passage_count} ${itemLabel(group.group)} · ${group.question_count} questions`),
+    el("span", "", `${formatStoryItemCount(group.passage_count, group.group)} · ${formatCount(group.question_count, "question", { zeroLabel: "No" })}`),
   );
   return card;
 }
@@ -436,15 +437,16 @@ function groupCard(group: StoryGroup, onClick: () => void): HTMLButtonElement {
 function levelCard(
   level: StoryLevel,
   onClick: () => void,
-  options: { disabledWhenEmpty: boolean; itemLabel: string },
+  options: { disabledWhenEmpty: boolean; group: StoryGroup["group"] },
 ): HTMLButtonElement {
   const card = button("", "focus-option");
   card.disabled = options.disabledWhenEmpty && level.passage_count === 0;
+  card.setAttribute("aria-disabled", String(card.disabled));
   card.addEventListener("click", onClick);
   card.append(
     el("strong", "", level.level),
-    el("span", "", `${level.passage_count} ${options.itemLabel}`),
-    el("span", "", `${level.question_count} questions`),
+    el("span", "", formatStoryItemCount(level.passage_count, options.group, { zeroLabel: "No" })),
+    el("span", "", card.disabled ? "No material has been added yet." : formatCount(level.question_count, "question", { zeroLabel: "No" })),
   );
   return card;
 }
@@ -454,8 +456,8 @@ function partCard(part: StoryPart, onClick: () => void): HTMLButtonElement {
   card.addEventListener("click", onClick);
   card.append(
     el("strong", "", part.label),
-    el("span", "", `${part.passage_count} Übungen`),
-    el("span", "", `${part.question_count} questions`),
+    el("span", "", formatCount(part.passage_count, "Übung", { plural: "Übungen", zeroLabel: "No" })),
+    el("span", "", formatCount(part.question_count, "question", { zeroLabel: "No" })),
   );
   return card;
 }
@@ -467,7 +469,7 @@ function passageCard(passage: StoryPassageSummary, onClick: () => void): HTMLBut
   card.append(
     el("strong", "", passage.title),
     el("span", "", passage.topic ? topicLabel(passage.topic) : "General"),
-    el("span", "", `${passage.question_count} questions`),
+    el("span", "", passage.question_count === 0 ? "No questions yet" : formatCount(passage.question_count, "question")),
   );
   return card;
 }
@@ -503,8 +505,13 @@ function groupLabel(group: StoryGroup["group"]): string {
   return group === "goethe" ? "Goethe-Institut" : "General";
 }
 
-function itemLabel(group: StoryGroup["group"]): string {
-  return group === "goethe" ? "Übungen" : "stories";
+function formatStoryItemCount(
+  count: number,
+  group: StoryGroup["group"],
+  options: { zeroLabel?: string } = {},
+): string {
+  if (group === "goethe") return formatCount(count, "Übung", { plural: "Übungen", ...options });
+  return formatCount(count, "story", options);
 }
 
 function partLabel(part: StoryPart["part"]): string {

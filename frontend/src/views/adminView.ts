@@ -31,6 +31,7 @@ import {
   type StimulusViewModel,
 } from "../stimuli/templates";
 import { clear, el } from "../utils/dom";
+import { formatCount } from "../utils/format";
 
 const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
@@ -234,7 +235,10 @@ function renderWordList(
   const list = el("div", "admin-items");
   for (const word of state.words) {
     const item = button("", "admin-item");
-    const focusCount = `${word.focus_entries.length} ${pluralize("focus entry", word.focus_entries.length)}`;
+    const focusCount = formatCount(word.focus_entries.length, "focus entry", {
+      plural: "focus entries",
+      zeroLabel: "No",
+    });
     item.append(
       el("strong", "", word.article ? `${word.article} ${word.word}` : word.word),
       el("span", "", `${word.part_of_speech} · ${focusCount}`),
@@ -439,7 +443,7 @@ function renderPassageList(
   const filteredPassages = state.passages.filter((passage) => matchesPassageSearch(passage, state.search));
   for (const passage of filteredPassages) {
     const item = button("", "admin-item");
-    const questionCount = `${passage.question_count} ${pluralize("question", passage.question_count)}`;
+    const questionCount = formatCount(passage.question_count, "question", { zeroLabel: "No" });
     item.append(
       adminItemTitle(passage.title, passage.status),
       el(
@@ -1650,10 +1654,6 @@ function resolvedExerciseLabel(shape: ReadingShape): string {
   if (shape === "goethe_source_choice") return "Two adverts - choose one";
   if (shape === "goethe_true_false_notice") return "Sign or notice - true/false";
   return "Standard questions";
-}
-
-function pluralize(noun: string, count: number): string {
-  return count === 1 ? noun : `${noun}s`;
 }
 
 function adminItemTitle(title: string, status: "draft" | "published"): HTMLElement {

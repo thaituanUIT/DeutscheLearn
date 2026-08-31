@@ -7,6 +7,7 @@ import {
   type GrammarPassageContext,
   type GrammarWrongAnswerContext,
 } from "../components/grammarWidget";
+import { themeToggle } from "../components/themeToggle";
 import { setPlayer } from "../state/playerStore";
 import { clear, el } from "../utils/dom";
 import { focusView } from "./focusView";
@@ -57,9 +58,11 @@ function draw(
   const shell = el("div", "shell");
   const header = el("header", "topbar");
   const headerStart = el("div", "header-start");
+  const headerEnd = el("div", "header-end");
   const playerNode = el("div", "player");
   playerNode.append(el("span", "muted", "Anonymous learner"), el("strong", "", player.display_name));
-  header.append(headerStart, playerNode);
+  headerEnd.append(themeToggle(), playerNode);
+  header.append(headerStart, headerEnd);
 
   const layout = el("div", "layout");
   const mainHost = el("div");

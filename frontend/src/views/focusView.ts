@@ -9,6 +9,7 @@ import {
 import type { FocusCard, FocusLevel, FocusRevisionQuestion, FocusTopic } from "../api/types";
 import { button } from "../components/button";
 import { el } from "../utils/dom";
+import { formatCount } from "../utils/format";
 
 type FocusViewOptions = {
   onBack: () => void;
@@ -232,11 +233,14 @@ function renderFlashcard(
 
 function levelCard(level: FocusLevel, onClick: () => void): HTMLButtonElement {
   const card = button("", "focus-option");
+  const isEmpty = level.word_count === 0;
+  card.disabled = isEmpty;
+  card.setAttribute("aria-disabled", String(isEmpty));
   card.addEventListener("click", onClick);
   card.append(
     el("strong", "", level.level),
-    el("span", "", `${level.topic_count} topics`),
-    el("span", "", `${level.word_count} words`),
+    el("span", "", formatCount(level.topic_count, "topic", { zeroLabel: "No" })),
+    el("span", "", isEmpty ? "No material has been added yet." : formatCount(level.word_count, "word")),
   );
   return card;
 }
@@ -246,7 +250,7 @@ function topicCard(topic: FocusTopic, onClick: () => void): HTMLButtonElement {
   card.addEventListener("click", onClick);
   card.append(
     el("strong", "", topic.label),
-    el("span", "", `${topic.word_count} words`),
+    el("span", "", formatCount(topic.word_count, "word", { zeroLabel: "No" })),
   );
   return card;
 }
