@@ -1619,12 +1619,11 @@ button {
   overflow-x: hidden;
 }
 
-.admin-item {
-  display: grid;
+.list-card {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
-  align-content: start;
   width: 100%;
-  min-height: 0;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1635,19 +1634,18 @@ button {
   cursor: pointer;
 }
 
-.admin-item[data-selected="true"] {
+.list-card[data-selected="true"] {
   border-color: var(--brand-secondary);
   background: color-mix(in srgb, var(--accent-subtle) 64%, var(--surface));
 }
 
-.admin-item:focus-visible {
+.list-card:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--focus-ring) 25%, var(--transparent));
   outline-offset: 2px;
 }
 
-.admin-item-meta {
+.list-card-meta {
   display: block;
-  margin-top: 2px;
   color: var(--text-muted);
   font-size: 13px;
   line-height: 1.25;
@@ -2162,11 +2160,8 @@ button {
   gap: var(--admin-space-inline);
 }
 
-.admin-item-title {
+.list-card-title {
   min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   color: var(--text);
   font-size: 15px;
   line-height: 1.25;
@@ -2174,8 +2169,8 @@ button {
   white-space: normal;
 }
 
-.admin-item-title-text,
-.admin-item-untitled {
+.list-card-title-text,
+.list-card-untitled {
   min-width: 0;
   display: -webkit-box;
   overflow: hidden;
@@ -2183,7 +2178,7 @@ button {
   -webkit-line-clamp: 2;
 }
 
-.admin-item-untitled {
+.list-card-untitled {
   color: var(--text-muted);
   font-style: italic;
 }

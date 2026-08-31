@@ -1701,10 +1701,10 @@ function segmentedControl<T extends string>({
 }
 
 function ListCard({ title, meta, selected, onSelect }: ListCardProps): HTMLButtonElement {
-  const item = button("", "admin-item");
+  const item = button("", "list-card");
   item.type = "button";
   item.dataset.selected = selected ? "true" : "false";
-  item.append(adminItemTitle(title, null), el("span", "admin-item-meta", meta));
+  item.append(listCardTitle(title), el("span", "list-card-meta", meta));
   item.addEventListener("click", () => {
     void onSelect();
   });
@@ -1727,15 +1727,14 @@ function resolvedExerciseLabel(shape: ReadingShape): string {
   return "Standard questions";
 }
 
-function adminItemTitle(title: string, status: "draft" | "published" | null, fallback = "Untitled passage"): HTMLElement {
-  const wrap = el("strong", "admin-item-title");
+function listCardTitle(title: string, fallback = "Untitled passage"): HTMLElement {
+  const wrap = el("strong", "list-card-title");
   const trimmedTitle = title.trim();
   if (trimmedTitle) {
-    wrap.append(el("span", "admin-item-title-text", trimmedTitle));
+    wrap.append(el("span", "list-card-title-text", trimmedTitle));
   } else {
-    wrap.append(el("em", "admin-item-untitled", fallback));
+    wrap.append(el("em", "list-card-untitled", fallback));
   }
-  if (status === "draft") wrap.append(el("span", "draft-badge", "Draft"));
   return wrap;
 }
 
