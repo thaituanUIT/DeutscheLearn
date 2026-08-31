@@ -417,47 +417,92 @@ button {
   gap: 14px;
 }
 
-.theme-toggle {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  width: 142px;
-  height: 36px;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+.theme-menu {
+  position: relative;
 }
 
-.theme-toggle__item {
-  min-width: 0;
+.theme-menu__trigger {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--transparent);
-  color: var(--text-muted);
+  color: var(--text);
   cursor: pointer;
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 800;
-  line-height: 1;
+  align-items: center;
+  justify-content: center;
   transition:
     background-color 120ms ease,
     color 120ms ease;
 }
 
-.theme-toggle__item:hover {
+.theme-menu__trigger:hover,
+.theme-menu__trigger[aria-expanded="true"] {
   background-color: var(--surface-raised);
-  color: var(--text);
 }
 
-.theme-toggle__item[aria-checked="true"] {
-  background-color: var(--accent-subtle);
-  color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-
-.theme-toggle__item:focus-visible {
+.theme-menu__trigger:focus-visible,
+.theme-menu__item:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--focus-ring) 25%, var(--transparent));
   outline-offset: 2px;
+}
+
+.theme-menu__list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  min-width: 132px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgb(var(--shadow-medium));
+}
+
+.theme-menu__list[hidden] {
+  display: none;
+}
+
+.theme-menu__item {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--transparent);
+  color: var(--text);
+  cursor: pointer;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.theme-menu__item:hover,
+.theme-menu__item:focus-visible {
+  background-color: var(--surface-raised);
+}
+
+.theme-menu__item[aria-checked="true"] {
+  background-color: var(--accent-subtle);
+}
+
+.theme-menu__check {
+  color: var(--primary);
+  font-size: 0.86rem;
+  font-weight: 900;
+  line-height: 1;
+  visibility: hidden;
+}
+
+.theme-menu__item[aria-checked="true"] .theme-menu__check {
+  visibility: visible;
 }
 
 .brand {
