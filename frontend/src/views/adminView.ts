@@ -1,5 +1,3 @@
-import { QueryObserver, keepPreviousData } from "@tanstack/query-core";
-
 import {
   createAdminReadingPassage,
   createAdminWord,
@@ -13,13 +11,6 @@ import {
   updateAdminReadingPassage,
   updateAdminWord,
 } from "../api/client";
-import {
-  PASSAGES_QUERY_KEY,
-  WORDS_QUERY_KEY,
-  invalidateFocusWords,
-  invalidateStoryPassages,
-  queryClient,
-} from "../api/queryClient";
 import type {
   AdminFocusEntry,
   AdminReadingAdStimulus,
@@ -47,7 +38,6 @@ const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
 const READING_GROUPS = ["general", "goethe"] as const;
 const GOETHE_PARTS = ["teil_1", "teil_2", "teil_3", "teil_4", "teil_5"] as const;
-const ADMIN_STALE_TIME = 30_000;
 const GERMAN_ARTICLES = ["der", "die", "das"] as const;
 const PARTS_OF_SPEECH = [
   "noun",
@@ -89,6 +79,7 @@ type ListCardProps = {
   selected: boolean;
   onSelect: () => void;
 };
+type AdminListStatus = "idle" | "loading" | "error";
 
 const READING_SHAPE_TABLE: Record<AdminReadingGroup, Partial<Record<AdminLevel, Partial<Record<AdminGoethePart, ReadingShape>>>>> = {
   general: {},
@@ -152,8 +143,6 @@ function adminWorkspace(token: string): HTMLElement {
   let activeTab: "words" | "reading" = "words";
   let disposeActiveTab = (): void => undefined;
 
-  void prefetchAdminLists(token);
-
   const showWords = (): void => {
     activeTab = "words";
     disposeActiveTab();
@@ -191,40 +180,40 @@ function renderWordsAdmin(host: HTMLElement, token: string): () => void {
     isNew: true,
     search: "",
   };
+  let disposed = false;
+  let requestId = 0;
 
   const { wrap, listPanel, editor } = adminMasterDetailLayout();
   host.replaceChildren(wrap);
 
   const renderEditor = (): void => {
-    renderWordEditor(editor, token, state, () => invalidateAdminWords());
+    renderWordEditor(editor, token, state, loadWords);
   };
 
-  const wordsObserver = new QueryObserver<AdminWord[], Error>(queryClient, adminWordsQueryOptions(token, state.search));
-  const applyWordsQuery = (): void => {
-    wordsObserver.setOptions(adminWordsQueryOptions(token, state.search));
+  const renderList = (status: AdminListStatus = "idle", error?: unknown, isFetching = false): void => {
+    renderWordList(listPanel, state, renderEditor, renderList, status, error, isFetching);
   };
-  const invalidateAdminWords = async (): Promise<void> => {
-    await invalidateFocusWords();
-  };
-  const unsubscribe = wordsObserver.subscribe((result) => {
-    if (result.data !== undefined) {
-      state.words = result.data;
-      renderWordList(listPanel, state, renderEditor, applyWordsQuery, result.isFetching);
-      return;
+
+  async function loadWords(): Promise<void> {
+    const currentRequest = ++requestId;
+    renderList(state.words.length === 0 ? "loading" : "idle", undefined, state.words.length > 0);
+    try {
+      const words = await getAdminWords(token);
+      if (disposed || currentRequest !== requestId) return;
+      state.words = words;
+      renderList();
+    } catch (error) {
+      if (disposed || currentRequest !== requestId) return;
+      renderList("error", error);
     }
-    if (result.isPending) {
-      listPanel.replaceChildren(el("p", "prompt admin-list-placeholder", "Loading words..."));
-      return;
-    }
-    if (result.error) {
-      listPanel.replaceChildren(adminError(result.error));
-      return;
-    }
-  });
+  }
 
   renderEditor();
-  applyWordsQuery();
-  return unsubscribe;
+  renderList("loading");
+  void loadWords();
+  return () => {
+    disposed = true;
+  };
 }
 
 function renderWordList(
@@ -232,9 +221,10 @@ function renderWordList(
   state: { words: AdminWord[]; selected: AdminWord; isNew: boolean; search: string },
   onSelect: () => void,
   onSearch: () => void,
+  status: AdminListStatus = "idle",
+  error?: unknown,
   isFetching = false,
 ): void {
-  let searchTimer: number | undefined;
   const newButton = button("New word", "button primary");
   newButton.textContent = "+ New";
   newButton.ariaLabel = "New word";
@@ -249,12 +239,7 @@ function renderWordList(
   search.autocomplete = "off";
   search.addEventListener("input", () => {
     state.search = search.value;
-    if (searchTimer !== undefined) {
-      window.clearTimeout(searchTimer);
-    }
-    searchTimer = window.setTimeout(() => {
-      onSearch();
-    }, 250);
+    onSearch();
   });
 
   const clearSearch = button("Clear", "button compact-button");
@@ -269,7 +254,13 @@ function renderWordList(
 
   const list = el("div", "admin-items");
   list.dataset.fetching = isFetching ? "true" : "false";
-  for (const word of state.words) {
+  const filteredWords = state.words.filter((word) => matchesWordSearch(word, state.search));
+  if (status === "loading") {
+    list.append(el("p", "prompt admin-list-placeholder", "Loading words..."));
+  } else if (status === "error") {
+    list.append(adminError(error));
+  }
+  for (const word of status === "idle" ? filteredWords : []) {
     const focusCount = word.focus_entries.length;
     list.append(
       ListCard({
@@ -285,7 +276,7 @@ function renderWordList(
     );
   }
 
-  if (state.words.length === 0) {
+  if (status === "idle" && filteredWords.length === 0) {
     list.append(el("p", "prompt", state.search.trim() ? "No matching words." : "No words yet."));
   }
 
@@ -398,44 +389,41 @@ function renderReadingAdmin(host: HTMLElement, token: string): () => void {
     isNew: true,
     search: "",
   };
+  let disposed = false;
+  let requestId = 0;
 
   const { wrap, listPanel, editor } = adminMasterDetailLayout();
   host.replaceChildren(wrap);
 
   const renderEditor = (): void => {
     state.selected.group = state.activeGroup;
-    renderPassageEditor(editor, token, state, () => invalidateAdminPassages());
+    renderPassageEditor(editor, token, state, loadPassages);
   };
 
-  const passagesObserver = new QueryObserver<AdminReadingPassageSummary[], Error>(
-    queryClient,
-    adminPassagesQueryOptions(token, state.activeGroup),
-  );
-  const applyPassagesQuery = (): void => {
-    passagesObserver.setOptions(adminPassagesQueryOptions(token, state.activeGroup));
+  const renderList = (status: AdminListStatus = "idle", error?: unknown, isFetching = false): void => {
+    renderPassageList(listPanel, token, state, renderEditor, loadPassages, status, error, isFetching);
   };
-  const invalidateAdminPassages = async (): Promise<void> => {
-    await invalidateStoryPassages();
-  };
-  const unsubscribe = passagesObserver.subscribe((result) => {
-    if (result.data !== undefined) {
-      state.passages = result.data;
-      renderPassageList(listPanel, token, state, renderEditor, applyPassagesQuery, result.isFetching);
-      return;
+
+  async function loadPassages(): Promise<void> {
+    const currentRequest = ++requestId;
+    renderList(state.passages.length === 0 ? "loading" : "idle", undefined, state.passages.length > 0);
+    try {
+      const passages = await getAdminReadingPassages(token, { group: state.activeGroup });
+      if (disposed || currentRequest !== requestId) return;
+      state.passages = passages;
+      renderList();
+    } catch (error) {
+      if (disposed || currentRequest !== requestId) return;
+      renderList("error", error);
     }
-    if (result.isPending) {
-      listPanel.replaceChildren(el("p", "prompt admin-list-placeholder", "Loading passages..."));
-      return;
-    }
-    if (result.error) {
-      listPanel.replaceChildren(adminError(result.error));
-      return;
-    }
-  });
+  }
 
   renderEditor();
-  applyPassagesQuery();
-  return unsubscribe;
+  renderList("loading");
+  void loadPassages();
+  return () => {
+    disposed = true;
+  };
 }
 
 function renderPassageList(
@@ -450,6 +438,8 @@ function renderPassageList(
   },
   onSelect: () => void,
   onGroupChange: () => void,
+  status: AdminListStatus = "idle",
+  error?: unknown,
   isFetching = false,
 ): void {
   const newButton = button("New passage", "button primary");
@@ -464,6 +454,7 @@ function renderPassageList(
   const tabs = readingGroupTabs(state.activeGroup, (group) => {
     if (!confirmDiscardingShapeData(state.selected, state.activeGroup, group)) return false;
     state.activeGroup = group;
+    state.passages = [];
     state.selected = emptyPassage(group);
     state.isNew = true;
     onSelect();
@@ -474,13 +465,13 @@ function renderPassageList(
   search.autocomplete = "off";
   search.addEventListener("input", () => {
     state.search = search.value;
-    renderPassageList(host, token, state, onSelect, onGroupChange, isFetching);
+    renderPassageList(host, token, state, onSelect, onGroupChange, status, error, isFetching);
   });
   const clearSearch = button("Clear", "button compact-button");
   clearSearch.disabled = !state.search.trim();
   clearSearch.addEventListener("click", () => {
     state.search = "";
-    renderPassageList(host, token, state, onSelect, onGroupChange, isFetching);
+    renderPassageList(host, token, state, onSelect, onGroupChange, status, error, isFetching);
   });
   const controls = el("div", "admin-list-controls");
   controls.append(search, clearSearch);
@@ -488,7 +479,12 @@ function renderPassageList(
   const list = el("div", "admin-items");
   list.dataset.fetching = isFetching ? "true" : "false";
   const filteredPassages = state.passages.filter((passage) => matchesPassageSearch(passage, state.search));
-  for (const passage of filteredPassages) {
+  if (status === "loading") {
+    list.append(el("p", "prompt admin-list-placeholder", "Loading passages..."));
+  } else if (status === "error") {
+    list.append(adminError(error));
+  }
+  for (const passage of status === "idle" ? filteredPassages : []) {
     const questionCount = formatCount(passage.question_count, "question", { zeroLabel: "No" });
     list.append(
       ListCard({
@@ -504,6 +500,9 @@ function renderPassageList(
         },
       }),
     );
+  }
+  if (status === "idle" && filteredPassages.length === 0) {
+    list.append(el("p", "prompt", state.search.trim() ? "No matching passages." : "No passages yet."));
   }
 
   const header = el("div", "admin-list-header");
@@ -833,32 +832,6 @@ function adminMasterDetailLayout(): { wrap: HTMLElement; listPanel: HTMLElement;
   return { wrap, listPanel, editor };
 }
 
-function adminWordsQueryOptions(token: string, search: string) {
-  const trimmedSearch = search.trim();
-  return {
-    queryKey: [...WORDS_QUERY_KEY, "admin", { search: trimmedSearch }] as const,
-    queryFn: () => getAdminWords(token, { search: trimmedSearch }),
-    staleTime: ADMIN_STALE_TIME,
-    placeholderData: keepPreviousData,
-  };
-}
-
-function adminPassagesQueryOptions(token: string, group: AdminReadingGroup) {
-  return {
-    queryKey: [...PASSAGES_QUERY_KEY, "admin", { group }] as const,
-    queryFn: () => getAdminReadingPassages(token, { group }),
-    staleTime: ADMIN_STALE_TIME,
-    placeholderData: keepPreviousData,
-  };
-}
-
-function prefetchAdminLists(token: string): Promise<unknown[]> {
-  return Promise.all([
-    queryClient.prefetchQuery(adminWordsQueryOptions(token, "")),
-    ...READING_GROUPS.map((group) => queryClient.prefetchQuery(adminPassagesQueryOptions(token, group))),
-  ]);
-}
-
 function editorActionBar(status: HTMLElement, cancel: HTMLButtonElement, save: HTMLButtonElement): HTMLElement {
   const actions = el("div", "admin-action-bar");
   const actionButtons = el("div", "admin-action-buttons");
@@ -871,7 +844,8 @@ function readingGroupTabs(
   activeGroup: AdminReadingGroup,
   onSelect: (group: AdminReadingGroup) => boolean,
 ): HTMLElement {
-  return SegmentedControl({
+  const wrap = el("div", "admin-reading-tabs");
+  wrap.append(SegmentedControl({
     label: "Reading collection",
     value: activeGroup,
     fill: true,
@@ -880,7 +854,8 @@ function readingGroupTabs(
       { value: "goethe", label: "Goethe", title: "Goethe-Institut" },
     ],
     onChange: onSelect,
-  });
+  }));
+  return wrap;
 }
 
 type QuestionBlock = {
@@ -1824,6 +1799,21 @@ function matchesPassageSearch(passage: AdminReadingPassageSummary, search: strin
     readingGroupLabel(passage.group),
     passage.level,
     passage.part ? partLabel(passage.part) : "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(term);
+}
+
+function matchesWordSearch(word: AdminWord, search: string): boolean {
+  const term = search.trim().toLowerCase();
+  if (!term) return true;
+  const haystack = [
+    word.word,
+    word.article ?? "",
+    word.part_of_speech,
+    word.meaning,
+    ...word.focus_entries.flatMap((entry) => [entry.level, entry.topic]),
   ]
     .join(" ")
     .toLowerCase();

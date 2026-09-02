@@ -1494,6 +1494,11 @@ button {
   justify-self: start;
 }
 
+.admin-reading-tabs {
+  width: 100%;
+  min-width: 0;
+}
+
 .admin-grid {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);

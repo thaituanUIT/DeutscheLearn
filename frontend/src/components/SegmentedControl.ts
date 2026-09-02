@@ -89,6 +89,7 @@ function injectSegmentedControlStyles(): void {
   style.textContent = `
 .segmented-control {
   --count: 2;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: repeat(var(--count), 1fr);
   align-items: center;
@@ -107,6 +108,7 @@ function injectSegmentedControlStyles(): void {
 
 .segmented-control__item {
   all: unset;
+  box-sizing: border-box;
   display: grid;
   place-items: center;
   align-self: stretch;
@@ -125,6 +127,7 @@ function injectSegmentedControlStyles(): void {
 }
 
 .segmented-control__label {
+  box-sizing: border-box;
   display: block;
   padding: 0 14px;
   text-align: center;
