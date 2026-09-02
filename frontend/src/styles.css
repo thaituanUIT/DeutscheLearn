@@ -1729,9 +1729,14 @@ button {
 .admin-preview-column {
   position: sticky;
   top: 24px;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   max-height: calc(100dvh - 106px);
-  overflow: hidden;
+  padding-right: 4px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   container: admin-preview / inline-size;
 }
 
@@ -1952,11 +1957,10 @@ button {
 }
 
 .admin-reading-preview {
+  flex: 1 0 auto;
   display: grid;
   gap: var(--admin-space-inline);
-  max-height: calc(100dvh - 106px);
-  overflow-y: auto;
-  overflow-x: hidden;
+  min-height: 0;
 }
 
 .admin-preview-label {
