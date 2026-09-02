@@ -1491,17 +1491,15 @@ button {
 }
 
 .admin-section-tabs {
-  width: max-content;
-  min-width: 240px;
   justify-self: start;
 }
 
 .segmented-control {
   --segment-count: 2;
-  width: 100%;
+  width: max-content;
   height: 44px;
   display: grid;
-  grid-template-columns: repeat(var(--segment-count), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--segment-count), 1fr);
   align-items: center;
   padding: var(--admin-space-label);
   border: 1px solid var(--border);
@@ -1513,7 +1511,6 @@ button {
   display: grid;
   place-items: center;
   height: 100%;
-  min-width: 0;
   padding: 0 var(--admin-space-inline);
   border: 0;
   border-radius: 6px;
@@ -1526,6 +1523,17 @@ button {
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
+}
+
+.segmented-control__sizer,
+.segmented-control__label {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+
+.segmented-control__sizer {
+  font-weight: 600;
+  visibility: hidden;
 }
 
 .segmented-control__item:hover {
@@ -1565,6 +1573,7 @@ button {
 
 .admin-list {
   overflow: hidden;
+  min-height: 360px;
 }
 
 .admin-editor {
@@ -1608,7 +1617,7 @@ button {
 
 .admin-items {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 260px;
   display: grid;
   align-content: start;
   gap: 8px;
@@ -1617,6 +1626,16 @@ button {
   scroll-padding-block: 16px;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.admin-items[data-fetching="true"] {
+  opacity: 0.72;
+}
+
+.admin-list-placeholder {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
 }
 
 .list-card {

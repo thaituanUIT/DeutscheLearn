@@ -151,6 +151,8 @@ function adminWorkspace(token: string): HTMLElement {
   let activeTab: "words" | "reading" = "words";
   let disposeActiveTab = (): void => undefined;
 
+  void prefetchAdminLists(token);
+
   const showWords = (): void => {
     activeTab = "words";
     disposeActiveTab();
@@ -203,16 +205,19 @@ function renderWordsAdmin(host: HTMLElement, token: string): () => void {
     await invalidateFocusWords();
   };
   const unsubscribe = wordsObserver.subscribe((result) => {
-    if (result.data) {
+    if (result.data !== undefined) {
       state.words = result.data;
       renderWordList(listPanel, state, renderEditor, applyWordsQuery, result.isFetching);
+      return;
+    }
+    if (result.isPending) {
+      listPanel.replaceChildren(el("p", "prompt admin-list-placeholder", "Loading words..."));
       return;
     }
     if (result.error) {
       listPanel.replaceChildren(adminError(result.error));
       return;
     }
-    listPanel.replaceChildren(el("p", "prompt", "Loading words..."));
   });
 
   renderEditor();
@@ -261,6 +266,7 @@ function renderWordList(
   controls.append(search, clearSearch);
 
   const list = el("div", "admin-items");
+  list.dataset.fetching = isFetching ? "true" : "false";
   for (const word of state.words) {
     const focusCount = word.focus_entries.length;
     list.append(
@@ -410,16 +416,19 @@ function renderReadingAdmin(host: HTMLElement, token: string): () => void {
     await invalidateStoryPassages();
   };
   const unsubscribe = passagesObserver.subscribe((result) => {
-    if (result.data) {
+    if (result.data !== undefined) {
       state.passages = result.data;
       renderPassageList(listPanel, token, state, renderEditor, applyPassagesQuery, result.isFetching);
+      return;
+    }
+    if (result.isPending) {
+      listPanel.replaceChildren(el("p", "prompt admin-list-placeholder", "Loading passages..."));
       return;
     }
     if (result.error) {
       listPanel.replaceChildren(adminError(result.error));
       return;
     }
-    listPanel.replaceChildren(el("p", "prompt", "Loading passages..."));
   });
 
   renderEditor();
@@ -475,6 +484,7 @@ function renderPassageList(
   controls.append(search, clearSearch);
 
   const list = el("div", "admin-items");
+  list.dataset.fetching = isFetching ? "true" : "false";
   const filteredPassages = state.passages.filter((passage) => matchesPassageSearch(passage, state.search));
   for (const passage of filteredPassages) {
     const questionCount = formatCount(passage.question_count, "question", { zeroLabel: "No" });
@@ -838,6 +848,13 @@ function adminPassagesQueryOptions(token: string, group: AdminReadingGroup) {
     staleTime: ADMIN_STALE_TIME,
     placeholderData: keepPreviousData,
   };
+}
+
+function prefetchAdminLists(token: string): Promise<unknown[]> {
+  return Promise.all([
+    queryClient.prefetchQuery(adminWordsQueryOptions(token, "")),
+    ...READING_GROUPS.map((group) => queryClient.prefetchQuery(adminPassagesQueryOptions(token, group))),
+  ]);
 }
 
 function editorActionBar(status: HTMLElement, cancel: HTMLButtonElement, save: HTMLButtonElement): HTMLElement {
@@ -1671,11 +1688,14 @@ function segmentedControl<T extends string>({
   };
 
   for (const option of options) {
-    const segment = button(option.label, "segmented-control__item");
+    const segment = button("", "segmented-control__item");
+    const sizer = el("span", "segmented-control__sizer", option.label);
+    sizer.setAttribute("aria-hidden", "true");
     segment.type = "button";
     segment.dataset.value = option.value;
     segment.title = option.title ?? option.label;
     segment.setAttribute("role", "tab");
+    segment.append(sizer, el("span", "segmented-control__label", option.label));
     segment.addEventListener("click", () => {
       if (activeValue === option.value) return;
       if (onChange(option.value) === false) return;
