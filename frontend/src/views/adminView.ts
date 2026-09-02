@@ -31,6 +31,7 @@ import type {
 } from "../api/types";
 import { appHeader } from "../components/appHeader";
 import { button } from "../components/button";
+import { SegmentedControl } from "../components/SegmentedControl";
 import {
   createStimulusEditor,
   stimulusInstruction,
@@ -164,9 +165,10 @@ function adminWorkspace(token: string): HTMLElement {
     disposeActiveTab = renderReadingAdmin(host, token);
   };
 
-  const tabs = segmentedControl({
+  const tabs = SegmentedControl({
     label: "Admin section",
     value: activeTab,
+    fill: false,
     options: [
       { value: "words", label: "Vocabulary" },
       { value: "reading", label: "Reading" },
@@ -869,9 +871,10 @@ function readingGroupTabs(
   activeGroup: AdminReadingGroup,
   onSelect: (group: AdminReadingGroup) => boolean,
 ): HTMLElement {
-  return segmentedControl({
+  return SegmentedControl({
     label: "Reading collection",
     value: activeGroup,
+    fill: true,
     options: [
       { value: "general", label: "General" },
       { value: "goethe", label: "Goethe", title: "Goethe-Institut" },
@@ -933,7 +936,7 @@ function trueFalseQuestionBlock(question: AdminReadingQuestion): QuestionBlock {
   const explanation = textarea("Explanation after answer", question.explanation ?? "", 3);
   const remove = button("Remove question", "admin-text-button danger-text-button");
   const header = questionBlockHeader(title, remove);
-  const answer = segmentedControl<TrueFalseAnswer>({
+  const answer = SegmentedControl<TrueFalseAnswer>({
     label: "Correct answer",
     value: selected,
     options: [
@@ -1496,7 +1499,7 @@ function articleSegmentedControl(
   enabled: boolean,
 ): { node: HTMLElement; value: () => GermanArticle | null; setEnabled: (nextEnabled: boolean) => void } {
   let selected = GERMAN_ARTICLES.includes(value as GermanArticle) ? (value as GermanArticle) : null;
-  const node = segmentedControl<GermanArticle>({
+  const node = SegmentedControl<GermanArticle>({
     label: "Article",
     value: selected ?? "der",
     options: GERMAN_ARTICLES.map((article) => ({ value: article, label: article })),
@@ -1660,64 +1663,6 @@ function syncGoethePartOptions(select: HTMLSelectElement, level: AdminLevel): vo
     }),
   );
   select.value = selected;
-}
-
-function segmentedControl<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: Array<{ value: T; label: string; title?: string }>;
-  onChange: (value: T) => boolean | void;
-}): HTMLElement {
-  let activeValue = value;
-  const wrap = el("div", "segmented-control");
-  wrap.setAttribute("role", "tablist");
-  wrap.setAttribute("aria-label", label);
-  wrap.style.setProperty("--segment-count", String(options.length));
-
-  const renderState = (): void => {
-    for (const segment of Array.from(wrap.querySelectorAll<HTMLButtonElement>(".segmented-control__item"))) {
-      const isSelected = segment.dataset.value === activeValue;
-      segment.setAttribute("aria-selected", isSelected ? "true" : "false");
-      segment.tabIndex = isSelected ? 0 : -1;
-    }
-  };
-
-  for (const option of options) {
-    const segment = button("", "segmented-control__item");
-    const sizer = el("span", "segmented-control__sizer", option.label);
-    sizer.setAttribute("aria-hidden", "true");
-    segment.type = "button";
-    segment.dataset.value = option.value;
-    segment.title = option.title ?? option.label;
-    segment.setAttribute("role", "tab");
-    segment.append(sizer, el("span", "segmented-control__label", option.label));
-    segment.addEventListener("click", () => {
-      if (activeValue === option.value) return;
-      if (onChange(option.value) === false) return;
-      activeValue = option.value;
-      renderState();
-    });
-    segment.addEventListener("keydown", (event) => {
-      if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-      event.preventDefault();
-      const currentIndex = options.findIndex((item) => item.value === activeValue);
-      const offset = event.key === "ArrowRight" ? 1 : -1;
-      const next = options[(currentIndex + offset + options.length) % options.length];
-      if (onChange(next.value) === false) return;
-      activeValue = next.value;
-      renderState();
-      const nextButton = wrap.querySelector<HTMLButtonElement>(`[data-value="${next.value}"]`);
-      nextButton?.focus();
-    });
-    wrap.append(segment);
-  }
-  renderState();
-  return wrap;
 }
 
 function ListCard({ title, meta, selected, onSelect }: ListCardProps): HTMLButtonElement {
