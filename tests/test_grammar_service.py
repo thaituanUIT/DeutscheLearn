@@ -37,20 +37,27 @@ class Result:
                 "page_start": None,
                 "page_end": None,
                 "similarity": 0.82,
+                "keyword_score": 0.12,
+                "hybrid_score": 0.61,
             }
         ]
 
 
-def test_retrieve_grammar_chunks_is_global_semantic_search() -> None:
+def test_retrieve_grammar_chunks_uses_lightweight_hybrid_ranking() -> None:
     db = CapturingDb()
 
-    citations = grammar.retrieve_grammar_chunks(db, [0.1, 0.2])
+    citations = grammar.retrieve_grammar_chunks(db, [0.1, 0.2], query_text="mit dem Auto")
 
     assert len(citations) == 1
-    assert db.params == {"embedding": "[0.10000000,0.20000000]"}
+    assert db.params == {"embedding": "[0.10000000,0.20000000]", "query_text": "mit dem Auto"}
     assert "where level" not in db.sql.casefold()
-    assert "topic_boost" not in db.sql
-    assert "order by embedding <=>" in db.sql.casefold()
+    assert "plainto_tsquery('simple', :query_text)" in db.sql
+    assert "keyword_score" in db.sql
+    assert "hybrid_score" in db.sql
+    assert "order by hybrid_score desc" in db.sql.casefold()
+    assert citations[0].similarity == 0.82
+    assert citations[0].keyword_score == 0.12
+    assert citations[0].hybrid_score == 0.61
 
 
 def test_generate_answer_prompt_has_no_derived_level(monkeypatch) -> None:

@@ -37,6 +37,8 @@ class GrammarCitation:
     source_kind: str = "markdown"
     page_start: int | None = None
     page_end: int | None = None
+    keyword_score: float = 0.0
+    hybrid_score: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -101,6 +103,7 @@ def answer_grammar_question(
     retrieved = retrieve_grammar_chunks(
         db=db,
         embedding=query_embedding,
+        query_text=question,
     )
     accepted = [
         citation
@@ -155,6 +158,7 @@ def embed_texts(texts: list[str], input_type: str, settings: Settings | None = N
 def retrieve_grammar_chunks(
     db: Session,
     embedding: list[float],
+    query_text: str,
 ) -> list[GrammarCitation]:
     if db.bind is None or db.bind.dialect.name != "postgresql":
         raise GrammarUnavailableError("Grammar retrieval requires a Postgres pgvector database")
@@ -162,6 +166,37 @@ def retrieve_grammar_chunks(
     rows = db.execute(
         text(
             """
+            with vector_candidates as (
+                select
+                    id,
+                    title,
+                    section,
+                    content,
+                    level,
+                    topic,
+                    source_path,
+                    source_kind,
+                    page_start,
+                    page_end,
+                    1 - (embedding <=> cast(:embedding as extensions.vector)) as similarity
+                from grammar_chunks
+                order by embedding <=> cast(:embedding as extensions.vector)
+                limit 24
+            ),
+            scored as (
+                select
+                    *,
+                    ts_rank_cd(
+                        to_tsvector(
+                            'simple',
+                            coalesce(title, '') || ' ' ||
+                            coalesce(section, '') || ' ' ||
+                            coalesce(content, '')
+                        ),
+                        plainto_tsquery('simple', :query_text)
+                    ) as keyword_score
+                from vector_candidates
+            )
             select
                 id,
                 title,
@@ -173,13 +208,15 @@ def retrieve_grammar_chunks(
                 source_kind,
                 page_start,
                 page_end,
-                1 - (embedding <=> cast(:embedding as extensions.vector)) as similarity
-            from grammar_chunks
-            order by embedding <=> cast(:embedding as extensions.vector)
+                similarity,
+                keyword_score,
+                similarity * 0.70 + least(keyword_score, 1.0) * 0.30 as hybrid_score
+            from scored
+            order by hybrid_score desc, similarity desc
             limit 12
             """
         ),
-        {"embedding": embedding_literal},
+        {"embedding": embedding_literal, "query_text": query_text},
     ).mappings()
     return [
         GrammarCitation(
@@ -194,6 +231,8 @@ def retrieve_grammar_chunks(
             source_kind=str(row["source_kind"]),
             page_start=int(row["page_start"]) if row["page_start"] is not None else None,
             page_end=int(row["page_end"]) if row["page_end"] is not None else None,
+            keyword_score=float(row["keyword_score"]),
+            hybrid_score=float(row["hybrid_score"]),
         )
         for row in rows
     ]
@@ -318,6 +357,8 @@ def _citation_to_dict(citation: GrammarCitation) -> dict[str, Any]:
         "source_kind": citation.source_kind,
         "page_start": citation.page_start,
         "page_end": citation.page_end,
+        "keyword_score": citation.keyword_score,
+        "hybrid_score": citation.hybrid_score,
     }
 
 
@@ -334,6 +375,8 @@ def _citation_from_dict(data: dict[str, Any]) -> GrammarCitation:
         source_kind=str(data.get("source_kind", "markdown")),
         page_start=int(data["page_start"]) if data.get("page_start") is not None else None,
         page_end=int(data["page_end"]) if data.get("page_end") is not None else None,
+        keyword_score=float(data.get("keyword_score", 0.0)),
+        hybrid_score=float(data.get("hybrid_score", 0.0)),
     )
 
 

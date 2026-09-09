@@ -21,6 +21,8 @@ GRAMMAR_DIR = Path("data/grammar")
 PDF_DIR = Path("data/grammar_pdfs")
 MANIFEST_PATH = Path("data/grammar_sources.json")
 SourceKind = Literal["markdown", "pdf"]
+MAX_CHUNK_TOKENS = 520
+CHUNK_OVERLAP_PARAGRAPHS = 1
 
 
 @dataclass(frozen=True)
@@ -105,7 +107,7 @@ def main() -> None:
         for start in range(0, len(changed_chunks), 96):
             batch = changed_chunks[start : start + 96]
             embeddings.extend(
-                embed_texts([chunk.content for chunk in batch], input_type="search_document")
+                embed_texts([embedding_text(chunk) for chunk in batch], input_type="search_document")
             )
 
         now = utc_now()
@@ -341,17 +343,25 @@ def chunk_markdown_doc(doc: GrammarDoc) -> list[GrammarChunk]:
     section = doc.title
     lines: list[str] = []
     order = 0
+
+    def flush() -> None:
+        nonlocal lines, order
+        parts = split_lines_by_budget(lines)
+        for index, part in enumerate(parts):
+            id_suffix = f"-{index}" if len(parts) > 1 else ""
+            chunks.append(build_chunk(doc, section, part, order, id_suffix=id_suffix))
+            order += 1
+        lines = []
+
     for line in doc.body.splitlines():
         if line.startswith("# "):
             if lines:
-                chunks.append(build_chunk(doc, section, lines, order))
-                order += 1
-                lines = []
+                flush()
             section = line.removeprefix("# ").strip()
         else:
             lines.append(line)
     if lines:
-        chunks.append(build_chunk(doc, section, lines, order))
+        flush()
     return chunks
 
 
@@ -397,7 +407,7 @@ def chunk_pdf_doc(doc: GrammarDoc) -> list[GrammarChunk]:
             page_start = current_page if page_start is None else min(page_start, current_page)
             page_end = current_page if page_end is None else max(page_end, current_page)
         lines.append(line)
-        if approximate_token_count("\n".join(lines)) > 520:
+        if approximate_token_count("\n".join(lines)) > MAX_CHUNK_TOKENS:
             flush()
     flush()
     return chunks
@@ -422,11 +432,16 @@ def build_chunk(
     order: int,
     page_start: int | None = None,
     page_end: int | None = None,
+    id_suffix: str = "",
 ) -> GrammarChunk:
     content = "\n".join(line.rstrip() for line in lines).strip()
-    digest = sha256(content)
+    metadata = {
+        **doc.metadata,
+        "approximate_tokens": approximate_token_count(content),
+    }
+    digest = sha256(f"{doc.title}\n{section}\n{content}")
     if doc.source_kind == "markdown":
-        chunk_id = f"{doc.doc_id}-{slug(section)}"
+        chunk_id = f"{doc.doc_id}-{slug(section)}{id_suffix}"
     else:
         page_suffix = f"-p{page_start}-{page_end}" if page_start is not None else ""
         chunk_id = f"{doc.doc_id}-{slug(section)}{page_suffix}-{order}"
@@ -439,8 +454,59 @@ def build_chunk(
         sort_order=order,
         page_start=page_start,
         page_end=page_end,
-        metadata={},
+        metadata=metadata,
     )
+
+
+def split_lines_by_budget(lines: list[str]) -> list[list[str]]:
+    paragraphs = split_paragraphs(lines)
+    chunks: list[list[str]] = []
+    current: list[str] = []
+
+    for paragraph in paragraphs:
+        candidate = [*current, *paragraph] if not current else [*current, "", *paragraph]
+        if current and approximate_token_count("\n".join(candidate)) > MAX_CHUNK_TOKENS:
+            chunks.append(current)
+            overlap = recent_paragraphs(current, CHUNK_OVERLAP_PARAGRAPHS)
+            current = [*overlap, "", *paragraph] if overlap else paragraph
+        else:
+            current = candidate
+
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def split_paragraphs(lines: list[str]) -> list[list[str]]:
+    paragraphs: list[list[str]] = []
+    current: list[str] = []
+    for line in lines:
+        if line.strip():
+            current.append(line)
+            continue
+        if current:
+            paragraphs.append(current)
+            current = []
+    if current:
+        paragraphs.append(current)
+    return paragraphs
+
+
+def recent_paragraphs(lines: list[str], count: int) -> list[str]:
+    if count <= 0:
+        return []
+    paragraphs = split_paragraphs(lines)
+    selected = paragraphs[-count:]
+    result: list[str] = []
+    for paragraph in selected:
+        if result:
+            result.append("")
+        result.extend(paragraph)
+    return result
+
+
+def embedding_text(chunk: GrammarChunk) -> str:
+    return f"{chunk.doc.title}\n{chunk.section}\n{chunk.content}"
 
 
 def normalize_database_url(database_url: str) -> str:
