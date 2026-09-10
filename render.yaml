@@ -28,5 +28,11 @@ services:
         value: google/gemma-4-31b-it:free
       - key: OPENROUTER_CHAT_FALLBACK_MODELS
         value: openrouter/free
+      - key: GRAMMAR_SIMILARITY_THRESHOLD
+        value: "0.45"
+      - key: GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD
+        value: "0.85"
+      - key: GRAMMAR_MIN_QUERY_WORDS
+        value: "3"
       - key: DATABASE_URL
         sync: false

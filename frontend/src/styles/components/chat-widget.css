@@ -37,8 +37,8 @@
   right: 0;
   bottom: 72px;
   width: 384px;
-  min-height: 420px;
-  max-height: min(640px, calc(100dvh - 140px));
+  min-height: min(420px, calc(100dvh - 220px));
+  max-height: min(560px, calc(100dvh - 220px));
   display: none;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
@@ -48,7 +48,7 @@
 }
 
 .grammar-widget[data-has-messages="true"] .grammar-panel {
-  height: min(520px, 640px, calc(100dvh - 140px));
+  height: min(520px, 560px, calc(100dvh - 220px));
 }
 
 .grammar-widget[data-state="open"] .grammar-panel,
@@ -324,6 +324,7 @@
     bottom: 0;
     width: 100%;
     height: auto;
+    min-height: 0;
     max-height: none;
     border-right: 0;
     border-bottom: 0;

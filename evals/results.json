@@ -1,0 +1,81 @@
+{
+  "embedding_model": "embed-multilingual-v3.0",
+  "embedding_dimension": 1024,
+  "chosen_absolute_floor": 0.45,
+  "relative_floor": 0.85,
+  "selection_rule": "Highest unanswerable abstention among floors with max Full-hit@k; precision and higher floor break ties.",
+  "rows": [
+    {
+      "absolute_floor": 0.3,
+      "full_hit_at_k": 0.6666666666666666,
+      "precision": 0.2962962962962963,
+      "unanswerable_abstention_rate": 0.0,
+      "answerable_abstention_rate": 0.0,
+      "avg_chunks": 3.5833333333333335
+    },
+    {
+      "absolute_floor": 0.35,
+      "full_hit_at_k": 0.6666666666666666,
+      "precision": 0.2962962962962963,
+      "unanswerable_abstention_rate": 0.0,
+      "answerable_abstention_rate": 0.0,
+      "avg_chunks": 3.5833333333333335
+    },
+    {
+      "absolute_floor": 0.4,
+      "full_hit_at_k": 0.6666666666666666,
+      "precision": 0.3333333333333333,
+      "unanswerable_abstention_rate": 0.0,
+      "answerable_abstention_rate": 0.0,
+      "avg_chunks": 3.0833333333333335
+    },
+    {
+      "absolute_floor": 0.45,
+      "full_hit_at_k": 0.6666666666666666,
+      "precision": 0.4666666666666667,
+      "unanswerable_abstention_rate": 0.6666666666666666,
+      "answerable_abstention_rate": 0.1111111111111111,
+      "avg_chunks": 1.6666666666666667
+    },
+    {
+      "absolute_floor": 0.5,
+      "full_hit_at_k": 0.4444444444444444,
+      "precision": 0.45454545454545453,
+      "unanswerable_abstention_rate": 0.6666666666666666,
+      "answerable_abstention_rate": 0.2222222222222222,
+      "avg_chunks": 1.0833333333333333
+    },
+    {
+      "absolute_floor": 0.55,
+      "full_hit_at_k": 0.2222222222222222,
+      "precision": 0.5,
+      "unanswerable_abstention_rate": 1.0,
+      "answerable_abstention_rate": 0.4444444444444444,
+      "avg_chunks": 0.5
+    },
+    {
+      "absolute_floor": 0.6,
+      "full_hit_at_k": 0.1111111111111111,
+      "precision": 0.6666666666666666,
+      "unanswerable_abstention_rate": 1.0,
+      "answerable_abstention_rate": 0.6666666666666666,
+      "avg_chunks": 0.25
+    },
+    {
+      "absolute_floor": 0.65,
+      "full_hit_at_k": 0.0,
+      "precision": 1.0,
+      "unanswerable_abstention_rate": 1.0,
+      "answerable_abstention_rate": 0.8888888888888888,
+      "avg_chunks": 0.08333333333333333
+    },
+    {
+      "absolute_floor": 0.7,
+      "full_hit_at_k": 0.0,
+      "precision": 0.0,
+      "unanswerable_abstention_rate": 1.0,
+      "answerable_abstention_rate": 1.0,
+      "avg_chunks": 0.0
+    }
+  ]
+}

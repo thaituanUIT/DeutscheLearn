@@ -27,7 +27,9 @@ class Settings(BaseSettings):
     openrouter_http_referer: str | None = None
     openrouter_app_title: str = "DeutscheLearn"
     grammar_rate_limit_per_hour: int = 10
-    grammar_similarity_threshold: float = 0.40
+    grammar_similarity_threshold: float = 0.45
+    grammar_relative_similarity_threshold: float = 0.85
+    grammar_min_query_words: int = 3
     static_assets_enabled: bool = True
 
     @model_validator(mode="after")
