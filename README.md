@@ -90,7 +90,11 @@ The grammar assistant uses a Render-friendly split:
 - Source PDFs live in local `data/grammar_pdfs` and are described by `data/grammar_sources.json`.
 - Local/dev ingestion embeds notes with Cohere `embed-multilingual-v3.0` and writes chunks to the
   same Supabase Postgres database used by `DATABASE_URL`.
-- OpenRouter generates answers with `google/gemma-4-31b-it:free`.
+- OpenRouter generates answers with `OPENROUTER_CHAT_MODEL`, defaulting to
+  `google/gemma-4-31b-it:free`.
+- `OPENROUTER_CHAT_FALLBACK_MODELS` is a comma-separated fallback list, defaulting to
+  `openrouter/free`, so a temporary rate limit on the preferred free model does not disable the
+  assistant.
 
 The embedding model is pinned to Cohere `embed-multilingual-v3.0` at 1024 dimensions. Changing
 the model is a schema migration plus full re-embed, not an environment-only change.
