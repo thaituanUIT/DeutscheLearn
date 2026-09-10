@@ -1,4 +1,5 @@
 import { el } from "../utils/dom";
+import type { Mistake } from "../state/progressStore";
 import type { QuizMode } from "./quizView";
 
 export type HomeMode = QuizMode | "focus" | "story";
@@ -11,6 +12,7 @@ export type HomeModeMetric = {
 type HomeViewOptions = {
   onSelectMode: (mode: HomeMode) => void;
   metrics: Record<HomeMode, HomeModeMetric>;
+  mistakes: Mistake[];
 };
 
 const modes: Array<{
@@ -82,5 +84,24 @@ export function homeView(options: HomeViewOptions): HTMLElement {
   }
 
   section.append(intro, grid);
+  if (options.mistakes.length > 0) {
+    section.append(mistakeTray(options.mistakes));
+  }
   return section;
+}
+
+function mistakeTray(mistakes: Mistake[]): HTMLElement {
+  const tray = el("section", "mistake-tray");
+  const list = el("div", "mistake-list");
+  for (const mistake of mistakes.slice(0, 3)) {
+    const item = el("div", "mistake-item");
+    item.append(
+      el("span", "mistake-mode", mistake.mode),
+      el("strong", "", mistake.word ?? mistake.prompt),
+      el("span", "mistake-answer", `${mistake.selected} / ${mistake.correct}`),
+    );
+    list.append(item);
+  }
+  tray.append(el("div", "question-type", "Review"), list);
+  return tray;
 }

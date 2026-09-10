@@ -16,6 +16,12 @@ import type {
 import { button } from "../components/button";
 import type { GrammarWrongAnswerContext } from "../components/grammarWidget";
 import { scoreBadge } from "../components/scoreBadge";
+import { getPlayer } from "../state/playerStore";
+import {
+  recordQuizAnswer,
+  recordQuizComplete,
+  type SessionSummary,
+} from "../state/progressStore";
 import { advanceQuestion, finishAttempt, getQuizState, startAttempt } from "../state/quizStore";
 import { el } from "../utils/dom";
 
@@ -121,6 +127,8 @@ async function handleAnswer(
         questionId,
         choice,
       );
+      recordCurrentQuizAnswer(options.mode, choice, answer.correct_answer);
+      recordCurrentQuizComplete(options.mode, answer.score, answer.total_questions);
       if (!answer.correct && state.currentQuestion) {
         options.onGrammarContextChange({
           wrongAnswer: {
@@ -136,6 +144,7 @@ async function handleAnswer(
 
     if (options.mode === "timed") {
       const answer = await submitTimedAnswer(state.attemptId, questionId, choice);
+      recordCurrentQuizAnswer(options.mode, choice, answer.correct_answer);
       if (!answer.attempt_finished && answer.next_question) {
         advanceQuestion(
           answer.next_question,
@@ -148,11 +157,18 @@ async function handleAnswer(
       }
 
       finishAttempt(answer.score, answer.total_questions);
-      renderTimedResult(section, answer.score, answer.total_questions, options);
+      renderTimedResult(
+        section,
+        answer.score,
+        answer.total_questions,
+        options,
+        recordCurrentQuizComplete(options.mode, answer.score, answer.total_questions),
+      );
       return;
     }
 
     const answer = await submitEndlessAnswer(state.attemptId, questionId, choice);
+    recordCurrentQuizAnswer(options.mode, choice, answer.correct_answer);
     if (answer.correct && answer.next_question) {
       advanceQuestion(answer.next_question, answer.score);
       renderEndlessFeedback(
@@ -175,6 +191,7 @@ async function handleAnswer(
       });
     }
     await options.onLeaderboardRefresh();
+    const summary = recordCurrentQuizComplete(options.mode, answer.score, answer.score + 1);
     renderResult(
       section,
       answer.score,
@@ -182,6 +199,7 @@ async function handleAnswer(
       answer.answered_word,
       answer.meaning_overview,
       options,
+      summary,
     );
   } catch (error) {
     pendingAnswerKey = null;
@@ -240,6 +258,7 @@ function renderResult(
   answeredWord: string,
   meaningOverview: string,
   options: QuizViewOptions,
+  summary: SessionSummary | null,
 ): void {
   section.replaceChildren();
   const content = el("div", "result");
@@ -249,6 +268,7 @@ function renderResult(
     el("p", "answered-word", answeredWord),
     el("p", "meaning-overview", meaningOverview),
   );
+  if (summary) content.append(sessionSummary(summary));
   const retry = button("Try again", "button primary");
   retry.addEventListener("click", () => renderStart(section, options));
   section.append(stats({ ...options, bestScore: Math.max(options.bestScore, score) }), content, retry);
@@ -260,6 +280,7 @@ function renderTimedResult(
   score: number,
   totalQuestions: number,
   options: QuizViewOptions,
+  summary: SessionSummary | null = null,
 ): void {
   stopTimedTimer();
   section.replaceChildren();
@@ -268,9 +289,29 @@ function renderTimedResult(
     el("h2", "", "Time up"),
     el("p", "prompt", `Final score: ${score} correct from ${totalQuestions} answers.`),
   );
+  if (summary) content.append(sessionSummary(summary));
   const retry = button("Try timed again", "button primary");
   retry.addEventListener("click", () => renderStart(section, options));
   section.append(stats(options), content, retry);
+}
+
+function sessionSummary(summary: SessionSummary): HTMLElement {
+  const wrap = el("div", "session-summary");
+  wrap.append(
+    summaryItem("RICHTIG", String(summary.score)),
+    summaryItem("GESAMT", String(summary.total)),
+    summaryItem("FEHLER", String(summary.missed)),
+  );
+  if (summary.isRecord) {
+    wrap.append(summaryItem("REKORD", "neu"));
+  }
+  return wrap;
+}
+
+function summaryItem(label: string, value: string): HTMLElement {
+  const item = el("span", "session-summary-item");
+  item.append(el("span", "session-summary-label", label), el("strong", "", value));
+  return item;
 }
 
 function stats(options: QuizViewOptions): HTMLElement {
@@ -337,7 +378,13 @@ function startTimedTimer(section: HTMLElement, options: QuizViewOptions): void {
     if (timer) timer.textContent = String(state.secondsRemaining);
     if (state.secondsRemaining === 0) {
       finishAttempt(state.score, state.totalQuestions);
-      renderTimedResult(section, state.score, state.totalQuestions, options);
+      renderTimedResult(
+        section,
+        state.score,
+        state.totalQuestions,
+        options,
+        recordCurrentQuizComplete(options.mode, state.score, state.totalQuestions),
+      );
     }
   }, 1000);
 }
@@ -347,4 +394,21 @@ function stopTimedTimer(): void {
     window.clearInterval(timedTimerId);
     timedTimerId = null;
   }
+}
+
+function recordCurrentQuizAnswer(mode: QuizMode, selected: string, correct: string): void {
+  const player = getPlayer();
+  const question = getQuizState().currentQuestion;
+  if (!player || !question) return;
+  recordQuizAnswer(player.player_id, mode, question, selected, correct);
+}
+
+function recordCurrentQuizComplete(
+  mode: QuizMode,
+  score: number,
+  total: number,
+): SessionSummary | null {
+  const player = getPlayer();
+  if (!player) return null;
+  return recordQuizComplete(player.player_id, mode, score, total);
 }

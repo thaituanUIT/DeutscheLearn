@@ -85,11 +85,11 @@ async function adminRequestNoContent(
 }
 
 export function getCurrentPlayer(): Promise<Player> {
-  return request<Player>("/api/players/me");
+  return withPreviewFallback(request<Player>("/api/players/me"), previewPlayer);
 }
 
 export function getWordOfDay(): Promise<WordOfDay> {
-  return request<WordOfDay>("/api/word-of-the-day");
+  return withPreviewFallback(request<WordOfDay>("/api/word-of-the-day"), previewWordOfDay);
 }
 
 export function startEndlessQuiz(): Promise<EndlessStart> {
@@ -150,7 +150,7 @@ export function submitTimedAnswer(
 }
 
 export function getLeaderboard(): Promise<LeaderboardEntry[]> {
-  return request<LeaderboardEntry[]>("/api/leaderboard?mode=endless&limit=5");
+  return withPreviewFallback(request<LeaderboardEntry[]>("/api/leaderboard?mode=endless&limit=5"), []);
 }
 
 export function getFocusLevels(): Promise<FocusLevel[]> {
@@ -166,7 +166,7 @@ export function getFocusTopicAliases(): Promise<FocusTopicAlias[]> {
 }
 
 export function fetchAllWords(): Promise<FocusCard[]> {
-  return request<FocusCard[]>("/api/focus/cards");
+  return withPreviewFallback(request<FocusCard[]>("/api/focus/cards"), previewFocusCards);
 }
 
 export function getFocusCards(level: string, topic: string): Promise<FocusCard[]> {
@@ -192,7 +192,7 @@ export function getStoryParts(level: string): Promise<StoryPart[]> {
 }
 
 export function fetchAllPassages(): Promise<StoryPassage[]> {
-  return request<StoryPassage[]>("/api/story/passages");
+  return withPreviewFallback(request<StoryPassage[]>("/api/story/passages"), previewStoryPassages);
 }
 
 export function getStoryPassages(
@@ -218,6 +218,104 @@ export function submitStoryAnswer(questionId: string, answerId: string): Promise
     }),
   });
 }
+
+async function withPreviewFallback<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await promise;
+  } catch (error) {
+    if (previewFallbackEnabled()) return fallback;
+    throw error;
+  }
+}
+
+function previewFallbackEnabled(): boolean {
+  return import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === "true";
+}
+
+const previewPlayer: Player = {
+  player_id: "preview",
+  display_name: "Preview learner",
+  best_endless_score: 0,
+};
+
+const previewWordOfDay: WordOfDay = {
+  word: "Bahnhof",
+  article: "der",
+  part_of_speech: "noun",
+  meaning: "train station",
+  date: new Date().toISOString().slice(0, 10),
+};
+
+const previewFocusCards: FocusCard[] = [
+  {
+    word: "Bahnhof",
+    article: "der",
+    part_of_speech: "noun",
+    meaning_overview: "train station",
+    topic: "travel",
+    topic_label: "Travel",
+    level: "A1",
+  },
+  {
+    word: "Fahrkarte",
+    article: "die",
+    part_of_speech: "noun",
+    meaning_overview: "ticket",
+    topic: "travel",
+    topic_label: "Travel",
+    level: "A1",
+  },
+  {
+    word: "öffnen",
+    article: null,
+    part_of_speech: "verb",
+    meaning_overview: "to open",
+    topic: "daily_life",
+    topic_label: "Daily life",
+    level: "A1",
+  },
+];
+
+const previewStoryPassages: StoryPassage[] = [
+  {
+    id: "preview-story",
+    group: "general",
+    level: "A1",
+    part: null,
+    exercise_type: null,
+    topic: "daily_life",
+    title: "Am Morgen",
+    passage_text: "Mara steht um sieben Uhr auf. Sie trinkt Kaffee und fährt mit dem Bus zur Schule.",
+    image_url: null,
+    render_kind: "text",
+    content: null,
+    image_path: null,
+    transcript: null,
+    context_label: null,
+    order_index: 1,
+    questions: [
+      {
+        id: "preview-story-question",
+        prompt: "Wann steht Mara auf?",
+        order_index: 1,
+        answers: [
+          {
+            id: "preview-story-answer-1",
+            answer_text: "Um sieben Uhr",
+            order_index: 1,
+            ref_stimulus: null,
+          },
+          {
+            id: "preview-story-answer-2",
+            answer_text: "Um neun Uhr",
+            order_index: 2,
+            ref_stimulus: null,
+          },
+        ],
+      },
+    ],
+  },
+];
 
 export function askGrammar(payload: {
   question: string;
