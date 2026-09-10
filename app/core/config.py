@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     cohere_embedding_dimension: int = 1024
     openrouter_api_key: str | None = None
     openrouter_chat_model: str = "google/gemma-4-31b-it:free"
+    openrouter_chat_fallback_models: str = "openrouter/free"
     openrouter_http_referer: str | None = None
     openrouter_app_title: str = "DeutscheLearn"
     grammar_rate_limit_per_hour: int = 10

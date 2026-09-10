@@ -93,6 +93,54 @@ def test_generate_answer_prompt_has_no_derived_level(monkeypatch) -> None:
     assert "Learner level" not in messages[1]["content"]
 
 
+def test_generate_answer_falls_back_when_openrouter_model_is_rate_limited(monkeypatch) -> None:
+    seen_models: list[str] = []
+
+    def fake_post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeout: int) -> dict[str, Any]:
+        seen_models.append(str(payload["model"]))
+        if payload["model"] == "google/gemma-4-31b-it:free":
+            raise grammar.GrammarUnavailableError("openrouter.ai request failed with status 429")
+        return {"choices": [{"message": {"content": "Use Dativ: mit dem Auto."}}]}
+
+    monkeypatch.setattr(grammar, "_post_json", fake_post_json)
+    settings = grammar.Settings(
+        cohere_api_key="cohere",
+        openrouter_api_key="openrouter",
+        openrouter_chat_fallback_models="openrouter/free",
+    )
+    citation = grammar.GrammarCitation(
+        chunk_id="prepositions-dativ",
+        title="Dativ Prepositions",
+        section="Mit",
+        content="Mit takes Dativ.",
+        level="A1",
+        topic="praeposition_dativ",
+        similarity=0.82,
+        source_path="data/grammar/prepositions-dativ.md",
+    )
+
+    answer = grammar.generate_answer(
+        question="Warum mit dem Auto?",
+        citations=[citation],
+        settings=settings,
+    )
+
+    assert answer == "Use Dativ: mit dem Auto."
+    assert seen_models == ["google/gemma-4-31b-it:free", "openrouter/free"]
+
+
+def test_openrouter_models_deduplicates_primary_and_fallbacks() -> None:
+    settings = grammar.Settings(
+        openrouter_chat_model="openrouter/free",
+        openrouter_chat_fallback_models="openrouter/free, google/gemma-4-31b-it:free",
+    )
+
+    assert grammar._openrouter_models(settings) == [
+        "openrouter/free",
+        "google/gemma-4-31b-it:free",
+    ]
+
+
 def test_post_json_treats_provider_outages_as_unavailable(monkeypatch) -> None:
     def fail_urlopen(*args: Any, **kwargs: Any) -> Any:
         raise URLError("temporary name resolution failure")

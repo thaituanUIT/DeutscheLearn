@@ -280,7 +280,22 @@ def generate_answer(
         headers["HTTP-Referer"] = settings.openrouter_http_referer
     if settings.openrouter_app_title:
         headers["X-Title"] = settings.openrouter_app_title
-    data = _post_json("https://openrouter.ai/api/v1/chat/completions", payload, headers, timeout=45)
+    provider_errors: list[str] = []
+    for model in _openrouter_models(settings):
+        payload["model"] = model
+        try:
+            data = _post_json(
+                "https://openrouter.ai/api/v1/chat/completions",
+                payload,
+                headers,
+                timeout=45,
+            )
+            break
+        except GrammarUnavailableError as exc:
+            provider_errors.append(f"{model}: {exc}")
+    else:
+        raise GrammarUnavailableError("; ".join(provider_errors))
+
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
@@ -288,6 +303,16 @@ def generate_answer(
     if not isinstance(content, str) or not content.strip():
         raise GrammarServiceError("OpenRouter returned an empty answer")
     return content.strip()
+
+
+def _openrouter_models(settings: Settings) -> list[str]:
+    models = [settings.openrouter_chat_model]
+    models.extend(
+        model.strip()
+        for model in settings.openrouter_chat_fallback_models.split(",")
+        if model.strip()
+    )
+    return list(dict.fromkeys(models))
 
 
 def _get_cached_answer(
