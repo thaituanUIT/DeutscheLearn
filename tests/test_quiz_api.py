@@ -22,7 +22,7 @@ from app.db.models import (
 from app.db.session import SessionLocal
 from app.main import app
 from app.services.focus import import_focus_words
-from app.services.grammar import GrammarAnswer
+from app.services.grammar import GrammarAnswer, GrammarServiceError
 from app.services.quiz import question_to_schema
 from app.services.words import get_meaning_overview
 
@@ -98,6 +98,26 @@ def test_grammar_ask_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
     assert response.status_code == 429
+
+
+def test_grammar_ask_provider_failure_returns_error_without_citations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.api.routes.check_rate_limit", lambda learner_id, ip: None)
+
+    def fail_answer(**kwargs) -> GrammarAnswer:
+        raise GrammarServiceError("OpenRouter response did not include an answer")
+
+    monkeypatch.setattr("app.api.routes.answer_grammar_question", fail_answer)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/grammar/ask",
+            json={"question": "what is akkusativ articles", "learner_id": "learner-1"},
+        )
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "Something went wrong while answering."}
 
 
 def test_admin_words_require_valid_token(monkeypatch: pytest.MonkeyPatch) -> None:

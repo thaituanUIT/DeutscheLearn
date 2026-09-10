@@ -37,6 +37,7 @@ class Result:
                 "source_kind": "markdown",
                 "page_start": None,
                 "page_end": None,
+                "content_hash": "hash-dativ-articles",
                 "similarity": 0.82,
                 "keyword_score": 0.12,
                 "hybrid_score": 0.61,
@@ -59,6 +60,154 @@ def test_retrieve_grammar_chunks_uses_lightweight_hybrid_ranking() -> None:
     assert citations[0].similarity == 0.82
     assert citations[0].keyword_score == 0.12
     assert citations[0].hybrid_score == 0.61
+
+
+def test_assess_query_quality_rejects_single_term_but_allows_short_question() -> None:
+    assert not grammar.assess_query_quality("akkusativ")["retrievable"]
+    assert grammar.assess_query_quality("what is akkusativ articles")["retrievable"]
+    assert grammar.clarification_prompt("akkusativ") == "What would you like to know about the Akkusativ?"
+
+
+def test_answer_grammar_question_rejects_vague_query_before_embedding(monkeypatch) -> None:
+    def fail_embed(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("Short queries should not go to retrieval")
+
+    monkeypatch.setattr(grammar, "embed_texts", fail_embed)
+
+    answer = grammar.answer_grammar_question(
+        db=CapturingDb(),  # type: ignore[arg-type]
+        question="akkusativ",
+        include_debug=True,
+        settings=grammar.Settings(cohere_api_key="cohere", openrouter_api_key="openrouter"),
+    )
+
+    assert answer.status == "no_match"
+    assert answer.answer == "What would you like to know about the Akkusativ?"
+    assert answer.citations == []
+    assert answer.retrieval_debug == {
+        "query": {
+            "retrievable": False,
+            "word_count": 1,
+            "content_word_count": 1,
+            "min_query_words": 3,
+            "reason": "too_short_or_vague",
+        },
+    }
+
+
+def test_filter_grammar_chunks_uses_absolute_and_relative_floors() -> None:
+    chunks = [
+        grammar.GrammarCitation(
+            chunk_id="akkusativ",
+            title="Articles and Cases",
+            section="Nominativ and Akkusativ",
+            content="Akkusativ masculine der becomes den.",
+            level="A1",
+            topic="artikel_kasus",
+            similarity=0.90,
+            source_path="data/grammar/articles-cases.md",
+        ),
+        grammar.GrammarCitation(
+            chunk_id="dativ-neighbor",
+            title="Articles and Cases",
+            section="Dativ Articles",
+            content="Dativ masculine der becomes dem.",
+            level="A1",
+            topic="artikel_kasus",
+            similarity=0.70,
+            source_path="data/grammar/articles-cases.md",
+        ),
+        grammar.GrammarCitation(
+            chunk_id="weak",
+            title="Perfect Tense",
+            section="Past Participle",
+            content="Regular participles use ge plus stem plus t.",
+            level="A2",
+            topic="perfekt",
+            similarity=0.30,
+            source_path="data/grammar/perfect-tense.md",
+        ),
+    ]
+
+    accepted, debug = grammar.filter_grammar_chunks(
+        chunks,
+        settings=grammar.Settings(
+            grammar_similarity_threshold=0.40,
+            grammar_relative_similarity_threshold=0.85,
+        ),
+    )
+
+    assert [chunk.chunk_id for chunk in accepted] == ["akkusativ"]
+    assert debug["top_score"] == 0.90
+    removed = {chunk["chunk_id"]: chunk["removed_by"] for chunk in debug["chunks"]}
+    assert removed == {
+        "akkusativ": None,
+        "dativ-neighbor": "relative_floor",
+        "weak": "absolute_floor",
+    }
+
+
+def test_filter_grammar_chunks_deduplicates_near_identical_content() -> None:
+    chunks = [
+        grammar.GrammarCitation(
+            chunk_id="one",
+            title="Articles and Cases",
+            section="Akkusativ",
+            content="Akkusativ masculine article der changes to den for the direct object.",
+            level="A1",
+            topic="artikel_kasus",
+            similarity=0.90,
+            source_path="data/grammar/articles-cases.md",
+        ),
+        grammar.GrammarCitation(
+            chunk_id="two",
+            title="Articles and Cases",
+            section="Akkusativ Examples",
+            content="Akkusativ masculine article der changes to den for the direct object in examples.",
+            level="A1",
+            topic="artikel_kasus",
+            similarity=0.89,
+            source_path="data/grammar/articles-cases.md",
+        ),
+    ]
+
+    accepted, debug = grammar.filter_grammar_chunks(chunks)
+
+    assert [chunk.chunk_id for chunk in accepted] == ["one"]
+    assert debug["chunks"][1]["removed_by"] == "duplicate"
+
+
+def test_filter_grammar_chunks_drops_conflicting_case_chunks() -> None:
+    chunks = [
+        grammar.GrammarCitation(
+            chunk_id="akkusativ",
+            title="Articles and Cases",
+            section="Nominativ and Akkusativ",
+            content="Akkusativ masculine article der changes to den.",
+            level="A1",
+            topic="artikel_kasus",
+            similarity=0.55,
+            source_path="data/grammar/articles-cases.md",
+        ),
+        grammar.GrammarCitation(
+            chunk_id="dativ",
+            title="Articles and Cases",
+            section="Dativ Articles",
+            content="Dativ masculine article der changes to dem.",
+            level="A1",
+            topic="artikel_kasus",
+            similarity=0.50,
+            source_path="data/grammar/articles-cases.md",
+        ),
+    ]
+
+    accepted, debug = grammar.filter_grammar_chunks(
+        chunks,
+        query_text="what is akkusativ articles",
+    )
+
+    assert [chunk.chunk_id for chunk in accepted] == ["akkusativ"]
+    assert debug["chunks"][1]["removed_by"] == "conflicting_case_term"
 
 
 def test_generate_answer_prompt_has_no_derived_level(monkeypatch) -> None:

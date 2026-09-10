@@ -413,13 +413,21 @@ function messageFromResponse(response: GrammarAskResponse): ChatMessage {
     return {
       role: "assistant",
       status: "no_match",
-      text: "This isn't in the grammar notes yet.",
+      text: response.answer?.trim() || "This isn't in the grammar notes yet.",
+    };
+  }
+  if (!response.answer?.trim() || response.citations.length === 0) {
+    return {
+      role: "assistant",
+      status: "error",
+      text: "Something went wrong while answering.",
+      canRetry: true,
     };
   }
   return {
     role: "assistant",
     status: "answered",
-    text: response.answer ?? "",
+    text: response.answer,
     citations: response.citations,
   };
 }
@@ -463,10 +471,22 @@ function loadMessages(playerId: string): ChatMessage[] {
     const raw = localStorage.getItem(`grammar_widget_${playerId}`);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as { messages?: ChatMessage[] };
-    return Array.isArray(parsed.messages) ? parsed.messages.slice(-MAX_MESSAGES) : [];
+    return Array.isArray(parsed.messages) ? parsed.messages.map(normalizeMessage).slice(-MAX_MESSAGES) : [];
   } catch {
     return [];
   }
+}
+
+function normalizeMessage(message: ChatMessage): ChatMessage {
+  if (message.role !== "assistant") return message;
+  if (message.status !== "answered") return message;
+  if (message.text.trim() && message.citations.length > 0) return message;
+  return {
+    role: "assistant",
+    status: "error",
+    text: "Something went wrong while answering.",
+    canRetry: true,
+  };
 }
 
 function readInitialOpen(playerId: string): boolean {

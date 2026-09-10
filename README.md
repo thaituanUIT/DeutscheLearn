@@ -55,6 +55,9 @@ COHERE_EMBEDDING_MODEL=embed-multilingual-v3.0
 COHERE_EMBEDDING_DIMENSION=1024
 OPENROUTER_API_KEY=
 OPENROUTER_CHAT_MODEL=google/gemma-4-31b-it:free
+OPENROUTER_CHAT_FALLBACK_MODELS=openrouter/free
+GRAMMAR_SIMILARITY_THRESHOLD=0.45
+GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD=0.85
 ```
 
 On Render, use the included `render.yaml`. It provisions a web service plus Postgres and sets `COOKIE_SECURE=true`.
@@ -95,6 +98,9 @@ The grammar assistant uses a Render-friendly split:
 - `OPENROUTER_CHAT_FALLBACK_MODELS` is a comma-separated fallback list, defaulting to
   `openrouter/free`, so a temporary rate limit on the preferred free model does not disable the
   assistant.
+- Retrieval uses a calibrated absolute floor (`GRAMMAR_SIMILARITY_THRESHOLD=0.45`) and a relative
+  floor (`GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD=0.85`) so weak neighbouring chunks are dropped
+  before generation.
 
 The embedding model is pinned to Cohere `embed-multilingual-v3.0` at 1024 dimensions. Changing
 the model is a schema migration plus full re-embed, not an environment-only change.

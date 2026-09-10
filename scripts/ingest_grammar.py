@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -57,6 +58,8 @@ def main() -> None:
     parser.add_argument("--extract-only", action="store_true")
     parser.add_argument("--changed-only", action="store_true")
     parser.add_argument("--delete-missing", action="store_true")
+    parser.add_argument("--embed-batch-size", type=int, default=96)
+    parser.add_argument("--embed-batch-delay", type=float, default=0.0)
     parser.add_argument("--corpus-dir", default=str(GRAMMAR_DIR))
     parser.add_argument("--pdf-dir", default=str(PDF_DIR))
     parser.add_argument("--manifest", default=str(MANIFEST_PATH))
@@ -104,11 +107,13 @@ def main() -> None:
         ]
         print(f"Embedding {len(changed_chunks)} changed chunks.")
         embeddings = []
-        for start in range(0, len(changed_chunks), 96):
-            batch = changed_chunks[start : start + 96]
+        for start in range(0, len(changed_chunks), args.embed_batch_size):
+            batch = changed_chunks[start : start + args.embed_batch_size]
             embeddings.extend(
                 embed_texts([embedding_text(chunk) for chunk in batch], input_type="search_document")
             )
+            if args.embed_batch_delay and start + args.embed_batch_size < len(changed_chunks):
+                time.sleep(args.embed_batch_delay)
 
         now = utc_now()
         for doc in docs:

@@ -16,6 +16,37 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.db.models import GrammarAnswerCache
 
+CONTENT_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "can",
+    "cau",
+    "cho",
+    "does",
+    "explain",
+    "for",
+    "grammar",
+    "how",
+    "is",
+    "la",
+    "my",
+    "of",
+    "or",
+    "please",
+    "question",
+    "the",
+    "this",
+    "to",
+    "trong",
+    "what",
+    "when",
+    "why",
+}
+MAX_ACCEPTED_CITATIONS = 6
+GERMAN_CASE_TERMS = {"akkusativ", "dativ", "nominativ", "genitiv"}
+
 
 class GrammarServiceError(RuntimeError):
     pass
@@ -40,6 +71,7 @@ class GrammarCitation:
     page_end: int | None = None
     keyword_score: float = 0.0
     hybrid_score: float = 0.0
+    content_hash: str = ""
 
 
 @dataclass(frozen=True)
@@ -59,7 +91,18 @@ def normalize_question(question: str) -> str:
 
 
 def question_hash(question: str) -> str:
-    return hashlib.sha256(normalize_question(question).encode("utf-8")).hexdigest()
+    return hashlib.sha256(question.encode("utf-8")).hexdigest()
+
+
+def cache_key(normalized_question: str, settings: Settings) -> str:
+    parts = [
+        f"q={normalized_question}",
+        f"embed={settings.cohere_embedding_model}",
+        f"abs={settings.grammar_similarity_threshold:.3f}",
+        f"rel={settings.grammar_relative_similarity_threshold:.3f}",
+        f"min_words={settings.grammar_min_query_words}",
+    ]
+    return "\n".join(parts)
 
 
 def check_rate_limit(
@@ -89,7 +132,16 @@ def answer_grammar_question(
 ) -> GrammarAnswer:
     settings = settings or get_settings()
     normalized = normalize_question(question)
-    cached = _get_cached_answer(db, normalized)
+    query_quality = assess_query_quality(question, settings=settings)
+    if not query_quality["retrievable"]:
+        return GrammarAnswer(
+            status="no_match",
+            answer=clarification_prompt(question),
+            citations=[],
+            retrieval_debug={"query": query_quality} if include_debug else None,
+        )
+
+    cached = _get_cached_answer(db, cache_key(normalized, settings))
     if cached is not None:
         answer, citations = cached
         return GrammarAnswer(
@@ -106,16 +158,14 @@ def answer_grammar_question(
         embedding=query_embedding,
         query_text=question,
     )
-    accepted = [
-        citation
-        for citation in retrieved
-        if citation.similarity >= settings.grammar_similarity_threshold
-    ][:6]
+    accepted, filter_debug = filter_grammar_chunks(retrieved, query_text=question, settings=settings)
     debug = (
         {
             "cache": "miss",
-            "threshold": settings.grammar_similarity_threshold,
-            "retrieved": [_citation_debug(citation) for citation in retrieved],
+            "query": query_quality,
+            "absolute_floor": settings.grammar_similarity_threshold,
+            "relative_floor": settings.grammar_relative_similarity_threshold,
+            **filter_debug,
         }
         if include_debug
         else None
@@ -124,8 +174,86 @@ def answer_grammar_question(
         return GrammarAnswer(status="no_match", answer=None, citations=[], retrieval_debug=debug)
 
     answer = generate_answer(question=question, citations=accepted, settings=settings)
-    _store_cached_answer(db, normalized, answer, accepted)
+    _store_cached_answer(db, cache_key(normalized, settings), answer, accepted)
     return GrammarAnswer(status="answered", answer=answer, citations=accepted, retrieval_debug=debug)
+
+
+def assess_query_quality(question: str, settings: Settings | None = None) -> dict[str, Any]:
+    settings = settings or get_settings()
+    words = [word for word in normalize_question(question).replace("?", " ").split() if word]
+    content_words = [
+        word
+        for word in words
+        if word.strip(".,:;!?()[]{}\"'`") not in CONTENT_STOPWORDS
+    ]
+    retrievable = len(words) >= settings.grammar_min_query_words and len(content_words) > 0
+    return {
+        "retrievable": retrievable,
+        "word_count": len(words),
+        "content_word_count": len(content_words),
+        "min_query_words": settings.grammar_min_query_words,
+        "reason": None if retrievable else "too_short_or_vague",
+    }
+
+
+def clarification_prompt(question: str) -> str:
+    terms = [
+        word.strip(".,:;!?()[]{}\"'`")
+        for word in normalize_question(question).split()
+        if word.strip(".,:;!?()[]{}\"'`")
+    ]
+    if len(terms) == 1:
+        term = terms[0].capitalize()
+        return f"What would you like to know about the {term}?"
+    return "What would you like to know about that grammar point?"
+
+
+def filter_grammar_chunks(
+    citations: list[GrammarCitation],
+    query_text: str = "",
+    settings: Settings | None = None,
+) -> tuple[list[GrammarCitation], dict[str, Any]]:
+    settings = settings or get_settings()
+    top_score = max((citation.similarity for citation in citations), default=0.0)
+    relative_floor_score = top_score * settings.grammar_relative_similarity_threshold
+    requested_cases = _case_terms(query_text)
+    accepted: list[GrammarCitation] = []
+    seen_fingerprints: set[str] = set()
+    chunk_debug: list[dict[str, Any]] = []
+
+    for citation in citations:
+        removed_by: str | None = None
+        if citation.similarity < settings.grammar_similarity_threshold:
+            removed_by = "absolute_floor"
+        elif citation.similarity < relative_floor_score:
+            removed_by = "relative_floor"
+        elif _has_conflicting_case_term(citation, requested_cases):
+            removed_by = "conflicting_case_term"
+        else:
+            fingerprint = _citation_fingerprint(citation)
+            if fingerprint in seen_fingerprints or _is_near_duplicate(citation, accepted):
+                removed_by = "duplicate"
+            elif len(accepted) >= MAX_ACCEPTED_CITATIONS:
+                removed_by = "cap"
+            else:
+                seen_fingerprints.add(fingerprint)
+                accepted.append(citation)
+
+        item = _citation_debug(citation)
+        item["raw_score"] = citation.similarity
+        item["top_score"] = top_score
+        item["relative_floor_score"] = relative_floor_score
+        item["requested_case_terms"] = sorted(requested_cases)
+        item["removed_by"] = removed_by
+        item["kept"] = removed_by is None
+        chunk_debug.append(item)
+
+    return accepted, {
+        "top_score": top_score,
+        "relative_floor_score": relative_floor_score,
+        "accepted_count": len(accepted),
+        "chunks": chunk_debug,
+    }
 
 
 def embed_texts(texts: list[str], input_type: str, settings: Settings | None = None) -> list[list[float]]:
@@ -179,6 +307,7 @@ def retrieve_grammar_chunks(
                     source_kind,
                     page_start,
                     page_end,
+                    content_hash,
                     1 - (embedding <=> cast(:embedding as extensions.vector)) as similarity
                 from grammar_chunks
                 order by embedding <=> cast(:embedding as extensions.vector)
@@ -209,6 +338,7 @@ def retrieve_grammar_chunks(
                 source_kind,
                 page_start,
                 page_end,
+                content_hash,
                 similarity,
                 keyword_score,
                 similarity * 0.70 + least(keyword_score, 1.0) * 0.30 as hybrid_score
@@ -234,6 +364,7 @@ def retrieve_grammar_chunks(
             page_end=int(row["page_end"]) if row["page_end"] is not None else None,
             keyword_score=float(row["keyword_score"]),
             hybrid_score=float(row["hybrid_score"]),
+            content_hash=str(row["content_hash"]),
         )
         for row in rows
     ]
@@ -258,10 +389,11 @@ def generate_answer(
                 "role": "system",
                 "content": (
                     "You are a German grammar tutor. Answer only from the provided grammar notes. "
+                    "Do not use outside knowledge, even if you know the answer. "
                     "Answer in the language the learner asked in. Explain in plain terms suited to a beginner. "
                     "Keep German grammar terms in German. Give at least one German example sentence. "
                     "If a rule has a simple case and an advanced exception, lead with the simple case. "
-                    "If the notes do not support the answer, say it is not covered."
+                    "If the retrieved notes do not directly cover the question, say plainly that the notes do not cover it."
                 ),
             },
             {
@@ -393,6 +525,7 @@ def _citation_to_dict(citation: GrammarCitation) -> dict[str, Any]:
         "page_end": citation.page_end,
         "keyword_score": citation.keyword_score,
         "hybrid_score": citation.hybrid_score,
+        "content_hash": citation.content_hash,
     }
 
 
@@ -411,6 +544,7 @@ def _citation_from_dict(data: dict[str, Any]) -> GrammarCitation:
         page_end=int(data["page_end"]) if data.get("page_end") is not None else None,
         keyword_score=float(data.get("keyword_score", 0.0)),
         hybrid_score=float(data.get("hybrid_score", 0.0)),
+        content_hash=str(data.get("content_hash", "")),
     )
 
 
@@ -418,6 +552,51 @@ def _citation_debug(citation: GrammarCitation) -> dict[str, Any]:
     data = _citation_to_dict(citation)
     data["content"] = citation.content[:240]
     return data
+
+
+def _citation_fingerprint(citation: GrammarCitation) -> str:
+    if citation.content_hash:
+        return citation.content_hash
+    normalized_content = " ".join(citation.content.casefold().split())
+    return hashlib.sha256(normalized_content.encode("utf-8")).hexdigest()
+
+
+def _is_near_duplicate(candidate: GrammarCitation, accepted: list[GrammarCitation]) -> bool:
+    candidate_tokens = set(_content_tokens(candidate.content))
+    if not candidate_tokens:
+        return False
+    for citation in accepted:
+        existing_tokens = set(_content_tokens(citation.content))
+        if not existing_tokens:
+            continue
+        overlap = len(candidate_tokens & existing_tokens)
+        smaller = min(len(candidate_tokens), len(existing_tokens))
+        union = len(candidate_tokens | existing_tokens)
+        if overlap / smaller >= 0.90 or overlap / union >= 0.82:
+            return True
+    return False
+
+
+def _has_conflicting_case_term(citation: GrammarCitation, requested_cases: set[str]) -> bool:
+    if not requested_cases:
+        return False
+    citation_cases = _case_terms(
+        f"{citation.title} {citation.section} {citation.content}"
+    )
+    return bool(citation_cases) and citation_cases.isdisjoint(requested_cases)
+
+
+def _case_terms(text: str) -> set[str]:
+    tokens = _content_tokens(text)
+    return {token for token in tokens if token in GERMAN_CASE_TERMS}
+
+
+def _content_tokens(text: str) -> list[str]:
+    return [
+        token.strip(".,:;!?()[]{}\"'`").casefold()
+        for token in text.split()
+        if len(token.strip(".,:;!?()[]{}\"'`")) > 2
+    ]
 
 
 def citation_label(citation: GrammarCitation) -> str:

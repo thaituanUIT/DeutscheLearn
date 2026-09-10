@@ -91,7 +91,10 @@ The runtime retrieval path is intentionally cheap:
 - compute PostgreSQL full-text rank over `title`, `section`, and `content`
 - combine semantic and keyword scores
 - order by the hybrid score
+- reject short or vague queries before retrieval
 - apply `GRAMMAR_SIMILARITY_THRESHOLD`
+- drop chunks below `GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD` times the top raw similarity score
+- cap accepted chunks at six after filtering and deduplication
 - send at most six citations to the chat model
 
 This is not a heavy cross-encoder reranker. It is a low-cost precision improvement for exact grammar terms, article forms, and short learner questions.
@@ -106,6 +109,8 @@ Relevant settings are in `app/core/config.py`:
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_CHAT_MODEL`
 - `GRAMMAR_SIMILARITY_THRESHOLD`
+- `GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD`
+- `GRAMMAR_MIN_QUERY_WORDS`
 - `GRAMMAR_RATE_LIMIT_PER_HOUR`
 
 The Cohere model and dimension are intentionally pinned. Changing either requires a schema migration and a full corpus re-embed.
@@ -119,6 +124,12 @@ Run the current eval summary:
 ```bash
 uv run python scripts/eval_grammar.py
 ```
+
+The eval sweeps absolute floors and records the selected calibration in `evals/results.json`.
+The current choice is `GRAMMAR_SIMILARITY_THRESHOLD=0.45` with
+`GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD=0.85`, calibrated against Cohere
+`embed-multilingual-v3.0` at 1024 dimensions. Changing the embedding model invalidates this
+calibration.
 
 Run focused tests for the RAG pieces:
 
