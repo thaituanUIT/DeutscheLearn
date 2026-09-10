@@ -1,4 +1,5 @@
 import json
+import logging
 from secrets import compare_digest
 from urllib import request as urlrequest
 from uuid import uuid4
@@ -91,6 +92,7 @@ from app.services.words import get_meaning_overview, get_word_of_day
 
 router = APIRouter(prefix="/api")
 TIMED_DURATION_SECONDS = 60
+logger = logging.getLogger(__name__)
 
 
 def require_admin(authorization: str | None = Header(default=None)) -> None:
@@ -140,11 +142,13 @@ def grammar_ask(
             detail="You've asked a lot of questions. Try again in a few minutes.",
         ) from None
     except GrammarUnavailableError as exc:
+        logger.warning("Grammar assistant unavailable: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="The grammar assistant is unavailable right now.",
         ) from exc
     except GrammarServiceError as exc:
+        logger.exception("Grammar assistant provider failure")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Something went wrong while answering.",

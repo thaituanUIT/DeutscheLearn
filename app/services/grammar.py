@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib import error as urlerror
 from urllib import request as urlrequest
+from urllib.parse import urlparse
 
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -339,9 +340,17 @@ def _post_json(
             return json.loads(response.read().decode("utf-8"))
     except urlerror.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        raise GrammarServiceError(f"Provider request failed: {exc.code} {body[:300]}") from exc
+        host = urlparse(url).netloc or "provider"
+        if exc.code in {401, 403, 429} or exc.code >= 500:
+            raise GrammarUnavailableError(
+                f"{host} request failed with status {exc.code}: {body[:300]}"
+            ) from exc
+        raise GrammarServiceError(
+            f"{host} request failed with status {exc.code}: {body[:300]}"
+        ) from exc
     except (urlerror.URLError, TimeoutError) as exc:
-        raise GrammarServiceError("Provider request failed") from exc
+        host = urlparse(url).netloc or "provider"
+        raise GrammarUnavailableError(f"{host} request failed") from exc
 
 
 def _citation_to_dict(citation: GrammarCitation) -> dict[str, Any]:
