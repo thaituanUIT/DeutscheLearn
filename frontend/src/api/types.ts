@@ -203,6 +203,8 @@ export type GrammarAskResponse = {
   citations: GrammarCitation[];
   retrieval_debug: Record<string, unknown> | null;
   cached: boolean;
+  finish_reason: string | null;
+  truncated: boolean;
 };
 
 export type AdminFocusEntry = {

@@ -428,6 +428,8 @@ class GrammarAskOut(BaseModel):
     citations: list[GrammarCitationOut] = Field(default_factory=list)
     retrieval_debug: dict[str, Any] | None = None
     cached: bool = False
+    finish_reason: str | None = None
+    truncated: bool = False
 
 
 def validate_stimulus_content(
