@@ -24,6 +24,8 @@ import type {
   StoryPassageSummary,
 } from "../api/types";
 import { button } from "../components/button";
+import { getPlayer } from "../state/playerStore";
+import { addStoryMistakes, recordStoryRead } from "../state/progressStore";
 import { stimulusInstruction, stimulusRenderer, type StimulusViewModel } from "../stimuli/templates";
 import { el } from "../utils/dom";
 import { formatCount } from "../utils/format";
@@ -197,6 +199,8 @@ async function renderStoryReader(
   try {
     const passage = storyPassageFromCorpus(await getStoryCorpus(), passageId);
     if (!passage) throw new Error("Story passage not found");
+    const player = getPlayer();
+    if (player) recordStoryRead(player.player_id, passage);
     options.onGrammarContextChange({
       passage: { title: passage.title, text: passage.passage_text },
       wrongAnswer: null,
@@ -312,6 +316,7 @@ function renderStoryPractice(
           }),
         );
         session.results = Object.fromEntries(results);
+        recordStoryMistakes(session);
         renderStoryPractice(section, session, options);
       } catch (error) {
         submit.disabled = false;
@@ -323,6 +328,24 @@ function renderStoryPractice(
   }
   panel.append(controls);
   section.replaceChildren(storyPracticeLayout(session.passage, panel));
+}
+
+function recordStoryMistakes(session: StorySession): void {
+  if (!session.results) return;
+  const player = getPlayer();
+  if (!player) return;
+  const mistakes = session.passage.questions.flatMap((question) => {
+    const result = session.results?.[question.id];
+    if (!result || result.correct) return [];
+    const selected = question.answers.find((answer) => answer.id === result.selected_answer_id);
+    if (!selected) return [];
+    return [{
+      prompt: question.prompt,
+      selected: selected.answer_text,
+      correct: result.correct_answer_text,
+    }];
+  });
+  addStoryMistakes(player.player_id, mistakes);
 }
 
 function storyContent(passage: StoryPassage): HTMLElement {

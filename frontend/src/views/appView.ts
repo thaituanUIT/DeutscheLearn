@@ -1,5 +1,10 @@
 import { getCurrentPlayer, getLeaderboard, getWordOfDay } from "../api/client";
-import { prefetchFocusWords, prefetchStoryPassages } from "../api/queryClient";
+import {
+  getCachedFocusWords,
+  getCachedStoryPassages,
+  prefetchFocusWords,
+  prefetchStoryPassages,
+} from "../api/queryClient";
 import type { LeaderboardEntry, Player, WordOfDay } from "../api/types";
 import { appHeader } from "../components/appHeader";
 import { button } from "../components/button";
@@ -9,9 +14,10 @@ import {
   type GrammarWrongAnswerContext,
 } from "../components/grammarWidget";
 import { setPlayer } from "../state/playerStore";
+import { homeMetricsForPlayer, recentMistakes } from "../state/progressStore";
 import { clear, el } from "../utils/dom";
 import { focusView } from "./focusView";
-import { homeView, type HomeMode, type HomeModeMetric } from "./homeView";
+import { homeView, type HomeMode } from "./homeView";
 import { leaderboardView, wordOfDayView } from "./leaderboardView";
 import { quizView } from "./quizView";
 import { storyView } from "./storyView";
@@ -54,6 +60,7 @@ function draw(
   let leaderboard = initialLeaderboard;
   let bestScore = player.best_endless_score;
   let grammarWidget: ReturnType<typeof mountGrammarWidget> | null = null;
+  let refreshedHomeMetrics = false;
 
   const shell = el("div", "shell");
   const playerNode = el("div", "player");
@@ -73,9 +80,24 @@ function draw(
     grammarWidget?.updateContext({ route: "home", passage: null, wrongAnswer: null });
     layout.className = "layout home-layout";
     headerStart.replaceChildren(el("h1", "brand", "DeutscheLearn"));
-    mainHost.replaceChildren(homeView({ onSelectMode: showMode, metrics: homeMetrics(player) }));
+    mainHost.replaceChildren(
+      homeView({
+        onSelectMode: showMode,
+        metrics: homeMetricsForPlayer(player, {
+          focusCards: getCachedFocusWords(),
+          storyTotal: getCachedStoryPassages()?.length,
+        }),
+        mistakes: recentMistakes(player.player_id),
+      }),
+    );
     sidebar.replaceChildren(wordOfDayView(wordOfDay), leaderboardHost);
     layout.replaceChildren(mainHost, sidebar);
+    if (!refreshedHomeMetrics) {
+      refreshedHomeMetrics = true;
+      void Promise.allSettled([prefetchFocusWords(), prefetchStoryPassages()]).then(() => {
+        if (readRoute() === "home") showHome(false);
+      });
+    }
   };
 
   const renderHeaderBack = (onClick: () => void): void => {
@@ -172,30 +194,4 @@ function writeRoute(route: AppRoute): void {
   const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`;
   if (window.location.hash === nextHash) return;
   window.history.pushState({}, "", nextUrl);
-}
-
-function homeMetrics(player: Player): Record<HomeMode, HomeModeMetric> {
-  const empty = "—";
-  return {
-    endless: {
-      label: "BESTE SERIE",
-      value: player.best_endless_score > 0 ? String(player.best_endless_score) : empty,
-    },
-    practice: {
-      label: "ZULETZT",
-      value: empty,
-    },
-    timed: {
-      label: "BESTE PUNKTZAHL",
-      value: empty,
-    },
-    focus: {
-      label: "FÄLLIG",
-      value: empty,
-    },
-    story: {
-      label: "GELESEN",
-      value: empty,
-    },
-  };
 }

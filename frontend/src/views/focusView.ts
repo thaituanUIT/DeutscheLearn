@@ -8,6 +8,8 @@ import {
 } from "../api/queryClient";
 import type { FocusCard, FocusLevel, FocusRevisionQuestion, FocusTopic } from "../api/types";
 import { button } from "../components/button";
+import { getPlayer } from "../state/playerStore";
+import { recordFocusReview } from "../state/progressStore";
 import { el } from "../utils/dom";
 import { formatCount } from "../utils/format";
 
@@ -228,7 +230,31 @@ function renderFlashcard(
   next.disabled = index === cards.length - 1;
   next.addEventListener("click", () => renderFlashcard(section, cards, index + 1, level, topic, options));
 
-  section.append(content, flashcardActions(previous, next, quiz));
+  const review = focusReviewActions(card, () => {
+    if (index < cards.length - 1) renderFlashcard(section, cards, index + 1, level, topic, options);
+  });
+
+  section.append(content, review, flashcardActions(previous, next, quiz));
+}
+
+function focusReviewActions(card: FocusCard, onReviewed: () => void): HTMLElement {
+  const wrap = el("div", "actions focus-review-actions");
+  const ratings = [
+    ["again", "Again"],
+    ["hard", "Hard"],
+    ["good", "Good"],
+    ["easy", "Easy"],
+  ] as const;
+  for (const [rating, label] of ratings) {
+    const control = button(label, rating === "good" ? "button primary" : "button");
+    control.addEventListener("click", () => {
+      const player = getPlayer();
+      if (player) recordFocusReview(player.player_id, card, rating);
+      onReviewed();
+    });
+    wrap.append(control);
+  }
+  return wrap;
 }
 
 function levelCard(level: FocusLevel, onClick: () => void): HTMLButtonElement {
