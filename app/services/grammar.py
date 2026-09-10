@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -46,6 +47,15 @@ CONTENT_STOPWORDS = {
 }
 MAX_ACCEPTED_CITATIONS = 6
 GERMAN_CASE_TERMS = {"akkusativ", "dativ", "nominativ", "genitiv"}
+TERM_ALIASES = {
+    "akkusativ": {"akkusativ", "accusative"},
+    "dativ": {"dativ", "dative"},
+    "nominativ": {"nominativ", "nominative"},
+    "genitiv": {"genitiv", "genitive"},
+    "article": {"article", "articles", "artikel"},
+}
+ANSWER_CACHE_VERSION = "grammar-answer-v5"
+logger = logging.getLogger(__name__)
 
 
 class GrammarServiceError(RuntimeError):
@@ -81,6 +91,8 @@ class GrammarAnswer:
     citations: list[GrammarCitation]
     retrieval_debug: dict[str, Any] | None = None
     cached: bool = False
+    finish_reason: str | None = None
+    truncated: bool = False
 
 
 _rate_events: dict[str, list[float]] = {}
@@ -96,6 +108,7 @@ def question_hash(question: str) -> str:
 
 def cache_key(normalized_question: str, settings: Settings) -> str:
     parts = [
+        f"version={ANSWER_CACHE_VERSION}",
         f"q={normalized_question}",
         f"embed={settings.cohere_embedding_model}",
         f"abs={settings.grammar_similarity_threshold:.3f}",
@@ -143,13 +156,15 @@ def answer_grammar_question(
 
     cached = _get_cached_answer(db, cache_key(normalized, settings))
     if cached is not None:
-        answer, citations = cached
+        answer, citations, finish_reason, truncated = cached
         return GrammarAnswer(
             status="answered",
             answer=answer,
             citations=citations,
             retrieval_debug={"cache": "hit"} if include_debug else None,
             cached=True,
+            finish_reason=finish_reason,
+            truncated=truncated,
         )
 
     query_embedding = embed_texts([question], input_type="search_query", settings=settings)[0]
@@ -173,9 +188,17 @@ def answer_grammar_question(
     if not accepted:
         return GrammarAnswer(status="no_match", answer=None, citations=[], retrieval_debug=debug)
 
-    answer = generate_answer(question=question, citations=accepted, settings=settings)
-    _store_cached_answer(db, cache_key(normalized, settings), answer, accepted)
-    return GrammarAnswer(status="answered", answer=answer, citations=accepted, retrieval_debug=debug)
+    answer, finish_reason = generate_answer(question=question, citations=accepted, settings=settings)
+    truncated = finish_reason == "length"
+    _store_cached_answer(db, cache_key(normalized, settings), answer, accepted, finish_reason, truncated)
+    return GrammarAnswer(
+        status="answered",
+        answer=answer,
+        citations=accepted,
+        retrieval_debug=debug,
+        finish_reason=finish_reason,
+        truncated=truncated,
+    )
 
 
 def assess_query_quality(question: str, settings: Settings | None = None) -> dict[str, Any]:
@@ -217,6 +240,7 @@ def filter_grammar_chunks(
     top_score = max((citation.similarity for citation in citations), default=0.0)
     relative_floor_score = top_score * settings.grammar_relative_similarity_threshold
     requested_cases = _case_terms(query_text)
+    requested_terms = _query_content_terms(query_text)
     accepted: list[GrammarCitation] = []
     seen_fingerprints: set[str] = set()
     chunk_debug: list[dict[str, Any]] = []
@@ -229,6 +253,8 @@ def filter_grammar_chunks(
             removed_by = "relative_floor"
         elif _has_conflicting_case_term(citation, requested_cases):
             removed_by = "conflicting_case_term"
+        elif not _has_requested_terms(citation, requested_terms):
+            removed_by = "missing_requested_terms"
         else:
             fingerprint = _citation_fingerprint(citation)
             if fingerprint in seen_fingerprints or _is_near_duplicate(citation, accepted):
@@ -244,6 +270,7 @@ def filter_grammar_chunks(
         item["top_score"] = top_score
         item["relative_floor_score"] = relative_floor_score
         item["requested_case_terms"] = sorted(requested_cases)
+        item["requested_terms"] = sorted(requested_terms)
         item["removed_by"] = removed_by
         item["kept"] = removed_by is None
         chunk_debug.append(item)
@@ -374,7 +401,7 @@ def generate_answer(
     question: str,
     citations: list[GrammarCitation],
     settings: Settings | None = None,
-) -> str:
+) -> tuple[str, str | None]:
     settings = settings or get_settings()
     if not settings.openrouter_api_key:
         raise GrammarUnavailableError("OPENROUTER_API_KEY is not configured")
@@ -393,7 +420,11 @@ def generate_answer(
                     "Answer in the language the learner asked in. Explain in plain terms suited to a beginner. "
                     "Keep German grammar terms in German. Give at least one German example sentence. "
                     "If a rule has a simple case and an advanced exception, lead with the simple case. "
-                    "If the retrieved notes do not directly cover the question, say plainly that the notes do not cover it."
+                    "If the retrieved notes do not directly cover the question, say plainly that the notes do not cover it. "
+                    "Answer in under 150 words. Use one markdown table when presenting forms across gender or case. "
+                    "Do not present gender or case forms as bullets if a table would fit. "
+                    "Otherwise use plain paragraphs and short lists. No headings. "
+                    "Every markdown table must have four columns or fewer; split wider form sets into multiple smaller tables."
                 ),
             },
             {
@@ -402,7 +433,7 @@ def generate_answer(
             },
         ],
         "temperature": 0.2,
-        "max_tokens": 500,
+        "max_tokens": 1000,
     }
     headers = {
         "Authorization": f"Bearer {settings.openrouter_api_key}",
@@ -429,12 +460,17 @@ def generate_answer(
         raise GrammarUnavailableError("; ".join(provider_errors))
 
     try:
-        content = data["choices"][0]["message"]["content"]
+        choice = data["choices"][0]
+        content = choice["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
         raise GrammarServiceError("OpenRouter response did not include an answer") from exc
     if not isinstance(content, str) or not content.strip():
         raise GrammarServiceError("OpenRouter returned an empty answer")
-    return content.strip()
+    finish_reason = choice.get("finish_reason")
+    if finish_reason is not None and not isinstance(finish_reason, str):
+        finish_reason = str(finish_reason)
+    logger.info("Grammar assistant completion finish_reason=%s", finish_reason)
+    return content.strip(), finish_reason
 
 
 def _openrouter_models(settings: Settings) -> list[str]:
@@ -450,7 +486,7 @@ def _openrouter_models(settings: Settings) -> list[str]:
 def _get_cached_answer(
     db: Session,
     normalized_question: str,
-) -> tuple[str, list[GrammarCitation]] | None:
+) -> tuple[str, list[GrammarCitation], str | None, bool] | None:
     row = db.scalar(
         select(GrammarAnswerCache).where(
             GrammarAnswerCache.question_hash == question_hash(normalized_question),
@@ -458,7 +494,13 @@ def _get_cached_answer(
     )
     if row is None:
         return None
-    return row.answer, [_citation_from_dict(item) for item in json.loads(row.citations_json)]
+    metadata = _cache_metadata(row.citations_json)
+    return (
+        row.answer,
+        [_citation_from_dict(item) for item in metadata["citations"]],
+        metadata["finish_reason"],
+        metadata["truncated"],
+    )
 
 
 def _store_cached_answer(
@@ -466,18 +508,40 @@ def _store_cached_answer(
     normalized_question: str,
     answer: str,
     citations: list[GrammarCitation],
+    finish_reason: str | None,
+    truncated: bool,
 ) -> None:
     row = GrammarAnswerCache(
         question_hash=question_hash(normalized_question),
         normalized_question=normalized_question,
         answer=answer,
-        citations_json=json.dumps([_citation_to_dict(citation) for citation in citations]),
+        citations_json=json.dumps(
+            {
+                "citations": [_citation_to_dict(citation) for citation in citations],
+                "finish_reason": finish_reason,
+                "truncated": truncated,
+            }
+        ),
     )
     db.add(row)
     try:
         db.commit()
     except SQLAlchemyError:
         db.rollback()
+
+
+def _cache_metadata(raw: str) -> dict[str, Any]:
+    parsed = json.loads(raw)
+    if isinstance(parsed, list):
+        return {"citations": parsed, "finish_reason": None, "truncated": False}
+    if not isinstance(parsed, dict):
+        return {"citations": [], "finish_reason": None, "truncated": False}
+    citations = parsed.get("citations")
+    return {
+        "citations": citations if isinstance(citations, list) else [],
+        "finish_reason": parsed.get("finish_reason"),
+        "truncated": bool(parsed.get("truncated")),
+    }
 
 
 def _post_json(
@@ -584,6 +648,38 @@ def _has_conflicting_case_term(citation: GrammarCitation, requested_cases: set[s
         f"{citation.title} {citation.section} {citation.content}"
     )
     return bool(citation_cases) and citation_cases.isdisjoint(requested_cases)
+
+
+def _has_requested_terms(citation: GrammarCitation, requested_terms: set[str]) -> bool:
+    if len(requested_terms) < 2:
+        return True
+    citation_tokens = set(_content_tokens(f"{citation.title} {citation.section} {citation.content}"))
+    missing = [
+        term
+        for term in requested_terms
+        if citation_tokens.isdisjoint(TERM_ALIASES.get(term, {term}))
+    ]
+    return not missing
+
+
+def _query_content_terms(text: str) -> set[str]:
+    terms = set()
+    for token in _content_tokens(text):
+        if token in CONTENT_STOPWORDS:
+            continue
+        if token.endswith("s") and len(token) > 4:
+            token = token[:-1]
+        canonical = _canonical_term(token)
+        if canonical:
+            terms.add(canonical)
+    return terms
+
+
+def _canonical_term(token: str) -> str | None:
+    for term, aliases in TERM_ALIASES.items():
+        if token in aliases:
+            return term
+    return token if token in GERMAN_CASE_TERMS else None
 
 
 def _case_terms(text: str) -> set[str]:

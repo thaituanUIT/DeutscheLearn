@@ -174,6 +174,8 @@ def grammar_ask(
         ],
         retrieval_debug=result.retrieval_debug,
         cached=result.cached,
+        finish_reason=result.finish_reason,
+        truncated=result.truncated,
     )
 
 

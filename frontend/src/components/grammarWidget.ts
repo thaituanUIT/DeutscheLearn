@@ -12,6 +12,7 @@ type ChatMessage =
       status: "answered";
       text: string;
       citations: GrammarCitation[];
+      truncated: boolean;
     }
   | {
       role: "assistant";
@@ -141,8 +142,9 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
         learner_id: player.player_id,
       });
       clearLoadingTimers();
-      messages = [...messages, messageFromResponse(response)].slice(-MAX_MESSAGES);
-      status = response.status === "no_match" ? "no-match" : "answered";
+      const assistantMessage = messageFromResponse(response);
+      messages = [...messages, assistantMessage].slice(-MAX_MESSAGES);
+      status = statusFromAssistantMessage(assistantMessage);
     } catch (error) {
       clearLoadingTimers();
       const errorMessage: ChatMessage = {
@@ -313,7 +315,10 @@ function renderMessage(message: ChatMessage, onRetry: () => void): HTMLElement {
     return bubble;
   }
   if (message.status === "answered") {
-    bubble.append(renderMarkdown(message.text), renderCitations(message.citations));
+    bubble.append(
+      message.truncated ? renderPlainTruncated(message.text, onRetry) : renderMarkdown(message.text),
+      renderCitations(message.citations),
+    );
     return bubble;
   }
   if (message.status === "no_match") {
@@ -331,44 +336,191 @@ function renderMessage(message: ChatMessage, onRetry: () => void): HTMLElement {
   return bubble;
 }
 
+function renderPlainTruncated(text: string, onContinue: () => void): HTMLElement {
+  const wrap = el("div", "grammar-markdown");
+  const p = el("p");
+  p.textContent = text;
+  const note = el("p", "grammar-truncated-note", "The answer was shortened. Ask me to continue if you want the rest.");
+  const continueButton = button("Continue", "grammar-chip");
+  continueButton.addEventListener("click", onContinue);
+  wrap.append(p, note, continueButton);
+  return wrap;
+}
+
 function renderMarkdown(markdown: string): HTMLElement {
   const wrap = el("div", "grammar-markdown");
-  const lines = markdown.split(/\n+/).filter((line) => line.trim());
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-      const item = el("p", "grammar-example");
-      item.append(renderInline(trimmed.slice(2)));
-      wrap.append(item);
-    } else if (!trimmed.startsWith("#")) {
-      const p = el("p");
-      p.append(renderInline(trimmed));
-      wrap.append(p);
+  const lines = markdown.split(/\r?\n/);
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index].trim();
+    if (!line) {
+      index += 1;
+      continue;
     }
+    if (isTableStart(lines, index)) {
+      const [table, nextIndex] = renderTable(lines, index);
+      wrap.append(table);
+      index = nextIndex;
+      continue;
+    }
+    if (isListItem(line)) {
+      const [list, nextIndex] = renderList(lines, index);
+      wrap.append(list);
+      index = nextIndex;
+      continue;
+    }
+    if (line.startsWith("#") || line.startsWith(">") || imageOrLinkOnly(line)) {
+      index += 1;
+      continue;
+    }
+    const paragraphLines = [];
+    while (index < lines.length) {
+      const current = lines[index].trim();
+      if (!current || isTableStart(lines, index) || isListItem(current) || current.startsWith("#") || current.startsWith(">")) {
+        break;
+      }
+      paragraphLines.push(current);
+      index += 1;
+    }
+    const p = el("p");
+    p.append(renderInline(paragraphLines.join(" ")));
+    wrap.append(p);
   }
   return wrap;
 }
 
 function renderInline(text: string): DocumentFragment {
   const fragment = document.createDocumentFragment();
-  const pattern = /(\*\*[^*]+\*\*|`[^`]+`)/g;
-  let lastIndex = 0;
-  for (const match of text.matchAll(pattern)) {
-    fragment.append(document.createTextNode(text.slice(lastIndex, match.index)));
-    const token = match[0];
-    if (token.startsWith("**")) {
-      const strong = document.createElement("strong");
-      strong.textContent = token.slice(2, -2);
-      fragment.append(strong);
-    } else {
+  text = text.replace(/!\[[^\]]*]\([^)]*\)/g, "").replace(/\[([^\]]+)]\([^)]*\)/g, "$1");
+  let index = 0;
+  while (index < text.length) {
+    if (text[index] === "`") {
+      const end = text.indexOf("`", index + 1);
+      if (end === -1) break;
       const code = document.createElement("code");
-      code.textContent = token.slice(1, -1);
+      code.textContent = text.slice(index + 1, end);
       fragment.append(code);
+      index = end + 1;
+      continue;
     }
-    lastIndex = (match.index ?? 0) + token.length;
+    if (text.startsWith("**", index)) {
+      const end = text.indexOf("**", index + 2);
+      if (end === -1) break;
+      const strong = document.createElement("strong");
+      strong.append(renderInline(text.slice(index + 2, end)));
+      fragment.append(strong);
+      index = end + 2;
+      continue;
+    }
+    if (text[index] === "*") {
+      const end = findClosingEmphasis(text, index + 1);
+      if (end === -1) break;
+      const em = document.createElement("em");
+      em.append(renderInline(text.slice(index + 1, end)));
+      fragment.append(em);
+      index = end + 1;
+      continue;
+    }
+    const next = nextMarkdownTokenIndex(text, index + 1);
+    fragment.append(document.createTextNode(text.slice(index, next)));
+    index = next;
   }
-  fragment.append(document.createTextNode(text.slice(lastIndex)));
+  if (index < text.length) {
+    fragment.append(document.createTextNode(text.slice(index)));
+  }
   return fragment;
+}
+
+function nextMarkdownTokenIndex(text: string, startIndex: number): number {
+  const candidates = [
+    text.indexOf("`", startIndex),
+    text.indexOf("*", startIndex),
+  ].filter((index) => index !== -1);
+  return candidates.length ? Math.min(...candidates) : text.length;
+}
+
+function findClosingEmphasis(text: string, startIndex: number): number {
+  let index = startIndex;
+  while (index < text.length) {
+    const found = text.indexOf("*", index);
+    if (found === -1) return -1;
+    if (!text.startsWith("**", found)) {
+      return found;
+    } else {
+      index = found + 2;
+    }
+  }
+  return -1;
+}
+
+function renderList(lines: string[], startIndex: number): [HTMLElement, number] {
+  const ordered = /^\d+\.\s+/.test(lines[startIndex].trim());
+  const list = document.createElement(ordered ? "ol" : "ul");
+  let index = startIndex;
+  while (index < lines.length) {
+    const line = lines[index].trim();
+    if (ordered !== /^\d+\.\s+/.test(line) || (!ordered && !/^[-*]\s+/.test(line))) break;
+    const item = document.createElement("li");
+    item.append(renderInline(line.replace(/^(\d+\.|[-*])\s+/, "")));
+    list.append(item);
+    index += 1;
+  }
+  return [list, index];
+}
+
+function renderTable(lines: string[], startIndex: number): [HTMLElement, number] {
+  const scroll = el("div", "grammar-table-scroll");
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const tbody = document.createElement("tbody");
+  const headers = splitTableRow(lines[startIndex]).slice(0, 4);
+  const headerRow = document.createElement("tr");
+  for (const header of headers) {
+    const th = document.createElement("th");
+    th.append(renderInline(header));
+    headerRow.append(th);
+  }
+  thead.append(headerRow);
+  let index = startIndex + 2;
+  while (index < lines.length && isTableRow(lines[index])) {
+    const cells = splitTableRow(lines[index]).slice(0, 4);
+    const row = document.createElement("tr");
+    for (const cell of cells) {
+      const td = document.createElement("td");
+      td.append(renderInline(cell));
+      row.append(td);
+    }
+    tbody.append(row);
+    index += 1;
+  }
+  table.append(thead, tbody);
+  scroll.append(table);
+  return [scroll, index];
+}
+
+function isTableStart(lines: string[], index: number): boolean {
+  return isTableRow(lines[index]) && index + 1 < lines.length && isTableSeparator(lines[index + 1]);
+}
+
+function isTableRow(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.split("|").length > 2;
+}
+
+function isTableSeparator(line: string): boolean {
+  return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(line.trim());
+}
+
+function splitTableRow(line: string): string[] {
+  return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+}
+
+function isListItem(line: string): boolean {
+  return /^([-*]|\d+\.)\s+/.test(line);
+}
+
+function imageOrLinkOnly(line: string): boolean {
+  return /^!?\[[^\]]*]\([^)]*\)$/.test(line);
 }
 
 function renderCitations(citations: GrammarCitation[]): HTMLElement {
@@ -429,7 +581,15 @@ function messageFromResponse(response: GrammarAskResponse): ChatMessage {
     status: "answered",
     text: response.answer,
     citations: response.citations,
+    truncated: response.truncated,
   };
+}
+
+function statusFromAssistantMessage(message: ChatMessage): WidgetStatus {
+  if (message.role !== "assistant") return "open";
+  if (message.status === "no_match") return "no-match";
+  if (message.status === "error") return "error";
+  return "answered";
 }
 
 function interfaceLanguage(): "en" | "vi" {
@@ -480,7 +640,9 @@ function loadMessages(playerId: string): ChatMessage[] {
 function normalizeMessage(message: ChatMessage): ChatMessage {
   if (message.role !== "assistant") return message;
   if (message.status !== "answered") return message;
-  if (message.text.trim() && message.citations.length > 0) return message;
+  if (message.text.trim() && message.citations.length > 0) {
+    return { ...message, truncated: Boolean(message.truncated) };
+  }
   return {
     role: "assistant",
     status: "error",

@@ -215,7 +215,7 @@ def test_generate_answer_prompt_has_no_derived_level(monkeypatch) -> None:
 
     def fake_post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeout: int) -> dict[str, Any]:
         captured["payload"] = payload
-        return {"choices": [{"message": {"content": "Use Dativ: einem guten Freund."}}]}
+        return {"choices": [{"message": {"content": "Use Dativ: einem guten Freund."}, "finish_reason": "stop"}]}
 
     monkeypatch.setattr(grammar, "_post_json", fake_post_json)
     settings = grammar.Settings(cohere_api_key="cohere", openrouter_api_key="openrouter")
@@ -230,15 +230,19 @@ def test_generate_answer_prompt_has_no_derived_level(monkeypatch) -> None:
         source_path="data/grammar/articles-cases.md",
     )
 
-    answer = grammar.generate_answer(
+    answer, finish_reason = grammar.generate_answer(
         question="warum einem guten Freund?",
         citations=[citation],
         settings=settings,
     )
 
     assert answer == "Use Dativ: einem guten Freund."
+    assert finish_reason == "stop"
     messages = captured["payload"]["messages"]
     assert "Answer in the language the learner asked in" in messages[0]["content"]
+    assert "Answer in under 150 words" in messages[0]["content"]
+    assert "Use one markdown table when presenting forms across gender or case" in messages[0]["content"]
+    assert captured["payload"]["max_tokens"] == 1000
     assert "Learner level" not in messages[1]["content"]
 
 
@@ -249,7 +253,7 @@ def test_generate_answer_falls_back_when_openrouter_model_is_rate_limited(monkey
         seen_models.append(str(payload["model"]))
         if payload["model"] == "google/gemma-4-31b-it:free":
             raise grammar.GrammarUnavailableError("openrouter.ai request failed with status 429")
-        return {"choices": [{"message": {"content": "Use Dativ: mit dem Auto."}}]}
+        return {"choices": [{"message": {"content": "Use Dativ: mit dem Auto."}, "finish_reason": "stop"}]}
 
     monkeypatch.setattr(grammar, "_post_json", fake_post_json)
     settings = grammar.Settings(
@@ -268,14 +272,42 @@ def test_generate_answer_falls_back_when_openrouter_model_is_rate_limited(monkey
         source_path="data/grammar/prepositions-dativ.md",
     )
 
-    answer = grammar.generate_answer(
+    answer, finish_reason = grammar.generate_answer(
         question="Warum mit dem Auto?",
         citations=[citation],
         settings=settings,
     )
 
     assert answer == "Use Dativ: mit dem Auto."
+    assert finish_reason == "stop"
     assert seen_models == ["google/gemma-4-31b-it:free", "openrouter/free"]
+
+
+def test_generate_answer_returns_length_finish_reason(monkeypatch) -> None:
+    def fake_post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeout: int) -> dict[str, Any]:
+        return {"choices": [{"message": {"content": "Use Dativ."}, "finish_reason": "length"}]}
+
+    monkeypatch.setattr(grammar, "_post_json", fake_post_json)
+    settings = grammar.Settings(cohere_api_key="cohere", openrouter_api_key="openrouter")
+    citation = grammar.GrammarCitation(
+        chunk_id="artikel-kasus-dativ-articles",
+        title="Artikel Kasus",
+        section="Dativ Articles",
+        content="der becomes dem in Dativ.",
+        level="A1",
+        topic="artikel_kasus",
+        similarity=0.82,
+        source_path="data/grammar/articles-cases.md",
+    )
+
+    answer, finish_reason = grammar.generate_answer(
+        question="warum einem guten Freund?",
+        citations=[citation],
+        settings=settings,
+    )
+
+    assert answer == "Use Dativ."
+    assert finish_reason == "length"
 
 
 def test_openrouter_models_deduplicates_primary_and_fallbacks() -> None:

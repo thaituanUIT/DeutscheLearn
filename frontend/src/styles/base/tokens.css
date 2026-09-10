@@ -7,6 +7,7 @@
   --border-strong: #0f0a01;
   --text: #0f0a01;
   --text-muted: #6b6763;
+  --text-label: #3d3832;
   --primary: #08327d;
   --primary-hover: #052459;
   --primary-fg: #fbfbfb;
@@ -57,6 +58,7 @@
   --border-strong: #d8d5d0;
   --text: #f0eeea;
   --text-muted: #a09b94;
+  --text-label: #d8d5d0;
   --primary: #6e9be8;
   --primary-hover: #89aeee;
   --primary-fg: #08192e;
