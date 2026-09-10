@@ -1,0 +1,43 @@
+@layer reset {
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    var(--text-body-weight) var(--text-body-size) / var(--text-body-line) "Archivo Variable",
+    "Archivo", "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+button {
+  font: inherit;
+}
+
+a {
+  color: var(--primary);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+}

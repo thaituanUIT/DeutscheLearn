@@ -1,0 +1,160 @@
+@layer views {
+.focus-title {
+  margin: 0;
+  font-size: var(--text-title-size);
+  line-height: var(--text-title-line);
+  font-weight: var(--text-title-weight);
+  letter-spacing: var(--text-title-tracking);
+}
+
+.focus-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.topics-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.story-group-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.goethe-parts-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.focus-option {
+  min-height: 164px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.focus-option:not(:disabled):hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.focus-option:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.focus-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.focus-option:disabled:hover {
+  border-color: var(--border);
+  background: transparent;
+}
+
+.focus-option strong {
+  font-size: var(--text-title-size);
+  line-height: var(--text-title-line);
+  font-weight: var(--text-title-weight);
+  letter-spacing: var(--text-title-tracking);
+  hyphens: auto;
+}
+
+.focus-option span {
+  display: grid;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: var(--text-meta-size);
+  line-height: var(--text-meta-line);
+}
+
+.focus-option > span::before {
+  color: var(--text);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-line);
+  font-weight: var(--text-label-weight);
+  letter-spacing: var(--text-label-tracking);
+  text-transform: uppercase;
+}
+
+.focus-option > span:first-of-type::before {
+  content: "Umfang";
+}
+
+.focus-option > span:nth-of-type(2)::before {
+  content: "Status";
+}
+
+.flashcard {
+  min-height: 420px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  text-align: left;
+}
+
+.flashcard-count {
+  color: var(--text-muted);
+  font-size: var(--text-meta-size);
+  line-height: var(--text-meta-line);
+  font-weight: var(--text-meta-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.flashcard-word {
+  min-height: 2.45em;
+  display: block;
+  margin: 0;
+  font-size: var(--text-display-size);
+  line-height: var(--text-display-line);
+  font-weight: var(--text-display-weight);
+  letter-spacing: var(--text-display-tracking);
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
+
+.flashcard-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.flashcard-actions > * {
+  justify-self: start;
+}
+
+.flashcard-next {
+  min-width: 132px;
+}
+
+.revision-next {
+  min-width: 180px;
+}
+
+.flashcard-actions > :last-child {
+  justify-self: end;
+}
+
+@media (max-width: 820px) {
+  .focus-grid,
+  .topics-grid,
+  .story-group-grid,
+  .goethe-parts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .focus-option {
+    min-height: 0;
+  }
+}
+}

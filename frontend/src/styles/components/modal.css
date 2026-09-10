@@ -1,0 +1,59 @@
+@layer components {
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  align-items: start;
+  justify-items: start;
+  padding: 18px;
+  background: color-mix(in srgb, var(--text) 42%, transparent);
+}
+
+.modal-dialog {
+  width: min(560px, 100%);
+  max-height: min(720px, calc(100vh - 36px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.topic-alias-list {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.topic-alias-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.topic-alias-row:last-child {
+  border-bottom: 0;
+}
+
+.topic-alias-row code {
+  justify-self: end;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--primary);
+  font-size: 0.88rem;
+}
+}
