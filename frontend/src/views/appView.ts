@@ -11,7 +11,7 @@ import {
 import { setPlayer } from "../state/playerStore";
 import { clear, el } from "../utils/dom";
 import { focusView } from "./focusView";
-import { homeView, type HomeMode } from "./homeView";
+import { homeView, type HomeMode, type HomeModeMetric } from "./homeView";
 import { leaderboardView, wordOfDayView } from "./leaderboardView";
 import { quizView } from "./quizView";
 import { storyView } from "./storyView";
@@ -73,7 +73,7 @@ function draw(
     grammarWidget?.updateContext({ route: "home", passage: null, wrongAnswer: null });
     layout.className = "layout home-layout";
     headerStart.replaceChildren(el("h1", "brand", "DeutscheLearn"));
-    mainHost.replaceChildren(homeView({ onSelectMode: showMode }));
+    mainHost.replaceChildren(homeView({ onSelectMode: showMode, metrics: homeMetrics(player) }));
     sidebar.replaceChildren(wordOfDayView(wordOfDay), leaderboardHost);
     layout.replaceChildren(mainHost, sidebar);
   };
@@ -172,4 +172,30 @@ function writeRoute(route: AppRoute): void {
   const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`;
   if (window.location.hash === nextHash) return;
   window.history.pushState({}, "", nextUrl);
+}
+
+function homeMetrics(player: Player): Record<HomeMode, HomeModeMetric> {
+  const empty = "—";
+  return {
+    endless: {
+      label: "BESTE SERIE",
+      value: player.best_endless_score > 0 ? String(player.best_endless_score) : empty,
+    },
+    practice: {
+      label: "ZULETZT",
+      value: empty,
+    },
+    timed: {
+      label: "BESTE PUNKTZAHL",
+      value: empty,
+    },
+    focus: {
+      label: "FÄLLIG",
+      value: empty,
+    },
+    story: {
+      label: "GELESEN",
+      value: empty,
+    },
+  };
 }

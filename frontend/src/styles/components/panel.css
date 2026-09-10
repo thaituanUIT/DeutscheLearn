@@ -1,0 +1,44 @@
+@layer components {
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 32px;
+}
+
+.quiz-card {
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.focus-card {
+  min-height: 560px;
+  display: grid;
+  align-content: start;
+  gap: 32px;
+}
+
+.story-card {
+  min-height: 560px;
+  display: grid;
+  align-content: start;
+  gap: 32px;
+}
+
+.story-reader-card {
+  height: calc(100vh - 132px);
+  min-height: 620px;
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.goethe-reader-card {
+  height: auto;
+  min-height: 0;
+  grid-template-rows: auto;
+  align-content: start;
+  overflow: visible;
+}
+}

@@ -1,0 +1,51 @@
+@layer views {
+.leaderboard-list {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0;
+}
+
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard-row:last-child {
+  border-bottom: 0;
+}
+
+.leaderboard-row.current-player {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.leaderboard-gap {
+  color: var(--text-muted);
+  padding: 0 8px;
+  text-align: left;
+}
+
+.rank {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+}

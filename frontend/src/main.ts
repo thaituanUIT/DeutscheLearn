@@ -1,4 +1,4 @@
-import "./styles.css";
+import "./styles/index.css";
 import { initializeThemeController } from "./state/themeStore";
 import { renderAdminApp } from "./views/adminView";
 import { renderApp } from "./views/appView";

@@ -14,8 +14,6 @@ type SegmentedControlProps<T extends string> = {
   label?: string;
 };
 
-let stylesInjected = false;
-
 export function SegmentedControl<T extends string>({
   options,
   value,
@@ -23,8 +21,6 @@ export function SegmentedControl<T extends string>({
   fill = false,
   label,
 }: SegmentedControlProps<T>): HTMLElement {
-  injectSegmentedControlStyles();
-
   let activeValue = value;
   const wrap = document.createElement("div");
   wrap.className = "segmented-control";
@@ -78,91 +74,4 @@ function labelSpan(label: string): HTMLElement {
   node.className = "segmented-control__label";
   node.textContent = label;
   return node;
-}
-
-function injectSegmentedControlStyles(): void {
-  if (stylesInjected) return;
-  stylesInjected = true;
-
-  const style = document.createElement("style");
-  style.dataset.component = "SegmentedControl";
-  style.textContent = `
-.segmented-control {
-  --count: 2;
-  box-sizing: border-box;
-  display: grid;
-  grid-template-columns: repeat(var(--count), 1fr);
-  align-items: center;
-  width: max-content;
-  height: 44px;
-  padding: 3px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.segmented-control[data-fill="true"] {
-  width: 100%;
-}
-
-.segmented-control__item {
-  all: unset;
-  box-sizing: border-box;
-  display: grid;
-  place-items: center;
-  align-self: stretch;
-  justify-self: stretch;
-  height: 100%;
-  border: 0;
-  border-radius: 5px;
-  background: var(--transparent);
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 400;
-  font-synthesis: none;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.segmented-control__label {
-  box-sizing: border-box;
-  display: block;
-  padding: 0 14px;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.segmented-control__item:hover {
-  background: var(--surface-raised);
-  color: var(--text);
-}
-
-.segmented-control__item[aria-selected="true"] {
-  background: var(--accent-subtle);
-  color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-
-.segmented-control__item:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--focus-ring) 25%, var(--transparent));
-  outline-offset: 2px;
-}
-
-.segmented-control[data-disabled="true"] {
-  opacity: 0.52;
-}
-
-.segmented-control[data-disabled="true"] .segmented-control__item {
-  cursor: not-allowed;
-}
-
-@media print {
-  .segmented-control {
-    display: none !important;
-  }
-}
-`;
-  document.head.append(style);
 }

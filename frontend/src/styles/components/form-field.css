@@ -1,0 +1,103 @@
+@layer components {
+.admin-field {
+  display: grid;
+  gap: var(--admin-space-label);
+  color: var(--text-muted);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-line);
+  font-weight: var(--text-label-weight);
+  letter-spacing: var(--text-label-tracking);
+  text-transform: uppercase;
+}
+
+.admin-reading-meta-grid .admin-field {
+  width: min(180px, 100%);
+}
+
+.admin-reading-meta-grid .admin-field[data-field="Topic"] {
+  width: min(360px, 100%);
+}
+
+.admin-form-fields {
+  display: grid;
+  align-content: start;
+  gap: var(--admin-space-field);
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-editor-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--admin-space-inline);
+  min-height: 40px;
+}
+
+.admin-editor-header .focus-title {
+  margin: 0;
+  font-size: var(--text-title-size);
+  line-height: var(--text-title-line);
+  font-weight: var(--text-title-weight);
+  letter-spacing: var(--text-title-tracking);
+  caret-color: transparent;
+  user-select: none;
+}
+
+.admin-input {
+  width: 100%;
+  min-height: 46px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+}
+
+.admin-input:focus {
+  border-color: var(--border);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.admin-input.field-error {
+  border-color: var(--danger);
+}
+
+.admin-input.field-error:focus {
+  border-color: var(--danger);
+  outline-color: var(--danger);
+}
+
+.required-marker {
+  margin-left: 3px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.admin-field-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.admin-textarea {
+  margin: 0;
+  padding-bottom: var(--admin-space-field);
+  resize: none;
+  line-height: 1.45;
+  overflow-y: hidden;
+}
+
+.admin-field[data-field="Passage text"] .admin-textarea {
+  min-height: 260px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+}

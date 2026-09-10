@@ -1,0 +1,79 @@
+@layer components {
+.list-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.list-card[data-selected="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.list-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.list-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.list-card-meta {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-meta-size);
+  line-height: var(--text-meta-line);
+  font-weight: var(--text-meta-weight);
+}
+
+.list-card-title {
+  min-width: 0;
+  color: var(--text);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line);
+  font-weight: var(--text-body-weight);
+  white-space: normal;
+}
+
+.list-card-title-text,
+.list-card-untitled {
+  min-width: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.list-card-untitled {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.draft-badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--danger);
+  background: transparent;
+  color: var(--danger);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-line);
+  font-weight: var(--text-label-weight);
+  letter-spacing: var(--text-label-tracking);
+  text-transform: uppercase;
+}
+}
