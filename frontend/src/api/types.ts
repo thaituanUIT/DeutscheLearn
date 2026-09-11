@@ -221,6 +221,21 @@ export type AdminWord = {
   focus_entries: AdminFocusEntry[];
 };
 
+export type AdminImportRowError = {
+  row: number;
+  field: string;
+  message: string;
+};
+
+export type AdminImportResult = {
+  total: number;
+  valid: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: AdminImportRowError[];
+};
+
 export type AdminReadingAnswer = {
   id?: string;
   answer_text: string;

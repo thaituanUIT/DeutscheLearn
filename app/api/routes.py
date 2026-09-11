@@ -5,6 +5,7 @@ from urllib import request as urlrequest
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -26,6 +27,9 @@ from app.db.models import (
 from app.db.session import get_db
 from app.schemas import (
     AdminFocusEntryOut,
+    AdminImportPayload,
+    AdminImportResult,
+    AdminImportRowError,
     AdminReadingAdOut,
     AdminReadingAnswerOut,
     AdminReadingPassageIn,
@@ -387,6 +391,30 @@ def admin_delete_word(word_key: str, db: Session = Depends(get_db)) -> None:
     db.commit()
 
 
+@router.post(
+    "/admin/import/words/preview",
+    response_model=AdminImportResult,
+    dependencies=[Depends(require_admin)],
+)
+def admin_preview_word_import(
+    payload: AdminImportPayload,
+    db: Session = Depends(get_db),
+) -> AdminImportResult:
+    return _import_words(db, payload.items, commit=False)
+
+
+@router.post(
+    "/admin/import/words",
+    response_model=AdminImportResult,
+    dependencies=[Depends(require_admin)],
+)
+def admin_import_words(
+    payload: AdminImportPayload,
+    db: Session = Depends(get_db),
+) -> AdminImportResult:
+    return _import_words(db, payload.items, commit=True)
+
+
 @router.get(
     "/admin/reading/passages",
     response_model=list[AdminReadingPassageSummaryOut],
@@ -485,6 +513,30 @@ def admin_delete_reading_passage(passage_id: str, db: Session = Depends(get_db))
     _mark_stimulus_uploads_for_delete(db, passage)
     db.delete(passage)
     db.commit()
+
+
+@router.post(
+    "/admin/import/reading/preview",
+    response_model=AdminImportResult,
+    dependencies=[Depends(require_admin)],
+)
+def admin_preview_reading_import(
+    payload: AdminImportPayload,
+    db: Session = Depends(get_db),
+) -> AdminImportResult:
+    return _import_reading_passages(db, payload.items, commit=False)
+
+
+@router.post(
+    "/admin/import/reading",
+    response_model=AdminImportResult,
+    dependencies=[Depends(require_admin)],
+)
+def admin_import_reading(
+    payload: AdminImportPayload,
+    db: Session = Depends(get_db),
+) -> AdminImportResult:
+    return _import_reading_passages(db, payload.items, commit=True)
 
 
 @router.post(
@@ -877,6 +929,156 @@ def _admin_word_out(word: CachedWord) -> AdminWordOut:
             for entry in sorted(word.focus_entries, key=lambda item: (item.level, item.topic.slug))
         ],
     )
+
+
+def _import_words(db: Session, rows: list[dict], *, commit: bool) -> AdminImportResult:
+    valid_rows: list[tuple[int, AdminWordIn]] = []
+    errors: list[AdminImportRowError] = []
+    seen_words: set[str] = set()
+
+    for row_number, row in enumerate(rows, start=1):
+        try:
+            word = AdminWordIn.model_validate(row)
+            word_key = word.word.strip()
+            if word_key in seen_words:
+                errors.append(_import_error(row_number, "word", "Duplicate word in import file."))
+                continue
+            seen_words.add(word_key)
+            _validate_word_import_rules(word, row_number, errors)
+            _validate_focus_entries(word.focus_entries)
+            if not any(error.row == row_number for error in errors):
+                valid_rows.append((row_number, word))
+        except ValidationError as exc:
+            errors.extend(_validation_errors(row_number, exc))
+        except HTTPException as exc:
+            errors.append(_import_error(row_number, "focus_entries", str(exc.detail)))
+
+    created, updated = _word_import_counts(db, [word for _, word in valid_rows])
+    result = AdminImportResult(
+        total=len(rows),
+        valid=len(valid_rows),
+        created=created,
+        updated=updated,
+        skipped=_skipped_row_count(errors),
+        errors=errors,
+    )
+    if errors or not commit:
+        return result
+
+    for _, payload in valid_rows:
+        word_key = payload.word.strip()
+        word = db.scalar(select(CachedWord).where(CachedWord.lemma == word_key))
+        if word is None:
+            word = CachedWord(
+                lemma=word_key,
+                article=_clean_optional_text(payload.article),
+                part_of_speech=payload.part_of_speech.strip(),
+                meaning=payload.meaning.strip(),
+            )
+            db.add(word)
+            db.flush()
+        else:
+            word.article = _clean_optional_text(payload.article)
+            word.part_of_speech = payload.part_of_speech.strip()
+            word.meaning = payload.meaning.strip()
+        _replace_focus_entries(db, word_key, payload.focus_entries)
+    db.commit()
+    return result
+
+
+def _word_import_counts(db: Session, rows: list[AdminWordIn]) -> tuple[int, int]:
+    if not rows:
+        return (0, 0)
+    word_keys = [row.word.strip() for row in rows]
+    existing = set(db.scalars(select(CachedWord.lemma).where(CachedWord.lemma.in_(word_keys))).all())
+    updated = sum(1 for key in word_keys if key in existing)
+    return (len(word_keys) - updated, updated)
+
+
+def _validate_word_import_rules(
+    word: AdminWordIn,
+    row_number: int,
+    errors: list[AdminImportRowError],
+) -> None:
+    article = _clean_optional_text(word.article)
+    part_of_speech = word.part_of_speech.strip()
+    if article and article not in {"der", "die", "das"}:
+        errors.append(_import_error(row_number, "article", "Article must be der, die, das, or empty."))
+    if article and part_of_speech != "noun":
+        errors.append(_import_error(row_number, "article", "Only nouns can have an article."))
+
+
+def _import_reading_passages(db: Session, rows: list[dict], *, commit: bool) -> AdminImportResult:
+    valid_rows: list[tuple[int, AdminReadingPassageIn]] = []
+    errors: list[AdminImportRowError] = []
+    seen_ids: set[str] = set()
+
+    for row_number, row in enumerate(rows, start=1):
+        try:
+            passage = AdminReadingPassageIn.model_validate(row)
+            if passage.id:
+                if passage.id in seen_ids:
+                    errors.append(_import_error(row_number, "id", "Duplicate passage id in import file."))
+                    continue
+                seen_ids.add(passage.id)
+            valid_rows.append((row_number, passage))
+        except ValidationError as exc:
+            errors.extend(_validation_errors(row_number, exc))
+
+    created, updated = _reading_import_counts(db, [passage for _, passage in valid_rows])
+    result = AdminImportResult(
+        total=len(rows),
+        valid=len(valid_rows),
+        created=created,
+        updated=updated,
+        skipped=_skipped_row_count(errors),
+        errors=errors,
+    )
+    if errors or not commit:
+        return result
+
+    for _, payload in valid_rows:
+        passage = db.scalar(select(ReadingPassage).where(ReadingPassage.id == payload.id)) if payload.id else None
+        if passage is None:
+            kwargs = {"id": payload.id} if payload.id else {}
+            passage = ReadingPassage(**kwargs)
+            db.add(passage)
+        _apply_reading_payload(passage, payload)
+        _claim_stimulus_uploads(db, passage)
+    db.commit()
+    return result
+
+
+def _reading_import_counts(db: Session, rows: list[AdminReadingPassageIn]) -> tuple[int, int]:
+    ids = [row.id for row in rows if row.id]
+    existing = set(db.scalars(select(ReadingPassage.id).where(ReadingPassage.id.in_(ids))).all()) if ids else set()
+    updated = sum(1 for row in rows if row.id in existing)
+    return (len(rows) - updated, updated)
+
+
+def _validation_errors(row_number: int, exc: ValidationError) -> list[AdminImportRowError]:
+    return [
+        _import_error(
+            row_number,
+            _validation_field(error.get("loc", ())),
+            str(error.get("msg", "Invalid value.")),
+        )
+        for error in exc.errors()
+    ]
+
+
+def _validation_field(loc: tuple | list) -> str:
+    if not loc:
+        return "__root__"
+    return ".".join(str(part) for part in loc)
+
+
+def _import_error(row_number: int, field: str, message: str) -> AdminImportRowError:
+    return AdminImportRowError(row=row_number, field=field, message=message)
+
+
+def _skipped_row_count(errors: list[AdminImportRowError]) -> int:
+    return len({error.row for error in errors})
 
 
 def _replace_focus_entries(

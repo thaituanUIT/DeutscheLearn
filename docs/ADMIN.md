@@ -37,6 +37,40 @@ Words include:
 
 Focus entries connect a word to a CEFR level and known topic slug. Duplicate level/topic entries are ignored during replacement.
 
+## Importing Content
+
+Routes:
+
+- `POST /api/admin/import/words/preview`
+- `POST /api/admin/import/words`
+- `POST /api/admin/import/reading/preview`
+- `POST /api/admin/import/reading`
+
+All routes accept:
+
+```json
+{
+  "items": []
+}
+```
+
+Responses include `total`, `valid`, `created`, `updated`, `skipped`, and row-level `errors`.
+
+Import behavior:
+
+- Preview validates rows and reports create/update counts without writing.
+- Import writes only when every row is valid.
+- Word imports create or update by `word`.
+- Reading imports create new passages or update by `id` when provided.
+- Vocabulary supports JSON and CSV in the admin UI.
+- Reading supports JSON in the admin UI because questions, answers, render content, and Goethe adverts are nested.
+
+Developer templates live in:
+
+```text
+templates/admin-import/
+```
+
 ## Reading Passage Management
 
 Routes:

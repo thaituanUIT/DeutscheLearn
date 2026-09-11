@@ -253,6 +253,80 @@ def test_admin_word_rejects_unknown_focus_topic_without_replacing_existing_entri
         db.close()
 
 
+def test_admin_word_import_preview_and_commit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    word = f"ImportWord-{uuid4()}"
+    headers = {"Authorization": "Bearer secret"}
+    payload = {
+        "items": [
+            {
+                "word": word,
+                "article": "das",
+                "part_of_speech": "noun",
+                "meaning": "A word imported from a batch file.",
+                "focus_entries": [{"level": "A1", "topic": "food_drink"}],
+            }
+        ]
+    }
+
+    with TestClient(app) as client:
+        preview = client.post("/api/admin/import/words/preview", headers=headers, json=payload)
+        committed = client.post("/api/admin/import/words", headers=headers, json=payload)
+        second_preview = client.post("/api/admin/import/words/preview", headers=headers, json=payload)
+
+    assert preview.status_code == 200
+    assert preview.json()["created"] == 1
+    assert preview.json()["updated"] == 0
+    assert committed.status_code == 200
+    assert committed.json()["created"] == 1
+    assert committed.json()["errors"] == []
+    assert second_preview.status_code == 200
+    assert second_preview.json()["created"] == 0
+    assert second_preview.json()["updated"] == 1
+
+    db = SessionLocal()
+    try:
+        stored = db.scalar(select(CachedWord).where(CachedWord.lemma == word))
+        assert stored is not None
+        assert stored.meaning == "A word imported from a batch file."
+    finally:
+        db.close()
+
+
+def test_admin_word_import_blocks_invalid_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    word = f"BlockedImport-{uuid4()}"
+    headers = {"Authorization": "Bearer secret"}
+
+    with TestClient(app) as client:
+        result = client.post(
+            "/api/admin/import/words",
+            headers=headers,
+            json={
+                "items": [
+                    {
+                        "word": word,
+                        "article": "das",
+                        "part_of_speech": "noun",
+                        "meaning": "This row should not be committed.",
+                        "focus_entries": [{"level": "A1", "topic": "food_drinks"}],
+                    }
+                ]
+            },
+        )
+
+    assert result.status_code == 200
+    assert result.json()["valid"] == 0
+    assert result.json()["errors"][0]["row"] == 1
+    assert "Unknown focus topic: food_drinks" in result.json()["errors"][0]["message"]
+
+    db = SessionLocal()
+    try:
+        assert db.scalar(select(CachedWord).where(CachedWord.lemma == word)) is None
+    finally:
+        db.close()
+
+
 def test_focus_seed_import_preserves_admin_focus_entries(tmp_path) -> None:
     admin_word = f"AdminSeed-{uuid4()}"
     csv_word = f"CsvSeed-{uuid4()}"
@@ -356,6 +430,119 @@ def test_admin_reading_passage_crud(monkeypatch: pytest.MonkeyPatch) -> None:
 
         deleted = client.delete(f"/api/admin/reading/passages/{passage_id}", headers=headers)
         assert deleted.status_code == 204
+
+
+def test_admin_reading_import_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    passage_id = f"import-reading-{uuid4()}"
+    headers = {"Authorization": "Bearer secret"}
+    payload = {
+        "items": [
+            {
+                "id": passage_id,
+                "group": "general",
+                "level": "A1",
+                "part": None,
+                "topic": "daily_life",
+                "title": "Imported Reading Passage",
+                "passage_text": "Mia liest am Morgen ein Buch.",
+                "image_url": None,
+                "render_kind": "text",
+                "content": None,
+                "image_path": None,
+                "transcript": None,
+                "context_label": None,
+                "status": "published",
+                "order_index": 3,
+                "ad_stimuli": [],
+                "questions": [
+                    {
+                        "prompt": "Wann liest Mia?",
+                        "explanation": "The passage says am Morgen.",
+                        "order_index": 0,
+                        "answers": [
+                            {"answer_text": "Am Morgen", "is_correct": True, "order_index": 0},
+                            {"answer_text": "Am Abend", "is_correct": False, "order_index": 1},
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+    with TestClient(app) as client:
+        preview = client.post("/api/admin/import/reading/preview", headers=headers, json=payload)
+        committed = client.post("/api/admin/import/reading", headers=headers, json=payload)
+
+    assert preview.status_code == 200
+    assert preview.json()["created"] == 1
+    assert committed.status_code == 200
+    assert committed.json()["errors"] == []
+
+    db = SessionLocal()
+    try:
+        passage = db.scalar(select(ReadingPassage).where(ReadingPassage.id == passage_id))
+        assert passage is not None
+        assert passage.title == "Imported Reading Passage"
+        assert len(passage.questions) == 1
+        assert len(passage.questions[0].answers) == 2
+    finally:
+        db.close()
+
+
+def test_admin_reading_import_rejects_invalid_question(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    passage_id = f"bad-reading-{uuid4()}"
+    headers = {"Authorization": "Bearer secret"}
+
+    with TestClient(app) as client:
+        result = client.post(
+            "/api/admin/import/reading",
+            headers=headers,
+            json={
+                "items": [
+                    {
+                        "id": passage_id,
+                        "group": "general",
+                        "level": "A1",
+                        "part": None,
+                        "topic": None,
+                        "title": "Invalid Imported Passage",
+                        "passage_text": "Mia liest.",
+                        "image_url": None,
+                        "render_kind": "text",
+                        "content": None,
+                        "image_path": None,
+                        "transcript": None,
+                        "context_label": None,
+                        "status": "published",
+                        "order_index": 0,
+                        "ad_stimuli": [],
+                        "questions": [
+                            {
+                                "prompt": "Was macht Mia?",
+                                "explanation": None,
+                                "order_index": 0,
+                                "answers": [
+                                    {"answer_text": "Sie liest.", "is_correct": False, "order_index": 0},
+                                    {"answer_text": "Sie schwimmt.", "is_correct": False, "order_index": 1},
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+
+    assert result.status_code == 200
+    assert result.json()["valid"] == 0
+    assert result.json()["errors"][0]["row"] == 1
+
+    db = SessionLocal()
+    try:
+        assert db.scalar(select(ReadingPassage).where(ReadingPassage.id == passage_id)) is None
+    finally:
+        db.close()
 
 
 def test_story_mode_lists_passages_without_exposing_correct_answers() -> None:
