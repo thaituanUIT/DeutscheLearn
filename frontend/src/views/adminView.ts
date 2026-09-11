@@ -240,10 +240,10 @@ function renderWordList(
     state.isNew = true;
     onSelect();
   });
-  const importButton = button("Import words", "button");
+  const importButton = button("Import", "button");
   importButton.addEventListener("click", () => {
     openAdminImportDialog({
-      title: "Import words",
+      title: "Import",
       accept: ".csv,.json,application/json,text/csv",
       parse: parseWordImportFile,
       preview: (items) => previewAdminWordImport(token, items),
