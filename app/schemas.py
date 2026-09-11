@@ -252,6 +252,25 @@ class AdminWordOut(BaseModel):
     focus_entries: list[AdminFocusEntryOut]
 
 
+class AdminImportPayload(BaseModel):
+    items: list[dict[str, Any]] = Field(min_length=1)
+
+
+class AdminImportRowError(BaseModel):
+    row: int
+    field: str
+    message: str
+
+
+class AdminImportResult(BaseModel):
+    total: int
+    valid: int
+    created: int
+    updated: int
+    skipped: int
+    errors: list[AdminImportRowError] = Field(default_factory=list)
+
+
 class AdminReadingAnswerIn(BaseModel):
     answer_text: str = Field(min_length=1)
     is_correct: bool = False

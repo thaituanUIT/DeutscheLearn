@@ -1,0 +1,110 @@
+[
+  {
+    "id": "template-general-a1-station",
+    "group": "general",
+    "level": "A1",
+    "part": null,
+    "topic": "travel_transport",
+    "title": "Am Bahnhof",
+    "passage_text": "Mia ist am Bahnhof. Sie kauft eine Fahrkarte nach Berlin.",
+    "image_url": null,
+    "render_kind": "text",
+    "content": null,
+    "image_path": null,
+    "transcript": null,
+    "context_label": null,
+    "status": "draft",
+    "order_index": 0,
+    "ad_stimuli": [],
+    "questions": [
+      {
+        "prompt": "Wo ist Mia?",
+        "explanation": "Im Text steht: Mia ist am Bahnhof.",
+        "order_index": 0,
+        "answers": [
+          {
+            "answer_text": "Am Bahnhof",
+            "is_correct": true,
+            "order_index": 0
+          },
+          {
+            "answer_text": "In der Schule",
+            "is_correct": false,
+            "order_index": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "template-goethe-a1-teil2",
+    "group": "goethe",
+    "level": "A1",
+    "part": "teil_2",
+    "topic": null,
+    "title": "Freizeit am Samstag",
+    "passage_text": "Wo finden Sie Informationen?",
+    "image_url": null,
+    "render_kind": "text",
+    "content": null,
+    "image_path": null,
+    "transcript": null,
+    "context_label": null,
+    "status": "draft",
+    "order_index": 1,
+    "ad_stimuli": [
+      {
+        "key": "a",
+        "title": "Schwimmbad Mitte",
+        "body": "Heute offen von 10 bis 18 Uhr.",
+        "render_kind": "website_box",
+        "content": {
+          "url": "www.schwimmbad-mitte.example",
+          "lines": [
+            "Heute offen von 10 bis 18 Uhr.",
+            "Eintritt: 5 Euro"
+          ]
+        },
+        "image_path": null,
+        "transcript": null,
+        "context_label": null,
+        "order_index": 0
+      },
+      {
+        "key": "b",
+        "title": "Stadtbibliothek",
+        "body": "Samstag Lesung fuer Kinder um 15 Uhr.",
+        "render_kind": "ad_box",
+        "content": {
+          "lines": [
+            "Samstag Lesung fuer Kinder",
+            "Beginn: 15 Uhr"
+          ]
+        },
+        "image_path": null,
+        "transcript": null,
+        "context_label": null,
+        "order_index": 1
+      }
+    ],
+    "questions": [
+      {
+        "prompt": "Sie moechten schwimmen gehen.",
+        "explanation": "Das Schwimmbad passt zu schwimmen.",
+        "order_index": 0,
+        "answers": [
+          {
+            "answer_text": "a)",
+            "is_correct": true,
+            "order_index": 0
+          },
+          {
+            "answer_text": "b)",
+            "is_correct": false,
+            "order_index": 1
+          }
+        ]
+      }
+    ]
+  }
+]

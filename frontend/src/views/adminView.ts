@@ -8,11 +8,16 @@ import {
   getAdminReadingPassages,
   getAdminWords,
   getFocusTopicAliases,
+  importAdminReading,
+  importAdminWords,
+  previewAdminReadingImport,
+  previewAdminWordImport,
   updateAdminReadingPassage,
   updateAdminWord,
 } from "../api/client";
 import type {
   AdminFocusEntry,
+  AdminImportResult,
   AdminReadingAdStimulus,
   AdminReadingPassage,
   AdminReadingQuestion,
@@ -191,7 +196,7 @@ function renderWordsAdmin(host: HTMLElement, token: string): () => void {
   };
 
   const renderList = (status: AdminListStatus = "idle", error?: unknown, isFetching = false): void => {
-    renderWordList(listPanel, state, renderEditor, renderList, status, error, isFetching);
+    renderWordList(listPanel, token, state, renderEditor, loadWords, status, error, isFetching);
   };
 
   async function loadWords(): Promise<void> {
@@ -218,6 +223,7 @@ function renderWordsAdmin(host: HTMLElement, token: string): () => void {
 
 function renderWordList(
   host: HTMLElement,
+  token: string,
   state: { words: AdminWord[]; selected: AdminWord; isNew: boolean; search: string },
   onSelect: () => void,
   onSearch: () => void,
@@ -233,6 +239,17 @@ function renderWordList(
     state.selected = emptyWord();
     state.isNew = true;
     onSelect();
+  });
+  const importButton = button("Import words", "button");
+  importButton.addEventListener("click", () => {
+    openAdminImportDialog({
+      title: "Import words",
+      accept: ".csv,.json,application/json,text/csv",
+      parse: parseWordImportFile,
+      preview: (items) => previewAdminWordImport(token, items),
+      commit: (items) => importAdminWords(token, items),
+      onImported: onSearch,
+    });
   });
 
   const search = input("Search words", state.search);
@@ -281,7 +298,9 @@ function renderWordList(
   }
 
   const header = el("div", "admin-list-header");
-  header.append(el("h2", "focus-title", "Words"), newButton);
+  const actions = el("div", "admin-list-actions");
+  actions.append(importButton, newButton);
+  header.append(el("h2", "focus-title", "Words"), actions);
   const children = [header, controls, list];
   if (isFetching) children.push(el("p", "prompt admin-list-status", "Refreshing..."));
   host.replaceChildren(...children);
@@ -451,6 +470,19 @@ function renderPassageList(
     state.isNew = true;
     onSelect();
   });
+  const importButton = button("Import", "button");
+  importButton.ariaLabel = "Import passages";
+  importButton.title = "Import passages";
+  importButton.addEventListener("click", () => {
+    openAdminImportDialog({
+      title: "Import passages",
+      accept: ".json,application/json",
+      parse: parseJsonImportFile,
+      preview: (items) => previewAdminReadingImport(token, items),
+      commit: (items) => importAdminReading(token, items),
+      onImported: onGroupChange,
+    });
+  });
   const tabs = readingGroupTabs(state.activeGroup, (group) => {
     if (!confirmDiscardingShapeData(state.selected, state.activeGroup, group)) return false;
     state.activeGroup = group;
@@ -506,7 +538,9 @@ function renderPassageList(
   }
 
   const header = el("div", "admin-list-header");
-  header.append(el("h2", "focus-title", "Passages"), newButton);
+  const actions = el("div", "admin-list-actions");
+  actions.append(importButton, newButton);
+  header.append(el("h2", "focus-title", "Passages"), actions);
   const children = [header, tabs, controls, list];
   if (isFetching) children.push(el("p", "prompt admin-list-status", "Refreshing..."));
   host.replaceChildren(...children);
@@ -813,6 +847,208 @@ function renderPassageEditor(
   const editorLayout = el("div", "admin-passage-editor");
   editorLayout.append(editorForm, previewColumn);
   host.replaceChildren(header, editorLayout);
+}
+
+type AdminImportDialogOptions = {
+  title: string;
+  accept: string;
+  parse: (file: File) => Promise<Record<string, unknown>[]>;
+  preview: (items: Record<string, unknown>[]) => Promise<AdminImportResult>;
+  commit: (items: Record<string, unknown>[]) => Promise<AdminImportResult>;
+  onImported: () => void | Promise<void>;
+};
+
+function openAdminImportDialog(options: AdminImportDialogOptions): void {
+  let parsedItems: Record<string, unknown>[] = [];
+  let previewResult: AdminImportResult | null = null;
+  const backdrop = el("div", "admin-modal-backdrop");
+  const modal = el("section", "admin-modal");
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  const title = el("h2", "focus-title", options.title);
+  const file = document.createElement("input");
+  file.type = "file";
+  file.accept = options.accept;
+  file.className = "admin-input";
+  const status = el("p", "prompt admin-import-status", "Choose a template file to preview.");
+  const resultHost = el("div", "admin-import-results");
+  const cancel = button("Cancel", "button");
+  const runImport = button("Import", "button primary");
+  runImport.disabled = true;
+
+  const close = (): void => {
+    backdrop.remove();
+  };
+
+  cancel.addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+  file.addEventListener("change", async () => {
+    const selectedFile = file.files?.[0];
+    parsedItems = [];
+    previewResult = null;
+    runImport.disabled = true;
+    resultHost.replaceChildren();
+    if (!selectedFile) return;
+    try {
+      status.textContent = "Previewing import...";
+      parsedItems = await options.parse(selectedFile);
+      previewResult = await options.preview(parsedItems);
+      renderImportResult(resultHost, previewResult);
+      runImport.disabled = previewResult.errors.length > 0 || previewResult.valid === 0;
+      status.textContent = previewResult.errors.length
+        ? "Fix the file and choose it again."
+        : "Preview looks ready.";
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : "Import preview failed.";
+    }
+  });
+  runImport.addEventListener("click", async () => {
+    if (!previewResult || previewResult.errors.length || parsedItems.length === 0) return;
+    try {
+      status.textContent = "Importing...";
+      runImport.disabled = true;
+      const result = await options.commit(parsedItems);
+      renderImportResult(resultHost, result);
+      if (result.errors.length) {
+        status.textContent = "Nothing was imported. Fix the file and try again.";
+        return;
+      }
+      status.textContent = "Import complete.";
+      await options.onImported();
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : "Import failed.";
+      runImport.disabled = false;
+    }
+  });
+
+  const actions = el("div", "admin-action-buttons");
+  actions.append(cancel, runImport);
+  modal.append(title, wordField(file, "File"), status, resultHost, actions);
+  backdrop.append(modal);
+  document.body.append(backdrop);
+  file.focus();
+}
+
+async function parseJsonImportFile(file: File): Promise<Record<string, unknown>[]> {
+  const payload = JSON.parse(await file.text()) as unknown;
+  const items = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown }).items)
+      ? (payload as { items: unknown[] }).items
+      : null;
+  if (!items) throw new Error("JSON must be an array or an object with an items array.");
+  return items.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error("Every imported item must be an object.");
+    }
+    return item as Record<string, unknown>;
+  });
+}
+
+async function parseWordImportFile(file: File): Promise<Record<string, unknown>[]> {
+  if (file.name.toLowerCase().endsWith(".json") || file.type.includes("json")) {
+    return parseJsonImportFile(file);
+  }
+  return parseWordCsv(await file.text());
+}
+
+function parseWordCsv(text: string): Record<string, unknown>[] {
+  const rows = parseCsvRows(text).filter((row) => row.some((cell) => cell.trim()));
+  if (rows.length < 2) throw new Error("CSV needs a header row and at least one word row.");
+  const headers = rows[0].map((header) => header.trim());
+  const required = ["word", "part_of_speech", "meaning"];
+  const missing = required.filter((name) => !headers.includes(name));
+  if (missing.length) throw new Error(`CSV is missing: ${missing.join(", ")}.`);
+  return rows.slice(1).map((row) => {
+    const record: Record<string, string> = {};
+    headers.forEach((header, index) => {
+      record[header] = row[index]?.trim() ?? "";
+    });
+    return {
+      word: record.word,
+      article: record.article || null,
+      part_of_speech: record.part_of_speech,
+      meaning: record.meaning,
+      focus_entries: parseFocusEntriesCell(record.focus_entries ?? ""),
+    };
+  });
+}
+
+function parseCsvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  row.push(cell);
+  rows.push(row);
+  return rows;
+}
+
+function parseFocusEntriesCell(value: string): AdminFocusEntry[] {
+  return value
+    .split(";")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [level, topic] = entry.split(":");
+      return {
+        level: (level?.trim() || "A1") as AdminLevel,
+        topic: topic?.trim() ?? "",
+      };
+    })
+    .filter((entry) => entry.topic);
+}
+
+function renderImportResult(host: HTMLElement, result: AdminImportResult): void {
+  const summary = el("div", "admin-import-summary");
+  summary.append(
+    importMetric("Total", result.total),
+    importMetric("Valid", result.valid),
+    importMetric("Create", result.created),
+    importMetric("Update", result.updated),
+    importMetric("Errors", result.errors.length),
+  );
+  const children: HTMLElement[] = [summary];
+  if (result.errors.length) {
+    const list = el("div", "admin-import-errors");
+    for (const error of result.errors.slice(0, 20)) {
+      list.append(el("p", "", `Row ${error.row} · ${error.field}: ${error.message}`));
+    }
+    if (result.errors.length > 20) {
+      list.append(el("p", "", `${result.errors.length - 20} more errors.`));
+    }
+    children.push(list);
+  }
+  host.replaceChildren(...children);
+}
+
+function importMetric(label: string, value: number): HTMLElement {
+  const node = el("div", "admin-import-metric");
+  node.append(el("span", "", label), el("strong", "", String(value)));
+  return node;
 }
 
 function adminEditorForm(): HTMLFormElement {

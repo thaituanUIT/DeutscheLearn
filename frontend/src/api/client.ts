@@ -1,4 +1,5 @@
 import type {
+  AdminImportResult,
   AdminReadingPassage,
   AdminReadingPassageSummary,
   AdminWord,
@@ -367,6 +368,20 @@ export function deleteAdminWord(token: string, word: string): Promise<void> {
   });
 }
 
+export function previewAdminWordImport(token: string, items: Record<string, unknown>[]): Promise<AdminImportResult> {
+  return adminRequest<AdminImportResult>(token, "/api/admin/import/words/preview", {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
+}
+
+export function importAdminWords(token: string, items: Record<string, unknown>[]): Promise<AdminImportResult> {
+  return adminRequest<AdminImportResult>(token, "/api/admin/import/words", {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
+}
+
 export function getAdminReadingPassages(
   token: string,
   filters: { group?: string; level?: string } = {},
@@ -419,6 +434,20 @@ export function deleteAdminReadingPassage(token: string, passageId: string): Pro
     `/api/admin/reading/passages/${encodeURIComponent(passageId)}`,
     { method: "DELETE" },
   );
+}
+
+export function previewAdminReadingImport(token: string, items: Record<string, unknown>[]): Promise<AdminImportResult> {
+  return adminRequest<AdminImportResult>(token, "/api/admin/import/reading/preview", {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
+}
+
+export function importAdminReading(token: string, items: Record<string, unknown>[]): Promise<AdminImportResult> {
+  return adminRequest<AdminImportResult>(token, "/api/admin/import/reading", {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
 }
 
 export function createStimulusImageUploadUrl(

@@ -1,0 +1,30 @@
+[
+  {
+    "word": "Bahnhof",
+    "article": "der",
+    "part_of_speech": "noun",
+    "meaning": "train station",
+    "focus_entries": [
+      {
+        "level": "A1",
+        "topic": "travel_transport"
+      }
+    ]
+  },
+  {
+    "word": "fahren",
+    "article": null,
+    "part_of_speech": "verb",
+    "meaning": "to go or travel by vehicle",
+    "focus_entries": [
+      {
+        "level": "A1",
+        "topic": "travel_transport"
+      },
+      {
+        "level": "A2",
+        "topic": "daily_routines"
+      }
+    ]
+  }
+]
