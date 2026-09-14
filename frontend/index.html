@@ -12,8 +12,20 @@
     />
     <script>
       (function () {
-        var s = localStorage.getItem("theme");
-        var d = s === "dark" || (s !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        var s = null;
+        var m = false;
+
+        try {
+          s = window.localStorage.getItem("theme");
+        } catch (error) {
+          s = null;
+        }
+
+        if (typeof window.matchMedia === "function") {
+          m = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        }
+
+        var d = s === "dark" || (s !== "light" && m);
         document.documentElement.dataset.theme = d ? "dark" : "light";
       })();
     </script>

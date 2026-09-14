@@ -44,7 +44,8 @@ export function themeToggle(): HTMLElement {
   }
 
   const render = (preference: ThemePreference): void => {
-    trigger.replaceChildren(themeIcon(isDarkThemeActive() ? "dark" : "light"));
+    trigger.textContent = "";
+    trigger.append(themeIcon(isDarkThemeActive() ? "dark" : "light"));
 
     for (const [option, item] of items) {
       const checked = option === preference;
