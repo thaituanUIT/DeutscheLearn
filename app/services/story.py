@@ -279,9 +279,9 @@ def _looks_true_false(answers: list[dict]) -> bool:
 def _exercise_type(stimulus: Stimulus) -> str | None:
     if stimulus.collection != "goethe":
         return None
-    if stimulus.teil == "teil_2":
+    if stimulus.level == "A1" and stimulus.teil == "teil_2":
         return "source_choice"
-    if stimulus.kind == "sign" or stimulus.teil == "teil_3":
+    if stimulus.level == "A1" and (stimulus.kind == "sign" or stimulus.teil == "teil_3"):
         return "true_false_notice"
     return "standard"
 

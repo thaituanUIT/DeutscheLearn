@@ -355,9 +355,11 @@ class AdminReadingPassageIn(BaseModel):
             self.image_path = None
             self.transcript = None
             return self
-        if self.part == "teil_2" and len(self.ad_stimuli) != 2:
+        uses_a1_source_choice = self.level == "A1" and self.part == "teil_2"
+        uses_a1_notice = self.level == "A1" and self.part == "teil_3"
+        if uses_a1_source_choice and len(self.ad_stimuli) != 2:
             raise ValueError("Goethe Teil 2 needs exactly two adverts.")
-        if self.part == "teil_2":
+        if uses_a1_source_choice:
             for ad in self.ad_stimuli:
                 if ad.render_kind not in {"image", "website_box", "ad_box"}:
                     raise ValueError("Goethe Teil 2 stimuli must use website_box, ad_box, or image.")
@@ -365,9 +367,10 @@ class AdminReadingPassageIn(BaseModel):
             self.content = None
             self.image_path = None
             self.transcript = None
-        elif self.part == "teil_3":
+        elif uses_a1_notice:
             validate_stimulus_content(self.render_kind, self.content, self.image_path, self.transcript)
         else:
+            self.ad_stimuli = []
             self.render_kind = "text"
             self.content = None
             self.image_path = None
@@ -421,10 +424,30 @@ class StimulusImageUploadUrlOut(BaseModel):
     upload_url: str
 
 
+class GrammarWrongAnswerContextIn(BaseModel):
+    question: str = Field(min_length=1, max_length=800)
+    learner_answer: str = Field(min_length=1, max_length=300)
+    correct_answer: str | None = Field(default=None, max_length=300)
+    word: str | None = Field(default=None, max_length=120)
+    mode: str | None = Field(default=None, max_length=40)
+
+
+class GrammarPassageContextIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1, max_length=1600)
+
+
+class GrammarContextIn(BaseModel):
+    route: str | None = Field(default=None, max_length=80)
+    wrong_answer: GrammarWrongAnswerContextIn | None = None
+    passage: GrammarPassageContextIn | None = None
+
+
 class GrammarAskIn(BaseModel):
     question: str = Field(min_length=1, max_length=1200)
     learner_id: str | None = Field(default=None, max_length=120)
     include_debug: bool = False
+    context: GrammarContextIn | None = None
 
 
 class GrammarCitationOut(BaseModel):
@@ -449,6 +472,7 @@ class GrammarAskOut(BaseModel):
     cached: bool = False
     finish_reason: str | None = None
     truncated: bool = False
+    retrieval_query: str | None = None
 
 
 def validate_stimulus_content(

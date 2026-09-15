@@ -7,6 +7,8 @@ Anonymous German language learning app with multiple learning modes.
 - Cookie-based anonymous player identity.
 - Random generated display names.
 - Multiple learning modes: flashcards, Goethe-Institut styled exercises, and grammar assistant.
+- Mistake-aware RAG tutoring: wrong quiz/story answers can be sent as structured context so the assistant explains the exact learner error with cited grammar notes.
+- Lightweight RAG data loop: grammar questions are logged with status, context type, route, and cited chunks so unanswered questions can drive corpus expansion and eval cases.
 - Modular TypeScript frontend with Vite.
 - FastAPI backend with SQLAlchemy.
 - Render deployment config with Supabase Postgres.
@@ -39,6 +41,35 @@ uv sync --locked --no-dev
 npm run build --prefix frontend
 uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+Or run the production container stack without Render:
+
+```bash
+docker compose up --build
+```
+
+The Compose stack starts:
+
+- `frontend`: Nginx serving the built Vite app on `http://localhost:8000`
+- `backend`: FastAPI API/RAG service on the internal app network
+- `db`: Postgres 16 with pgvector on the private database network
+
+Useful environment overrides:
+
+```bash
+APP_PORT=8080 docker compose up --build
+DEUTSCHELEARN_ADMIN_TOKEN=change-me \
+DEUTSCHELEARN_COHERE_API_KEY=... \
+DEUTSCHELEARN_OPENROUTER_API_KEY=... \
+docker compose up --build
+```
+
+The backend container runs `alembic upgrade head` before starting Uvicorn. The frontend proxies
+`/api/*` requests to the backend service and serves all other routes as the SPA. The default Compose
+database credentials are local-development friendly; set `DEUTSCHELEARN_POSTGRES_PASSWORD`
+and API keys from your shell or a deployment secret store for hosted environments. If your
+database password contains URL-special characters, URL-encode it because Compose also uses it
+inside `DATABASE_URL`.
 
 Production installs use `uv sync --locked --no-dev` to skip local-only tooling such as tests,
 crawling, and PDF ingestion. Use the default `uv sync --locked` for development.
@@ -149,6 +180,12 @@ npm run eval
 The current golden set is a starter set and should grow toward roughly 60 items. Before relying
 on an LLM judge for answer quality, hand-score 20 generation outputs and record the agreement
 rate here.
+
+The grammar API accepts optional structured context for wrong answers and reading passages. The
+service uses this context to enrich retrieval while keeping answer generation grounded in the
+same cited chunks. Each grammar request is recorded in `grammar_question_logs`, which gives the
+admin side a future source for content-gap reports such as frequently asked no-match topics,
+weak routes, and chunks that are over- or under-used.
 
 The app still creates missing tables on startup for local development, but production database
 schema changes should be applied with Alembic before deploying application code that depends on

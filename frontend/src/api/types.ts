@@ -205,6 +205,7 @@ export type GrammarAskResponse = {
   cached: boolean;
   finish_reason: string | null;
   truncated: boolean;
+  retrieval_query: string | null;
 };
 
 export type AdminFocusEntry = {

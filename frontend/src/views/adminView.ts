@@ -67,7 +67,17 @@ type ReadingShape =
   | "goethe_true_false_text"
   | "goethe_source_choice"
   | "goethe_true_false_notice"
+  | "goethe_yes_no"
+  | "goethe_abc_choice"
+  | "goethe_matching"
+  | "goethe_gap_match"
   | "goethe_standard";
+type GoethePartSpec = {
+  shape: ReadingShape;
+  label: string;
+  description: string;
+  defaultOptions: string[];
+};
 type FieldValidationIssue = {
   field: string;
   message: string;
@@ -86,21 +96,116 @@ type ListCardProps = {
 };
 type AdminListStatus = "idle" | "loading" | "error";
 
-const READING_SHAPE_TABLE: Record<AdminReadingGroup, Partial<Record<AdminLevel, Partial<Record<AdminGoethePart, ReadingShape>>>>> = {
-  general: {},
-  goethe: {
-    A1: {
-      teil_1: "goethe_true_false_text",
-      teil_2: "goethe_source_choice",
-      teil_3: "goethe_true_false_notice",
+const GOETHE_PART_SPECS: Record<AdminLevel, Partial<Record<AdminGoethePart, GoethePartSpec>>> = {
+  A1: {
+    teil_1: {
+      shape: "goethe_true_false_text",
+      label: "Teil 1 · Short text · Richtig/Falsch",
+      description: "Read a short personal text and mark each statement as Richtig or Falsch.",
+      defaultOptions: ["Richtig", "Falsch"],
     },
-    A2: {
-      teil_1: "goethe_true_false_text",
-      teil_2: "goethe_source_choice",
-      teil_3: "goethe_true_false_notice",
+    teil_2: {
+      shape: "goethe_source_choice",
+      label: "Teil 2 · Two adverts · a/b",
+      description: "Read a situation and choose which of two adverts fits.",
+      defaultOptions: ["a", "b"],
     },
-    B1: { teil_1: "goethe_standard" },
-    B2: { teil_1: "goethe_standard" },
+    teil_3: {
+      shape: "goethe_true_false_notice",
+      label: "Teil 3 · Sign or notice · Richtig/Falsch",
+      description: "Read a sign, notice, or short announcement and mark Richtig or Falsch.",
+      defaultOptions: ["Richtig", "Falsch"],
+    },
+  },
+  A2: {
+    teil_1: {
+      shape: "goethe_abc_choice",
+      label: "Teil 1 · Newspaper article · a/b/c",
+      description: "Read one article and choose a, b, or c for tasks 1-5.",
+      defaultOptions: ["a", "b", "c"],
+    },
+    teil_2: {
+      shape: "goethe_abc_choice",
+      label: "Teil 2 · Information board · a/b/c",
+      description: "Use an information board/table and choose a, b, or c for tasks 6-10.",
+      defaultOptions: ["a", "b", "c"],
+    },
+    teil_3: {
+      shape: "goethe_abc_choice",
+      label: "Teil 3 · E-mail · a/b/c",
+      description: "Read one e-mail and choose a, b, or c for tasks 11-15.",
+      defaultOptions: ["a", "b", "c"],
+    },
+    teil_4: {
+      shape: "goethe_matching",
+      label: "Teil 4 · Ad matching · a-f/x",
+      description: "Match situations to adverts a-f; one task has no solution and uses X.",
+      defaultOptions: ["a", "b", "c", "d", "e", "f", "X"],
+    },
+  },
+  B1: {
+    teil_1: {
+      shape: "goethe_true_false_text",
+      label: "Teil 1 · Text · Richtig/Falsch",
+      description: "Read one text and mark each statement as Richtig or Falsch.",
+      defaultOptions: ["Richtig", "Falsch"],
+    },
+    teil_2: {
+      shape: "goethe_abc_choice",
+      label: "Teil 2 · Article · a/b/c",
+      description: "Read one article and choose a, b, or c.",
+      defaultOptions: ["a", "b", "c"],
+    },
+    teil_3: {
+      shape: "goethe_matching",
+      label: "Teil 3 · Advertisement matching · a-j/x",
+      description: "Match situations to adverts a-j; use X when none fits.",
+      defaultOptions: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "X"],
+    },
+    teil_4: {
+      shape: "goethe_yes_no",
+      label: "Teil 4 · Opinion texts · Ja/Nein",
+      description: "Read opinions and choose whether each person supports the statement.",
+      defaultOptions: ["Ja", "Nein"],
+    },
+    teil_5: {
+      shape: "goethe_abc_choice",
+      label: "Teil 5 · Rules text · a/b/c",
+      description: "Read rules or regulations and choose a, b, or c.",
+      defaultOptions: ["a", "b", "c"],
+    },
+  },
+  B2: {
+    teil_1: {
+      shape: "goethe_matching",
+      label: "Teil 1 · Four people · a-d",
+      description: "Match statements to people a-d; people can be selected more than once.",
+      defaultOptions: ["a", "b", "c", "d"],
+    },
+    teil_2: {
+      shape: "goethe_gap_match",
+      label: "Teil 2 · Gap sentences · a-h",
+      description: "Choose which sentence a-h fits each gap; two sentences do not fit.",
+      defaultOptions: ["a", "b", "c", "d", "e", "f", "g", "h"],
+    },
+    teil_3: {
+      shape: "goethe_abc_choice",
+      label: "Teil 3 · Article · a/b/c",
+      description: "Read one article and choose a, b, or c.",
+      defaultOptions: ["a", "b", "c"],
+    },
+    teil_4: {
+      shape: "goethe_matching",
+      label: "Teil 4 · Headline matching · a-h",
+      description: "Match opinion texts to headings a-h; one option does not fit.",
+      defaultOptions: ["a", "b", "c", "d", "e", "f", "g", "h"],
+    },
+    teil_5: {
+      shape: "goethe_matching",
+      label: "Teil 5 · Regulation headings · a-h",
+      description: "Match paragraphs from rules or regulations to headings a-h.",
+      defaultOptions: ["a", "b", "c", "d", "e", "f", "g", "h"],
+    },
   },
 };
 
@@ -596,9 +701,11 @@ function renderPassageEditor(
   const formFields = el("div", "admin-form-fields");
   const shape = (): ReadingShape =>
     resolveReadingShape(state.activeGroup, level.value as AdminLevel, part.value as AdminGoethePart);
-  let questionControls = state.selected.questions.map((question) => questionBlockForShape(question, shape()));
+  const activeSpec = (): GoethePartSpec | null =>
+    state.activeGroup === "goethe" ? goethePartSpec(level.value as AdminLevel, part.value as AdminGoethePart) : null;
+  let questionControls = state.selected.questions.map((question) => questionBlockForShape(question, shape(), activeSpec()));
   if (questionControls.length === 0) {
-    questionControls = [questionBlockForShape(emptyQuestion(0), shape())];
+    questionControls = [questionBlockForShape(emptyQuestion(0, activeSpec()?.defaultOptions), shape(), activeSpec())];
   }
   const renderQuestions = (): void => {
     questions.replaceChildren(
@@ -670,10 +777,11 @@ function renderPassageEditor(
     questionControls = questionControls.map((control, index) => {
       if (questionBlockMatchesShape(control, activeShape)) return control;
       questionShapeChanged = true;
-      return questionBlockForShape(questionFromBlockSafely(control, index), activeShape);
+      return questionBlockForShape(questionFromBlockSafely(control, index), activeShape, activeSpec());
     });
     if (questionShapeChanged) renderQuestions();
-    resolvedType.textContent = `Type: ${resolvedExerciseLabel(activeShape)}`;
+    const spec = activeSpec();
+    resolvedType.textContent = spec ? `Type: ${spec.label}` : `Type: ${resolvedExerciseLabel(activeShape)}`;
     const metaFields = [wordField(level, "Level")];
     if (state.activeGroup === "goethe") {
       metaFields.push(wordField(part, "Goethe Teil"), resolvedType);
@@ -686,6 +794,8 @@ function renderPassageEditor(
     if (activeShape === "goethe_source_choice") {
       stimulusFields.push(sourceChoicePanel);
     } else {
+      const spec = activeSpec();
+      if (spec) stimulusFields.push(el("p", "prompt admin-goethe-shape-note", spec.description));
       if (activeShape === "goethe_true_false_notice") {
         stimulusFields.push(wordField(contextLabel), noticeEditor.node);
       }
@@ -800,7 +910,7 @@ function renderPassageEditor(
   const addTemplate = button("+ Add question", "button");
   addTemplate.className = "button primary";
   addTemplate.addEventListener("click", () => {
-    questionControls.push(questionBlockForShape(emptyQuestion(questionControls.length), shape()));
+    questionControls.push(questionBlockForShape(emptyQuestion(questionControls.length, activeSpec()?.defaultOptions), shape(), activeSpec()));
     renderQuestions();
     renderForm();
   });
@@ -1127,8 +1237,13 @@ function questionBlock(question: AdminReadingQuestion): QuestionBlock {
   return standardQuestionBlock(question);
 }
 
-function questionBlockForShape(question: AdminReadingQuestion, shape: ReadingShape): QuestionBlock {
-  return isTrueFalseShape(shape) ? trueFalseQuestionBlock(question) : standardQuestionBlock(question);
+function questionBlockForShape(
+  question: AdminReadingQuestion,
+  shape: ReadingShape,
+  spec: GoethePartSpec | null = null,
+): QuestionBlock {
+  if (isTrueFalseShape(shape)) return trueFalseQuestionBlock(question);
+  return standardQuestionBlock(normalizeQuestionOptions(question, spec?.defaultOptions));
 }
 
 function questionBlockMatchesShape(block: QuestionBlock, shape: ReadingShape): boolean {
@@ -1137,6 +1252,23 @@ function questionBlockMatchesShape(block: QuestionBlock, shape: ReadingShape): b
 
 function isTrueFalseShape(shape: ReadingShape): boolean {
   return shape === "goethe_true_false_text" || shape === "goethe_true_false_notice";
+}
+
+function normalizeQuestionOptions(
+  question: AdminReadingQuestion,
+  defaultOptions: string[] | undefined,
+): AdminReadingQuestion {
+  if (!defaultOptions?.length || question.answers.some((answer) => answer.answer_text.trim())) {
+    return question;
+  }
+  return {
+    ...question,
+    answers: defaultOptions.map((option, index) => ({
+      answer_text: option,
+      is_correct: index === 0,
+      order_index: index,
+    })),
+  };
 }
 
 function trueFalseQuestionBlock(question: AdminReadingQuestion): QuestionBlock {
@@ -1617,17 +1749,16 @@ function emptyAdStimulus(key: "a" | "b", orderIndex: number): AdminReadingAdStim
   };
 }
 
-function emptyQuestion(orderIndex: number): AdminReadingPassage["questions"][number] {
+function emptyQuestion(orderIndex: number, options = ["", "", "", ""]): AdminReadingPassage["questions"][number] {
   return {
     prompt: "",
     explanation: null,
     order_index: orderIndex,
-    answers: [
-      { answer_text: "", is_correct: true, order_index: 0 },
-      { answer_text: "", is_correct: false, order_index: 1 },
-      { answer_text: "", is_correct: false, order_index: 2 },
-      { answer_text: "", is_correct: false, order_index: 3 },
-    ],
+    answers: options.map((answerText, index) => ({
+      answer_text: answerText,
+      is_correct: index === 0,
+      order_index: index,
+    })),
   };
 }
 
@@ -1852,11 +1983,15 @@ function resolveReadingShape(
   teil: AdminGoethePart | null,
 ): ReadingShape {
   if (collection === "general") return "general_free_form";
-  return READING_SHAPE_TABLE.goethe[level]?.[teil ?? "teil_1"] ?? "goethe_standard";
+  return goethePartSpec(level, teil ?? "teil_1")?.shape ?? "goethe_standard";
 }
 
 function allowedGoetheParts(level: AdminLevel): AdminGoethePart[] {
-  return Object.keys(READING_SHAPE_TABLE.goethe[level] ?? { teil_1: "goethe_standard" }) as AdminGoethePart[];
+  return Object.keys(GOETHE_PART_SPECS[level] ?? { teil_1: null }) as AdminGoethePart[];
+}
+
+function goethePartSpec(level: AdminLevel, part: AdminGoethePart): GoethePartSpec | null {
+  return GOETHE_PART_SPECS[level]?.[part] ?? null;
 }
 
 function syncGoethePartOptions(select: HTMLSelectElement, level: AdminLevel): void {
@@ -1868,7 +2003,7 @@ function syncGoethePartOptions(select: HTMLSelectElement, level: AdminLevel): vo
     ...allowedParts.map((part) => {
       const option = document.createElement("option");
       option.value = part;
-      option.textContent = partLabel(part);
+      option.textContent = goethePartSpec(level, part)?.label ?? partLabel(part);
       option.selected = part === selected;
       return option;
     }),
@@ -1900,6 +2035,10 @@ function resolvedExerciseLabel(shape: ReadingShape): string {
   if (shape === "goethe_true_false_text") return "Personal text - true/false";
   if (shape === "goethe_source_choice") return "Two adverts - choose one";
   if (shape === "goethe_true_false_notice") return "Sign or notice - true/false";
+  if (shape === "goethe_yes_no") return "Opinion task - yes/no";
+  if (shape === "goethe_abc_choice") return "Multiple choice - a/b/c";
+  if (shape === "goethe_matching") return "Matching task";
+  if (shape === "goethe_gap_match") return "Gap sentence matching";
   return "Standard questions";
 }
 

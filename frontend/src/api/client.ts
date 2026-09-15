@@ -321,12 +321,27 @@ const previewStoryPassages: StoryPassage[] = [
 export function askGrammar(payload: {
   question: string;
   learner_id?: string | null;
+  context?: {
+    route?: string | null;
+    wrong_answer?: {
+      question: string;
+      learner_answer: string;
+      correct_answer?: string | null;
+      word?: string | null;
+      mode?: string | null;
+    } | null;
+    passage?: {
+      title: string;
+      text: string;
+    } | null;
+  } | null;
 }): Promise<GrammarAskResponse> {
   return request<GrammarAskResponse>("/api/grammar/ask", {
     method: "POST",
     body: JSON.stringify({
       question: payload.question,
       learner_id: payload.learner_id ?? null,
+      context: payload.context ?? null,
     }),
   });
 }

@@ -1,0 +1,94 @@
+services:
+  frontend:
+    build:
+      context: .
+      target: frontend
+    image: deutschelearn-frontend:latest
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8000}:80"
+    networks:
+      - public
+      - app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  backend:
+    build:
+      context: .
+      target: backend
+    image: deutschelearn-backend:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      PORT: "8000"
+      DATABASE_URL: postgresql://deutschelearn:${DEUTSCHELEARN_POSTGRES_PASSWORD:-deutschelearn}@db:5432/deutschelearn
+      STATIC_ASSETS_ENABLED: "false"
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      COOKIE_SAMESITE: "${COOKIE_SAMESITE:-lax}"
+      SEED_ON_STARTUP: "${SEED_ON_STARTUP:-true}"
+      ADMIN_TOKEN: "${DEUTSCHELEARN_ADMIN_TOKEN:-}"
+      COHERE_API_KEY: "${DEUTSCHELEARN_COHERE_API_KEY:-}"
+      COHERE_EMBEDDING_MODEL: embed-multilingual-v3.0
+      COHERE_EMBEDDING_DIMENSION: "1024"
+      OPENROUTER_API_KEY: "${DEUTSCHELEARN_OPENROUTER_API_KEY:-}"
+      OPENROUTER_CHAT_MODEL: "${DEUTSCHELEARN_OPENROUTER_CHAT_MODEL:-google/gemma-4-31b-it:free}"
+      OPENROUTER_CHAT_FALLBACK_MODELS: "${DEUTSCHELEARN_OPENROUTER_CHAT_FALLBACK_MODELS:-openrouter/free}"
+      GRAMMAR_SIMILARITY_THRESHOLD: "${GRAMMAR_SIMILARITY_THRESHOLD:-0.45}"
+      GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD: "${GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD:-0.85}"
+      GRAMMAR_MIN_QUERY_WORDS: "${GRAMMAR_MIN_QUERY_WORDS:-3}"
+    networks:
+      - app
+      - private
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).read()",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: deutschelearn
+      POSTGRES_USER: deutschelearn
+      POSTGRES_PASSWORD: "${DEUTSCHELEARN_POSTGRES_PASSWORD:-deutschelearn}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - private
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deutschelearn -d deutschelearn"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  public:
+    driver: bridge
+  app:
+    driver: bridge
+  private:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres_data:

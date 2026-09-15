@@ -29,6 +29,9 @@ export type GrammarPassageContext = {
 export type GrammarWrongAnswerContext = {
   question: string;
   learnerAnswer: string;
+  correctAnswer?: string | null;
+  word?: string | null;
+  mode?: string | null;
 };
 
 type GrammarWidgetContext = {
@@ -140,6 +143,7 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
       const response = await askGrammar({
         question,
         learner_id: player.player_id,
+        context: apiContext(context),
       });
       clearLoadingTimers();
       const assistantMessage = messageFromResponse(response);
@@ -604,10 +608,32 @@ function passageQuestion(passage: GrammarPassageContext, language: "en" | "vi"):
 }
 
 function wrongAnswerQuestion(context: GrammarWrongAnswerContext, language: "en" | "vi"): string {
+  const correctLine = context.correctAnswer ? `\nCorrect answer: ${context.correctAnswer}` : "";
   if (language === "vi") {
-    return `Vì sao câu trả lời của tôi sai?\n\nCâu hỏi: ${context.question}\nCâu trả lời của tôi: ${context.learnerAnswer}`;
+    return `Vì sao câu trả lời của tôi sai?\n\nCâu hỏi: ${context.question}\nCâu trả lời của tôi: ${context.learnerAnswer}${context.correctAnswer ? `\nĐáp án đúng: ${context.correctAnswer}` : ""}`;
   }
-  return `Why was my answer wrong?\n\nQuestion: ${context.question}\nMy answer: ${context.learnerAnswer}`;
+  return `Why was my answer wrong?\n\nQuestion: ${context.question}\nMy answer: ${context.learnerAnswer}${correctLine}`;
+}
+
+function apiContext(context: GrammarWidgetContext): Parameters<typeof askGrammar>[0]["context"] {
+  return {
+    route: context.route,
+    wrong_answer: context.wrongAnswer
+      ? {
+          question: context.wrongAnswer.question,
+          learner_answer: context.wrongAnswer.learnerAnswer,
+          correct_answer: context.wrongAnswer.correctAnswer ?? null,
+          word: context.wrongAnswer.word ?? null,
+          mode: context.wrongAnswer.mode ?? null,
+        }
+      : null,
+    passage: context.passage
+      ? {
+          title: context.passage.title,
+          text: context.passage.text,
+        }
+      : null,
+  };
 }
 
 function topicLabel(topic: string): string {

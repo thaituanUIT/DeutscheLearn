@@ -432,6 +432,45 @@ def test_admin_reading_passage_crud(monkeypatch: pytest.MonkeyPatch) -> None:
         assert deleted.status_code == 204
 
 
+def test_admin_goethe_a2_teil_1_uses_model_choice_format(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    headers = {"Authorization": "Bearer secret"}
+    payload = {
+        "group": "goethe",
+        "level": "A2",
+        "part": "teil_1",
+        "topic": None,
+        "title": f"A2 Goethe Teil 1 {uuid4()}",
+        "passage_text": "Der Koch Stefan probiert immer neue Rezepte aus.",
+        "order_index": 1,
+        "questions": [
+            {
+                "prompt": "Dieser Text informiert über...",
+                "explanation": "A2 Teil 1 uses a, b, c multiple choice.",
+                "order_index": 0,
+                "answers": [
+                    {"answer_text": "a den Berufsweg eines Kochs.", "is_correct": True, "order_index": 0},
+                    {"answer_text": "b einen Koch in einem Hotel.", "is_correct": False, "order_index": 1},
+                    {"answer_text": "c eine neue Berufsausbildung.", "is_correct": False, "order_index": 2},
+                ],
+            }
+        ],
+        "ad_stimuli": [],
+    }
+
+    with TestClient(app) as client:
+        created = client.post("/api/admin/reading/passages", headers=headers, json=payload)
+        assert created.status_code == 200
+        body = created.json()
+
+        assert body["level"] == "A2"
+        assert body["part"] == "teil_1"
+        assert body["exercise_type"] == "standard"
+        assert body["render_kind"] == "text"
+        assert body["ad_stimuli"] == []
+        assert [answer["answer_text"][0] for answer in body["questions"][0]["answers"]] == ["a", "b", "c"]
+
+
 def test_admin_reading_import_json(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
     passage_id = f"import-reading-{uuid4()}"
