@@ -85,6 +85,7 @@ from app.services.grammar import (
     grammar_context_type,
     normalize_question,
 )
+from app.services.goethe_reading import exercise_type_for, stimulus_kind_for, uses_source_choice
 from app.services.quiz import create_question
 from app.services.story import (
     get_all_story_passages,
@@ -1200,7 +1201,7 @@ def _apply_reading_payload(passage: ReadingPassage, payload: AdminReadingPassage
     passage.context_label = _clean_optional_text(payload.context_label)
     passage.sort_order = payload.order_index
     passage.updated_at = utc_now()
-    ad_rows = _reading_ad_stimuli_from_payload(payload) if _uses_goethe_source_choice(payload.group, payload.level, payload.part) else []
+    ad_rows = _reading_ad_stimuli_from_payload(payload) if uses_source_choice(payload.group, payload.level, payload.part) else []
     passage.items = [
         _reading_item_from_payload(question, ad_rows if index == 0 else [])
         for index, question in enumerate(payload.questions)
@@ -1354,27 +1355,11 @@ def _clean_optional_text(value: str | None) -> str | None:
 
 
 def _exercise_type(passage: ReadingPassage) -> str | None:
-    if passage.group != "goethe":
-        return None
-    if _uses_goethe_source_choice(passage.group, passage.level, passage.part):
-        return "source_choice"
-    if _uses_goethe_notice(passage.group, passage.level, passage.part):
-        return "true_false_notice"
-    return "standard"
+    return exercise_type_for(passage.group, passage.level, passage.part, passage.kind)
 
 
 def _stimulus_kind(group: str, level: str, part: str | None) -> str:
-    if _uses_goethe_notice(group, level, part):
-        return "sign"
-    return "text"
-
-
-def _uses_goethe_source_choice(group: str, level: str, part: str | None) -> bool:
-    return group == "goethe" and level == "A1" and part == "teil_2"
-
-
-def _uses_goethe_notice(group: str, level: str, part: str | None) -> bool:
-    return group == "goethe" and level == "A1" and part == "teil_3"
+    return stimulus_kind_for(group, level, part)
 
 
 def _image_extension(content_type: str) -> str:

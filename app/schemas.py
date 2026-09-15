@@ -2,6 +2,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.services.goethe_reading import uses_notice, uses_source_choice
+
 RenderKind = Literal[
     "text",
     "image",
@@ -355,11 +357,11 @@ class AdminReadingPassageIn(BaseModel):
             self.image_path = None
             self.transcript = None
             return self
-        uses_a1_source_choice = self.level == "A1" and self.part == "teil_2"
-        uses_a1_notice = self.level == "A1" and self.part == "teil_3"
-        if uses_a1_source_choice and len(self.ad_stimuli) != 2:
+        uses_goethe_source_choice = uses_source_choice(self.group, self.level, self.part)
+        uses_goethe_notice = uses_notice(self.group, self.level, self.part)
+        if uses_goethe_source_choice and len(self.ad_stimuli) != 2:
             raise ValueError("Goethe Teil 2 needs exactly two adverts.")
-        if uses_a1_source_choice:
+        if uses_goethe_source_choice:
             for ad in self.ad_stimuli:
                 if ad.render_kind not in {"image", "website_box", "ad_box"}:
                     raise ValueError("Goethe Teil 2 stimuli must use website_box, ad_box, or image.")
@@ -367,7 +369,7 @@ class AdminReadingPassageIn(BaseModel):
             self.content = None
             self.image_path = None
             self.transcript = None
-        elif uses_a1_notice:
+        elif uses_goethe_notice:
             validate_stimulus_content(self.render_kind, self.content, self.image_path, self.transcript)
         else:
             self.ad_stimuli = []

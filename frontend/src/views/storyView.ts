@@ -24,6 +24,7 @@ import type {
   StoryPassageSummary,
 } from "../api/types";
 import { button } from "../components/button";
+import { goethePartLabel, partLabel } from "../goethe/readingSpecs";
 import { getPlayer } from "../state/playerStore";
 import { addStoryMistakes, recordStoryRead } from "../state/progressStore";
 import { stimulusInstruction, stimulusRenderer, type StimulusViewModel } from "../stimuli/templates";
@@ -48,34 +49,6 @@ type StorySession = {
 
 type StoryQuestionResult = StoryAnswer & {
   selected_answer_id: string;
-};
-
-const GOETHE_PART_LABELS: Record<StoryLevel["level"], Partial<Record<StoryPart["part"], string>>> = {
-  A1: {
-    teil_1: "Teil 1 · Short text · Richtig/Falsch",
-    teil_2: "Teil 2 · Two adverts · a/b",
-    teil_3: "Teil 3 · Sign or notice · Richtig/Falsch",
-  },
-  A2: {
-    teil_1: "Teil 1 · Newspaper article · a/b/c",
-    teil_2: "Teil 2 · Information board · a/b/c",
-    teil_3: "Teil 3 · E-mail · a/b/c",
-    teil_4: "Teil 4 · Ad matching · a-f/x",
-  },
-  B1: {
-    teil_1: "Teil 1 · Text · Richtig/Falsch",
-    teil_2: "Teil 2 · Article · a/b/c",
-    teil_3: "Teil 3 · Advertisement matching",
-    teil_4: "Teil 4 · Opinions · Ja/Nein",
-    teil_5: "Teil 5 · Rules · a/b/c",
-  },
-  B2: {
-    teil_1: "Teil 1 · Four people · a-d",
-    teil_2: "Teil 2 · Gap sentences · a-h",
-    teil_3: "Teil 3 · Article · a/b/c",
-    teil_4: "Teil 4 · Headline matching",
-    teil_5: "Teil 5 · Regulation headings",
-  },
 };
 
 export function storyView(options: StoryViewOptions): HTMLElement {
@@ -565,14 +538,6 @@ function formatStoryItemCount(
 ): string {
   if (group === "goethe") return formatCount(count, "Übung", { plural: "Übungen", ...options });
   return formatCount(count, "story", options);
-}
-
-function partLabel(part: StoryPart["part"]): string {
-  return part.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function goethePartLabel(level: StoryLevel["level"], part: StoryPart["part"]): string {
-  return GOETHE_PART_LABELS[level]?.[part] ?? partLabel(part);
 }
 
 function topicLabel(topic: string): string {
