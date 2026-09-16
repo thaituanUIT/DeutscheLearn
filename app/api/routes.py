@@ -77,7 +77,9 @@ from app.services.focus import (
     get_focus_revision_questions,
     get_focus_topics,
 )
+from app.services.goethe_reading import exercise_type_for, stimulus_kind_for, uses_source_choice
 from app.services.grammar import (
+    GrammarAnswer,
     GrammarServiceError,
     GrammarUnavailableError,
     answer_grammar_question,
@@ -85,7 +87,6 @@ from app.services.grammar import (
     grammar_context_type,
     normalize_question,
 )
-from app.services.goethe_reading import exercise_type_for, stimulus_kind_for, uses_source_choice
 from app.services.quiz import create_question
 from app.services.story import (
     get_all_story_passages,
@@ -204,21 +205,21 @@ def log_grammar_question(
     question: str,
     route: str | None,
     context_type: str | None,
-    result: object,
+    result: GrammarAnswer,
 ) -> None:
     try:
-        citations = getattr(result, "citations")
-        debug = getattr(result, "retrieval_debug")
+        citations = result.citations
+        debug = result.retrieval_debug
         row = GrammarQuestionLog(
             learner_id=learner_id,
             normalized_question=normalize_question(question),
-            retrieval_query=getattr(result, "retrieval_query"),
-            status=getattr(result, "status"),
+            retrieval_query=result.retrieval_query,
+            status=result.status,
             context_type=context_type,
             route=route,
             cited_chunk_ids_json=json.dumps([citation.chunk_id for citation in citations]),
             retrieval_debug_json=json.dumps(debug) if debug is not None else None,
-            cached=bool(getattr(result, "cached")),
+            cached=bool(result.cached),
         )
         db.add(row)
         db.commit()
