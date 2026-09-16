@@ -6,15 +6,10 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.db.models import Item, ItemOption, Stimulus
 from app.services.focus import FOCUS_LEVELS
+from app.services.goethe_reading import GOETHE_PARTS_BY_LEVEL, exercise_type_for, goethe_part_label
 
 STORY_SEED_PATH = Path("data/story_passages.json")
 STORY_GROUPS = ("general", "goethe")
-GOETHE_PARTS_BY_LEVEL = {
-    "A1": ("teil_1", "teil_2", "teil_3"),
-    "A2": ("teil_1", "teil_2", "teil_3", "teil_4"),
-    "B1": ("teil_1", "teil_2", "teil_3", "teil_4", "teil_5"),
-    "B2": ("teil_1", "teil_2", "teil_3", "teil_4", "teil_5"),
-}
 
 
 def import_story_passages(db: Session, json_path: Path = STORY_SEED_PATH) -> None:
@@ -133,7 +128,7 @@ def get_goethe_parts(db: Session, level: str) -> list[dict[str, int | str]]:
     return [
         {
             "part": part,
-            "label": part.replace("_", " ").title(),
+            "label": goethe_part_label(level, part),
             "passage_count": counts.get(part, 0),
             "question_count": question_counts.get(part, 0),
         }
@@ -277,13 +272,7 @@ def _looks_true_false(answers: list[dict]) -> bool:
 
 
 def _exercise_type(stimulus: Stimulus) -> str | None:
-    if stimulus.collection != "goethe":
-        return None
-    if stimulus.teil == "teil_2":
-        return "source_choice"
-    if stimulus.kind == "sign" or stimulus.teil == "teil_3":
-        return "true_false_notice"
-    return "standard"
+    return exercise_type_for(stimulus.collection, stimulus.level, stimulus.teil, stimulus.kind)
 
 
 def _clean_optional_text(value: str | None) -> str | None:

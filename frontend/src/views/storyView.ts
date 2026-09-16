@@ -24,6 +24,7 @@ import type {
   StoryPassageSummary,
 } from "../api/types";
 import { button } from "../components/button";
+import { goethePartLabel, partLabel } from "../goethe/readingSpecs";
 import { getPlayer } from "../state/playerStore";
 import { addStoryMistakes, recordStoryRead } from "../state/progressStore";
 import { stimulusInstruction, stimulusRenderer, type StimulusViewModel } from "../stimuli/templates";
@@ -131,7 +132,7 @@ async function renderStoryParts(
 
     const grid = el("div", "focus-grid goethe-parts-grid");
     for (const part of parts) {
-      grid.append(partCard(part, () => renderStoryPassages(section, "goethe", level, part.part, options)));
+      grid.append(partCard(part, level, () => renderStoryPassages(section, "goethe", level, part.part, options)));
     }
 
     section.replaceChildren(intro, grid);
@@ -441,6 +442,8 @@ function firstWrongAnswerContext(session: StorySession): GrammarWrongAnswerConte
     return {
       question: question.prompt,
       learnerAnswer: selected.answer_text,
+      correctAnswer: result.correct_answer_text,
+      mode: "story",
     };
   }
   return null;
@@ -474,11 +477,11 @@ function levelCard(
   return card;
 }
 
-function partCard(part: StoryPart, onClick: () => void): HTMLButtonElement {
+function partCard(part: StoryPart, level: StoryLevel["level"], onClick: () => void): HTMLButtonElement {
   const card = button("", "focus-option goethe-part-option");
   card.addEventListener("click", onClick);
   card.append(
-    el("strong", "", part.label),
+    el("strong", "", goethePartLabel(level, part.part)),
     el("span", "", formatCount(part.passage_count, "Übung", { plural: "Übungen", zeroLabel: "No" })),
     el("span", "", formatCount(part.question_count, "question", { zeroLabel: "No" })),
   );
@@ -504,7 +507,7 @@ function storyPassagesIntro(
 ): HTMLElement {
   const intro = el("div");
   intro.append(
-    el("div", "question-type", part ? `${groupLabel(group)} · ${level} · ${partLabel(part)}` : level),
+    el("div", "question-type", part ? `${groupLabel(group)} · ${level} · ${goethePartLabel(level, part)}` : level),
     el("h2", "focus-title", group === "goethe" ? "Choose an Übung" : "Choose a story"),
   );
   return intro;
@@ -535,10 +538,6 @@ function formatStoryItemCount(
 ): string {
   if (group === "goethe") return formatCount(count, "Übung", { plural: "Übungen", ...options });
   return formatCount(count, "story", options);
-}
-
-function partLabel(part: StoryPart["part"]): string {
-  return part.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function topicLabel(topic: string): string {

@@ -29,6 +29,19 @@ import { appHeader } from "../components/appHeader";
 import { button } from "../components/button";
 import { SegmentedControl } from "../components/SegmentedControl";
 import {
+  GOETHE_PARTS,
+  allowedGoetheParts,
+  goethePartSpec,
+  isTrueFalseShape,
+  partLabel,
+  resolveReadingShape,
+  resolvedExerciseLabel,
+  type GoetheLevel,
+  type GoethePart,
+  type GoethePartSpec,
+  type ReadingShape,
+} from "../goethe/readingSpecs";
+import {
   createStimulusEditor,
   stimulusInstruction,
   stimulusOptionLabel,
@@ -42,7 +55,6 @@ import { formatCount } from "../utils/format";
 const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
 const READING_GROUPS = ["general", "goethe"] as const;
-const GOETHE_PARTS = ["teil_1", "teil_2", "teil_3", "teil_4", "teil_5"] as const;
 const GERMAN_ARTICLES = ["der", "die", "das"] as const;
 const PARTS_OF_SPEECH = [
   "noun",
@@ -57,17 +69,11 @@ const PARTS_OF_SPEECH = [
 let questionBlockId = 0;
 let adminControlId = 0;
 
-type AdminLevel = (typeof LEVELS)[number];
+type AdminLevel = GoetheLevel;
 type AdminReadingGroup = (typeof READING_GROUPS)[number];
-type AdminGoethePart = (typeof GOETHE_PARTS)[number];
+type AdminGoethePart = GoethePart;
 type GermanArticle = (typeof GERMAN_ARTICLES)[number];
 type AdminPartOfSpeech = (typeof PARTS_OF_SPEECH)[number];
-type ReadingShape =
-  | "general_free_form"
-  | "goethe_true_false_text"
-  | "goethe_source_choice"
-  | "goethe_true_false_notice"
-  | "goethe_standard";
 type FieldValidationIssue = {
   field: string;
   message: string;
@@ -85,24 +91,6 @@ type ListCardProps = {
   onSelect: () => void;
 };
 type AdminListStatus = "idle" | "loading" | "error";
-
-const READING_SHAPE_TABLE: Record<AdminReadingGroup, Partial<Record<AdminLevel, Partial<Record<AdminGoethePart, ReadingShape>>>>> = {
-  general: {},
-  goethe: {
-    A1: {
-      teil_1: "goethe_true_false_text",
-      teil_2: "goethe_source_choice",
-      teil_3: "goethe_true_false_notice",
-    },
-    A2: {
-      teil_1: "goethe_true_false_text",
-      teil_2: "goethe_source_choice",
-      teil_3: "goethe_true_false_notice",
-    },
-    B1: { teil_1: "goethe_standard" },
-    B2: { teil_1: "goethe_standard" },
-  },
-};
 
 export function renderAdminApp(root: HTMLElement): void {
   const params = new URLSearchParams(window.location.search);
@@ -596,9 +584,11 @@ function renderPassageEditor(
   const formFields = el("div", "admin-form-fields");
   const shape = (): ReadingShape =>
     resolveReadingShape(state.activeGroup, level.value as AdminLevel, part.value as AdminGoethePart);
-  let questionControls = state.selected.questions.map((question) => questionBlockForShape(question, shape()));
+  const activeSpec = (): GoethePartSpec | null =>
+    state.activeGroup === "goethe" ? goethePartSpec(level.value as AdminLevel, part.value as AdminGoethePart) : null;
+  let questionControls = state.selected.questions.map((question) => questionBlockForShape(question, shape(), activeSpec()));
   if (questionControls.length === 0) {
-    questionControls = [questionBlockForShape(emptyQuestion(0), shape())];
+    questionControls = [questionBlockForShape(emptyQuestion(0, activeSpec()?.defaultOptions), shape(), activeSpec())];
   }
   const renderQuestions = (): void => {
     questions.replaceChildren(
@@ -670,10 +660,11 @@ function renderPassageEditor(
     questionControls = questionControls.map((control, index) => {
       if (questionBlockMatchesShape(control, activeShape)) return control;
       questionShapeChanged = true;
-      return questionBlockForShape(questionFromBlockSafely(control, index), activeShape);
+      return questionBlockForShape(questionFromBlockSafely(control, index), activeShape, activeSpec());
     });
     if (questionShapeChanged) renderQuestions();
-    resolvedType.textContent = `Type: ${resolvedExerciseLabel(activeShape)}`;
+    const spec = activeSpec();
+    resolvedType.textContent = spec ? `Type: ${spec.label}` : `Type: ${resolvedExerciseLabel(activeShape)}`;
     const metaFields = [wordField(level, "Level")];
     if (state.activeGroup === "goethe") {
       metaFields.push(wordField(part, "Goethe Teil"), resolvedType);
@@ -686,6 +677,8 @@ function renderPassageEditor(
     if (activeShape === "goethe_source_choice") {
       stimulusFields.push(sourceChoicePanel);
     } else {
+      const spec = activeSpec();
+      if (spec) stimulusFields.push(el("p", "prompt admin-goethe-shape-note", spec.description));
       if (activeShape === "goethe_true_false_notice") {
         stimulusFields.push(wordField(contextLabel), noticeEditor.node);
       }
@@ -800,7 +793,7 @@ function renderPassageEditor(
   const addTemplate = button("+ Add question", "button");
   addTemplate.className = "button primary";
   addTemplate.addEventListener("click", () => {
-    questionControls.push(questionBlockForShape(emptyQuestion(questionControls.length), shape()));
+    questionControls.push(questionBlockForShape(emptyQuestion(questionControls.length, activeSpec()?.defaultOptions), shape(), activeSpec()));
     renderQuestions();
     renderForm();
   });
@@ -1127,16 +1120,34 @@ function questionBlock(question: AdminReadingQuestion): QuestionBlock {
   return standardQuestionBlock(question);
 }
 
-function questionBlockForShape(question: AdminReadingQuestion, shape: ReadingShape): QuestionBlock {
-  return isTrueFalseShape(shape) ? trueFalseQuestionBlock(question) : standardQuestionBlock(question);
+function questionBlockForShape(
+  question: AdminReadingQuestion,
+  shape: ReadingShape,
+  spec: GoethePartSpec | null = null,
+): QuestionBlock {
+  if (isTrueFalseShape(shape)) return trueFalseQuestionBlock(question);
+  return standardQuestionBlock(normalizeQuestionOptions(question, spec?.defaultOptions));
 }
 
 function questionBlockMatchesShape(block: QuestionBlock, shape: ReadingShape): boolean {
   return isTrueFalseShape(shape) ? block.mode === "true_false" : block.mode === "standard";
 }
 
-function isTrueFalseShape(shape: ReadingShape): boolean {
-  return shape === "goethe_true_false_text" || shape === "goethe_true_false_notice";
+function normalizeQuestionOptions(
+  question: AdminReadingQuestion,
+  defaultOptions: string[] | undefined,
+): AdminReadingQuestion {
+  if (!defaultOptions?.length || question.answers.some((answer) => answer.answer_text.trim())) {
+    return question;
+  }
+  return {
+    ...question,
+    answers: defaultOptions.map((option, index) => ({
+      answer_text: option,
+      is_correct: index === 0,
+      order_index: index,
+    })),
+  };
 }
 
 function trueFalseQuestionBlock(question: AdminReadingQuestion): QuestionBlock {
@@ -1617,17 +1628,16 @@ function emptyAdStimulus(key: "a" | "b", orderIndex: number): AdminReadingAdStim
   };
 }
 
-function emptyQuestion(orderIndex: number): AdminReadingPassage["questions"][number] {
+function emptyQuestion(orderIndex: number, options = ["", "", "", ""]): AdminReadingPassage["questions"][number] {
   return {
     prompt: "",
     explanation: null,
     order_index: orderIndex,
-    answers: [
-      { answer_text: "", is_correct: true, order_index: 0 },
-      { answer_text: "", is_correct: false, order_index: 1 },
-      { answer_text: "", is_correct: false, order_index: 2 },
-      { answer_text: "", is_correct: false, order_index: 3 },
-    ],
+    answers: options.map((answerText, index) => ({
+      answer_text: answerText,
+      is_correct: index === 0,
+      order_index: index,
+    })),
   };
 }
 
@@ -1846,19 +1856,6 @@ function readingGroupLabel(group: AdminReadingGroup): string {
   return group === "goethe" ? "Goethe" : "General";
 }
 
-function resolveReadingShape(
-  collection: AdminReadingGroup,
-  level: AdminLevel,
-  teil: AdminGoethePart | null,
-): ReadingShape {
-  if (collection === "general") return "general_free_form";
-  return READING_SHAPE_TABLE.goethe[level]?.[teil ?? "teil_1"] ?? "goethe_standard";
-}
-
-function allowedGoetheParts(level: AdminLevel): AdminGoethePart[] {
-  return Object.keys(READING_SHAPE_TABLE.goethe[level] ?? { teil_1: "goethe_standard" }) as AdminGoethePart[];
-}
-
 function syncGoethePartOptions(select: HTMLSelectElement, level: AdminLevel): void {
   const allowedParts = allowedGoetheParts(level);
   const selected = allowedParts.includes(select.value as AdminGoethePart)
@@ -1868,7 +1865,7 @@ function syncGoethePartOptions(select: HTMLSelectElement, level: AdminLevel): vo
     ...allowedParts.map((part) => {
       const option = document.createElement("option");
       option.value = part;
-      option.textContent = partLabel(part);
+      option.textContent = goethePartSpec(level, part)?.label ?? partLabel(part);
       option.selected = part === selected;
       return option;
     }),
@@ -1889,18 +1886,6 @@ function ListCard({ title, meta, selected, onSelect }: ListCardProps): HTMLButto
 
 function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function partLabel(part: AdminGoethePart): string {
-  return part.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function resolvedExerciseLabel(shape: ReadingShape): string {
-  if (shape === "general_free_form") return "Free-form practice";
-  if (shape === "goethe_true_false_text") return "Personal text - true/false";
-  if (shape === "goethe_source_choice") return "Two adverts - choose one";
-  if (shape === "goethe_true_false_notice") return "Sign or notice - true/false";
-  return "Standard questions";
 }
 
 function listCardTitle(title: string, fallback = "Untitled passage"): HTMLElement {

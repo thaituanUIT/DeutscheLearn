@@ -134,6 +134,9 @@ async function handleAnswer(
           wrongAnswer: {
             question: state.currentQuestion.prompt,
             learnerAnswer: choice,
+            correctAnswer: answer.correct_answer,
+            word: state.currentQuestion.word,
+            mode: options.mode,
           },
         });
       }
@@ -187,6 +190,9 @@ async function handleAnswer(
         wrongAnswer: {
           question: state.currentQuestion.prompt,
           learnerAnswer: choice,
+          correctAnswer: answer.correct_answer,
+          word: state.currentQuestion.word,
+          mode: options.mode,
         },
       });
     }

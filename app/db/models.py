@@ -380,6 +380,22 @@ class GrammarAnswerCache(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 
+class GrammarQuestionLog(Base):
+    __tablename__ = "grammar_question_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    learner_id: Mapped[str | None] = mapped_column(String(120), index=True)
+    normalized_question: Mapped[str] = mapped_column(Text, nullable=False)
+    retrieval_query: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    context_type: Mapped[str | None] = mapped_column(String(40), index=True)
+    route: Mapped[str | None] = mapped_column(String(80), index=True)
+    cited_chunk_ids_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    retrieval_debug_json: Mapped[str | None] = mapped_column(Text)
+    cached: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+
 def _options_look_true_false(options: list[ItemOption]) -> bool:
     labels = {option.label.casefold() for option in options}
     return labels <= {"richtig", "falsch", "true", "false"} and len(labels) == 2

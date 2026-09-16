@@ -16,6 +16,7 @@ from app.db.models import (
     AnonymousPlayer,
     CachedWord,
     FocusWordEntry,
+    GrammarQuestionLog,
     QuizAttempt,
     QuizAttemptQuestion,
     ReadingAnswer,
@@ -81,7 +82,10 @@ from app.services.grammar import (
     GrammarUnavailableError,
     answer_grammar_question,
     check_rate_limit,
+    grammar_context_type,
+    normalize_question,
 )
+from app.services.goethe_reading import exercise_type_for, stimulus_kind_for, uses_source_choice
 from app.services.quiz import create_question
 from app.services.story import (
     get_all_story_passages,
@@ -135,9 +139,11 @@ def grammar_ask(
     client_ip = request.client.host if request.client else "unknown"
     try:
         check_rate_limit(payload.learner_id, client_ip)
+        context = payload.context.model_dump(exclude_none=True) if payload.context else None
         result = answer_grammar_question(
             db=db,
             question=payload.question.strip(),
+            context=context,
             include_debug=include_debug,
         )
     except PermissionError:
@@ -157,6 +163,14 @@ def grammar_ask(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Something went wrong while answering.",
         ) from exc
+    log_grammar_question(
+        db=db,
+        learner_id=payload.learner_id,
+        question=payload.question,
+        route=payload.context.route if payload.context else None,
+        context_type=grammar_context_type(context),
+        result=result,
+    )
     return GrammarAskOut(
         status=result.status,
         answer=result.answer,
@@ -176,11 +190,41 @@ def grammar_ask(
             )
             for citation in result.citations
         ],
-        retrieval_debug=result.retrieval_debug,
+        retrieval_debug=result.retrieval_debug if include_debug else None,
         cached=result.cached,
         finish_reason=result.finish_reason,
         truncated=result.truncated,
+        retrieval_query=result.retrieval_query if include_debug else None,
     )
+
+
+def log_grammar_question(
+    db: Session,
+    learner_id: str | None,
+    question: str,
+    route: str | None,
+    context_type: str | None,
+    result: object,
+) -> None:
+    try:
+        citations = getattr(result, "citations")
+        debug = getattr(result, "retrieval_debug")
+        row = GrammarQuestionLog(
+            learner_id=learner_id,
+            normalized_question=normalize_question(question),
+            retrieval_query=getattr(result, "retrieval_query"),
+            status=getattr(result, "status"),
+            context_type=context_type,
+            route=route,
+            cited_chunk_ids_json=json.dumps([citation.chunk_id for citation in citations]),
+            retrieval_debug_json=json.dumps(debug) if debug is not None else None,
+            cached=bool(getattr(result, "cached")),
+        )
+        db.add(row)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to log grammar question")
 
 
 @router.get("/players/me", response_model=PlayerOut)
@@ -1145,7 +1189,7 @@ def _apply_reading_payload(passage: ReadingPassage, payload: AdminReadingPassage
     passage.collection = payload.group
     passage.level = payload.level
     passage.teil = payload.part if payload.group == "goethe" else None
-    passage.kind = _stimulus_kind(payload.group, payload.part)
+    passage.kind = _stimulus_kind(payload.group, payload.level, payload.part)
     passage.title = payload.title.strip()
     passage.body = payload.passage_text.strip()
     passage.image_url = _clean_optional_text(payload.image_url)
@@ -1157,7 +1201,7 @@ def _apply_reading_payload(passage: ReadingPassage, payload: AdminReadingPassage
     passage.context_label = _clean_optional_text(payload.context_label)
     passage.sort_order = payload.order_index
     passage.updated_at = utc_now()
-    ad_rows = _reading_ad_stimuli_from_payload(payload) if payload.group == "goethe" and payload.part == "teil_2" else []
+    ad_rows = _reading_ad_stimuli_from_payload(payload) if uses_source_choice(payload.group, payload.level, payload.part) else []
     passage.items = [
         _reading_item_from_payload(question, ad_rows if index == 0 else [])
         for index, question in enumerate(payload.questions)
@@ -1311,19 +1355,11 @@ def _clean_optional_text(value: str | None) -> str | None:
 
 
 def _exercise_type(passage: ReadingPassage) -> str | None:
-    if passage.group != "goethe":
-        return None
-    if passage.part == "teil_2":
-        return "source_choice"
-    if passage.part == "teil_3":
-        return "true_false_notice"
-    return "standard"
+    return exercise_type_for(passage.group, passage.level, passage.part, passage.kind)
 
 
-def _stimulus_kind(group: str, part: str | None) -> str:
-    if group == "goethe" and part == "teil_3":
-        return "sign"
-    return "text"
+def _stimulus_kind(group: str, level: str, part: str | None) -> str:
+    return stimulus_kind_for(group, level, part)
 
 
 def _image_extension(content_type: str) -> str:

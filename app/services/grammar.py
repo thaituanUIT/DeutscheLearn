@@ -89,6 +89,7 @@ class GrammarAnswer:
     status: str
     answer: str | None
     citations: list[GrammarCitation]
+    retrieval_query: str = ""
     retrieval_debug: dict[str, Any] | None = None
     cached: bool = False
     finish_reason: str | None = None
@@ -118,6 +119,14 @@ def cache_key(normalized_question: str, settings: Settings) -> str:
     return "\n".join(parts)
 
 
+def context_cache_fragment(context: dict[str, Any] | None) -> str:
+    if not context:
+        return "context={}"
+    return "context=" + hashlib.sha256(
+        json.dumps(context, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
 def check_rate_limit(
     learner_id: str | None,
     ip_address: str,
@@ -140,44 +149,50 @@ def check_rate_limit(
 def answer_grammar_question(
     db: Session,
     question: str,
+    context: dict[str, Any] | None = None,
     include_debug: bool = False,
     settings: Settings | None = None,
 ) -> GrammarAnswer:
     settings = settings or get_settings()
     normalized = normalize_question(question)
-    query_quality = assess_query_quality(question, settings=settings)
+    retrieval_query = build_retrieval_query(question, context)
+    query_quality = assess_query_quality(retrieval_query, settings=settings)
     if not query_quality["retrievable"]:
         return GrammarAnswer(
             status="no_match",
             answer=clarification_prompt(question),
             citations=[],
+            retrieval_query=retrieval_query,
             retrieval_debug={"query": query_quality} if include_debug else None,
         )
 
-    cached = _get_cached_answer(db, cache_key(normalized, settings))
+    normalized_cache_key = cache_key(normalized, settings) + "\n" + context_cache_fragment(context)
+    cached = _get_cached_answer(db, normalized_cache_key)
     if cached is not None:
         answer, citations, finish_reason, truncated = cached
         return GrammarAnswer(
             status="answered",
             answer=answer,
             citations=citations,
+            retrieval_query=retrieval_query,
             retrieval_debug={"cache": "hit"} if include_debug else None,
             cached=True,
             finish_reason=finish_reason,
             truncated=truncated,
         )
 
-    query_embedding = embed_texts([question], input_type="search_query", settings=settings)[0]
+    query_embedding = embed_texts([retrieval_query], input_type="search_query", settings=settings)[0]
     retrieved = retrieve_grammar_chunks(
         db=db,
         embedding=query_embedding,
-        query_text=question,
+        query_text=retrieval_query,
     )
-    accepted, filter_debug = filter_grammar_chunks(retrieved, query_text=question, settings=settings)
+    accepted, filter_debug = filter_grammar_chunks(retrieved, query_text=retrieval_query, settings=settings)
     debug = (
         {
             "cache": "miss",
             "query": query_quality,
+            "context_type": grammar_context_type(context),
             "absolute_floor": settings.grammar_similarity_threshold,
             "relative_floor": settings.grammar_relative_similarity_threshold,
             **filter_debug,
@@ -186,19 +201,92 @@ def answer_grammar_question(
         else None
     )
     if not accepted:
-        return GrammarAnswer(status="no_match", answer=None, citations=[], retrieval_debug=debug)
+        return GrammarAnswer(
+            status="no_match",
+            answer=None,
+            citations=[],
+            retrieval_query=retrieval_query,
+            retrieval_debug=debug,
+        )
 
-    answer, finish_reason = generate_answer(question=question, citations=accepted, settings=settings)
+    answer, finish_reason = generate_answer(
+        question=build_generation_question(question, context),
+        citations=accepted,
+        settings=settings,
+    )
     truncated = finish_reason == "length"
-    _store_cached_answer(db, cache_key(normalized, settings), answer, accepted, finish_reason, truncated)
+    _store_cached_answer(db, normalized_cache_key, answer, accepted, finish_reason, truncated)
     return GrammarAnswer(
         status="answered",
         answer=answer,
         citations=accepted,
+        retrieval_query=retrieval_query,
         retrieval_debug=debug,
         finish_reason=finish_reason,
         truncated=truncated,
     )
+
+
+def build_retrieval_query(question: str, context: dict[str, Any] | None = None) -> str:
+    parts = [question.strip()]
+    wrong_answer = _context_object(context, "wrong_answer")
+    if wrong_answer:
+        parts.extend(
+            [
+                "German grammar mistake explanation.",
+                f"Exercise question: {wrong_answer.get('question', '')}",
+                f"Learner answer: {wrong_answer.get('learner_answer', '')}",
+                f"Correct answer: {wrong_answer.get('correct_answer', '')}",
+                f"Target word: {wrong_answer.get('word', '')}",
+            ]
+        )
+    passage = _context_object(context, "passage")
+    if passage:
+        parts.extend(
+            [
+                "German reading passage grammar explanation.",
+                f"Passage title: {passage.get('title', '')}",
+                f"Passage text: {passage.get('text', '')[:900]}",
+            ]
+        )
+    return "\n".join(part for part in parts if part and str(part).strip())
+
+
+def build_generation_question(question: str, context: dict[str, Any] | None = None) -> str:
+    parts = [question.strip()]
+    wrong_answer = _context_object(context, "wrong_answer")
+    if wrong_answer:
+        parts.append(
+            "\nLearner mistake context:\n"
+            f"- Exercise question: {wrong_answer.get('question', '')}\n"
+            f"- Learner answer: {wrong_answer.get('learner_answer', '')}\n"
+            f"- Correct answer: {wrong_answer.get('correct_answer') or 'unknown'}\n"
+            f"- Target word: {wrong_answer.get('word') or 'unknown'}\n"
+            "Explain the likely grammar reason for the mistake, then give one tiny practice tip."
+        )
+    passage = _context_object(context, "passage")
+    if passage:
+        parts.append(
+            "\nPassage context:\n"
+            f"- Title: {passage.get('title', '')}\n"
+            f"- Text: {passage.get('text', '')[:1200]}"
+        )
+    return "\n".join(parts)
+
+
+def grammar_context_type(context: dict[str, Any] | None) -> str | None:
+    if _context_object(context, "wrong_answer"):
+        return "wrong_answer"
+    if _context_object(context, "passage"):
+        return "passage"
+    return None
+
+
+def _context_object(context: dict[str, Any] | None, key: str) -> dict[str, Any] | None:
+    if not context:
+        return None
+    value = context.get(key)
+    return value if isinstance(value, dict) else None
 
 
 def assess_query_quality(question: str, settings: Settings | None = None) -> dict[str, Any]:
