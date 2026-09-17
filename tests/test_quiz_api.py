@@ -471,6 +471,74 @@ def test_admin_goethe_a2_teil_1_uses_model_choice_format(monkeypatch: pytest.Mon
         assert [answer["answer_text"][0] for answer in body["questions"][0]["answers"]] == ["a", "b", "c"]
 
 
+@pytest.mark.parametrize(
+    ("level", "part"),
+    [("A2", "teil_1"), ("B1", "teil_2"), ("B2", "teil_1")],
+)
+def test_admin_goethe_rejects_inherited_true_false_answers(
+    monkeypatch: pytest.MonkeyPatch,
+    level: str,
+    part: str,
+) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    payload = {
+        "group": "goethe",
+        "level": level,
+        "part": part,
+        "title": f"{level} {part}",
+        "passage_text": "Ein Modelltest-Text.",
+        "questions": [
+            {
+                "prompt": "Eine Aufgabe",
+                "answers": [
+                    {"answer_text": "Richtig", "is_correct": True, "order_index": 0},
+                    {"answer_text": "Falsch", "is_correct": False, "order_index": 1},
+                ],
+            }
+        ],
+    }
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/admin/reading/passages",
+            headers={"Authorization": "Bearer secret"},
+            json=payload,
+        )
+
+    assert response.status_code == 422
+    assert "Richtig/Falsch is not valid" in response.text
+
+
+def test_admin_goethe_b1_teil_1_keeps_model_true_false_format(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    payload = {
+        "group": "goethe",
+        "level": "B1",
+        "part": "teil_1",
+        "title": f"B1 Goethe Teil 1 {uuid4()}",
+        "passage_text": "Ein Blogbeitrag fuer den B1 Modelltest.",
+        "questions": [
+            {
+                "prompt": "Die Aussage stimmt mit dem Text ueberein.",
+                "answers": [
+                    {"answer_text": "Richtig", "is_correct": True, "order_index": 0},
+                    {"answer_text": "Falsch", "is_correct": False, "order_index": 1},
+                ],
+            }
+        ],
+    }
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/admin/reading/passages",
+            headers={"Authorization": "Bearer secret"},
+            json=payload,
+        )
+
+    assert response.status_code == 200
+    assert response.json()["questions"][0]["answers"][0]["answer_text"] == "Richtig"
+
+
 def test_admin_reading_import_json(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
     passage_id = f"import-reading-{uuid4()}"

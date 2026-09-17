@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.services.goethe_reading import uses_notice, uses_source_choice
+from app.services.goethe_reading import get_goethe_part_spec, uses_notice, uses_source_choice
 
 RenderKind = Literal[
     "text",
@@ -357,6 +357,10 @@ class AdminReadingPassageIn(BaseModel):
             self.image_path = None
             self.transcript = None
             return self
+        spec = get_goethe_part_spec(self.level, self.part)
+        if spec is None:
+            raise ValueError(f"{self.level} does not define {self.part or 'a reading part'} in the Goethe model test")
+        self._validate_goethe_answers(spec.shape)
         uses_goethe_source_choice = uses_source_choice(self.group, self.level, self.part)
         uses_goethe_notice = uses_notice(self.group, self.level, self.part)
         if uses_goethe_source_choice and len(self.ad_stimuli) != 2:
@@ -378,6 +382,22 @@ class AdminReadingPassageIn(BaseModel):
             self.image_path = None
             self.transcript = None
         return self
+
+    def _validate_goethe_answers(self, shape: str) -> None:
+        for question in self.questions:
+            labels = {answer.answer_text.strip().casefold() for answer in question.answers}
+            if shape in {"true_false_text", "true_false_notice"}:
+                if labels != {"richtig", "falsch"}:
+                    raise ValueError("This Goethe part requires exactly Richtig and Falsch answers")
+                continue
+            if shape == "yes_no":
+                if labels != {"ja", "nein"}:
+                    raise ValueError("This Goethe part requires exactly Ja and Nein answers")
+                continue
+            if labels == {"richtig", "falsch"}:
+                raise ValueError("Richtig/Falsch is not valid for this Goethe model-test part")
+            if shape == "abc_choice" and len(question.answers) != 3:
+                raise ValueError("This Goethe part requires exactly three answer choices (a, b, c)")
 
 
 class AdminReadingPassageSummaryOut(BaseModel):

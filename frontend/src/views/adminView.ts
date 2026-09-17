@@ -660,7 +660,7 @@ function renderPassageEditor(
     questionControls = questionControls.map((control, index) => {
       if (questionBlockMatchesShape(control, activeShape)) return control;
       questionShapeChanged = true;
-      return questionBlockForShape(questionFromBlockSafely(control, index), activeShape, activeSpec());
+      return questionBlockForShape(questionFromBlockSafely(control, index), activeShape, activeSpec(), true);
     });
     if (questionShapeChanged) renderQuestions();
     const spec = activeSpec();
@@ -1093,6 +1093,7 @@ type QuestionBlock = {
   prompt: HTMLTextAreaElement;
   explanation: HTMLTextAreaElement;
   remove: HTMLButtonElement;
+  shape: ReadingShape;
   mode: "true_false" | "standard";
   trueFalseAnswer?: () => TrueFalseAnswer;
   options?: OptionEditor[];
@@ -1116,29 +1117,42 @@ type AdStimulusBlock = {
   orderIndex: number;
 };
 
-function questionBlock(question: AdminReadingQuestion): QuestionBlock {
-  return standardQuestionBlock(question);
-}
-
 function questionBlockForShape(
   question: AdminReadingQuestion,
   shape: ReadingShape,
   spec: GoethePartSpec | null = null,
+  resetOptions = false,
 ): QuestionBlock {
-  if (isTrueFalseShape(shape)) return trueFalseQuestionBlock(question);
-  return standardQuestionBlock(normalizeQuestionOptions(question, spec?.defaultOptions));
+  if (isTrueFalseShape(shape)) return trueFalseQuestionBlock(question, shape);
+  const normalizedQuestion = resetOptions
+    ? replaceQuestionOptions(question, spec?.defaultOptions)
+    : normalizeQuestionOptions(question, spec?.defaultOptions);
+  return standardQuestionBlock(normalizedQuestion, shape);
 }
 
 function questionBlockMatchesShape(block: QuestionBlock, shape: ReadingShape): boolean {
-  return isTrueFalseShape(shape) ? block.mode === "true_false" : block.mode === "standard";
+  return block.shape === shape;
 }
 
 function normalizeQuestionOptions(
   question: AdminReadingQuestion,
   defaultOptions: string[] | undefined,
 ): AdminReadingQuestion {
-  if (!defaultOptions?.length || question.answers.some((answer) => answer.answer_text.trim())) {
+  if (!defaultOptions?.length) {
     return question;
+  }
+  const hasEnteredAnswers = question.answers.some((answer) => answer.answer_text.trim());
+  const inheritedTrueFalse = answerSet(question) === "falsch|richtig";
+  if (hasEnteredAnswers && !inheritedTrueFalse) return question;
+  return replaceQuestionOptions(question, defaultOptions);
+}
+
+function replaceQuestionOptions(
+  question: AdminReadingQuestion,
+  defaultOptions: string[] | undefined,
+): AdminReadingQuestion {
+  if (!defaultOptions?.length) {
+    return { ...question, answers: emptyQuestion(question.order_index).answers };
   }
   return {
     ...question,
@@ -1150,7 +1164,15 @@ function normalizeQuestionOptions(
   };
 }
 
-function trueFalseQuestionBlock(question: AdminReadingQuestion): QuestionBlock {
+function answerSet(question: AdminReadingQuestion): string {
+  return question.answers
+    .map((answer) => answer.answer_text.trim().toLocaleLowerCase("de-DE"))
+    .filter(Boolean)
+    .sort()
+    .join("|");
+}
+
+function trueFalseQuestionBlock(question: AdminReadingQuestion, shape: ReadingShape): QuestionBlock {
   let selected: TrueFalseAnswer = canonicalTrueFalseAnswer(question);
   const node = el("div", "admin-question-block");
   const title = el("h3", "admin-question-title", "Question");
@@ -1171,10 +1193,10 @@ function trueFalseQuestionBlock(question: AdminReadingQuestion): QuestionBlock {
   });
 
   node.append(header, wordField(prompt), wordField(answer, "Correct answer"), wordField(explanation));
-  return { node, title, prompt, explanation, remove, mode: "true_false", trueFalseAnswer: () => selected };
+  return { node, title, prompt, explanation, remove, shape, mode: "true_false", trueFalseAnswer: () => selected };
 }
 
-function standardQuestionBlock(question: AdminReadingQuestion): QuestionBlock {
+function standardQuestionBlock(question: AdminReadingQuestion, shape: ReadingShape): QuestionBlock {
   const sortedAnswers = question.answers.length > 0
     ? [...question.answers].sort((first, second) => first.order_index - second.order_index)
     : emptyQuestion(question.order_index).answers;
@@ -1235,6 +1257,7 @@ function standardQuestionBlock(question: AdminReadingQuestion): QuestionBlock {
     prompt,
     explanation,
     remove,
+    shape,
     mode: "standard",
     options: optionEditors,
     addOption: addOptionButton,
