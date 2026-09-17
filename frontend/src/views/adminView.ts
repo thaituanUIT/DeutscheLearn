@@ -35,7 +35,6 @@ import {
   isTrueFalseShape,
   partLabel,
   resolveReadingShape,
-  resolvedExerciseLabel,
   type GoetheLevel,
   type GoethePart,
   type GoethePartSpec,
@@ -590,6 +589,7 @@ function renderPassageEditor(
   if (questionControls.length === 0) {
     questionControls = [questionBlockForShape(emptyQuestion(0, activeSpec()?.defaultOptions), shape(), activeSpec())];
   }
+  const addTemplate = button("+ Add question", "button primary");
   const renderQuestions = (): void => {
     questions.replaceChildren(
       ...questionControls.map((control, index) => {
@@ -602,6 +602,7 @@ function renderPassageEditor(
         };
         return control.node;
       }),
+      addTemplate,
     );
   };
   renderQuestions();
@@ -609,8 +610,7 @@ function renderPassageEditor(
   const status = el("p", "prompt admin-dirty-state");
   const metaGrid = el("div", "admin-reading-meta-grid");
   const formScroll = el("div", "form-scroll");
-  const resolvedType = el("span", "admin-resolved-type");
-  const questionSectionNode = questionSection(questions, button("+ Add question", "button primary"));
+  const questionSectionNode = questionSection(questions);
   const validation = createFormValidation(status);
   validation.register("title", title);
   validation.register("passage_text", passage);
@@ -663,11 +663,9 @@ function renderPassageEditor(
       return questionBlockForShape(questionFromBlockSafely(control, index), activeShape, activeSpec(), true);
     });
     if (questionShapeChanged) renderQuestions();
-    const spec = activeSpec();
-    resolvedType.textContent = spec ? `Type: ${spec.label}` : `Type: ${resolvedExerciseLabel(activeShape)}`;
     const metaFields = [wordField(level, "Level")];
     if (state.activeGroup === "goethe") {
-      metaFields.push(wordField(part, "Goethe Teil"), resolvedType);
+      metaFields.push(wordField(part, "Goethe Teil"));
     } else {
       metaFields.push(wordField(topic));
     }
@@ -790,17 +788,11 @@ function renderPassageEditor(
     void savePassage();
   });
 
-  const addTemplate = button("+ Add question", "button");
-  addTemplate.className = "button primary";
   addTemplate.addEventListener("click", () => {
     questionControls.push(questionBlockForShape(emptyQuestion(questionControls.length, activeSpec()?.defaultOptions), shape(), activeSpec()));
     renderQuestions();
     renderForm();
   });
-  questionSectionNode.querySelector(".admin-question-header")?.replaceChildren(
-    el("h3", "admin-section-title", "Questions"),
-    addTemplate,
-  );
 
   const cancel = button("Cancel", "button");
   cancel.addEventListener("click", () => {
@@ -1389,10 +1381,10 @@ function truncateAdvertName(name: string): string {
   return name.length > limit ? `${name.slice(0, limit - 1)}…` : name;
 }
 
-function questionSection(questions: HTMLElement, addButton: HTMLButtonElement): HTMLElement {
+function questionSection(questions: HTMLElement): HTMLElement {
   const wrap = el("section", "admin-question-section");
   const header = el("div", "admin-question-header");
-  header.append(el("h3", "admin-section-title", "Questions"), addButton);
+  header.append(el("h3", "admin-section-title", "Questions"));
   wrap.append(header, questions);
   return wrap;
 }
