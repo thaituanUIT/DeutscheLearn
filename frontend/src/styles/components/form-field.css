@@ -18,6 +18,11 @@
   width: min(360px, 100%);
 }
 
+.admin-reading-meta-grid .admin-field[data-field="Goethe Teil"] {
+  flex: 1 1 420px;
+  width: min(520px, 100%);
+}
+
 .admin-form-fields {
   display: grid;
   align-content: start;

@@ -190,20 +190,6 @@
   gap: var(--admin-space-field);
 }
 
-.admin-resolved-type {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  align-self: end;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
-  font-weight: var(--text-meta-weight);
-  font-size: var(--text-meta-size);
-  line-height: var(--text-meta-line);
-}
-
 .admin-passage-editor {
   flex: 1 1 auto;
   display: grid;
@@ -289,6 +275,10 @@
   align-content: start;
   gap: var(--admin-space-field);
   min-height: 0;
+}
+
+.admin-question-list > .button {
+  justify-self: start;
 }
 
 .admin-question-block {
