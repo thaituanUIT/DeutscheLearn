@@ -56,13 +56,26 @@
   border-color: var(--primary);
 }
 
-.header-back {
-  min-width: 94px;
-}
-
 .primary:hover {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
+}
+
+.header-back {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.header-back:hover {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 .answer-option {

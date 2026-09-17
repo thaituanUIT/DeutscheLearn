@@ -101,7 +101,7 @@ function draw(
   };
 
   const renderHeaderBack = (onClick: () => void): void => {
-    const back = button("Back", "button header-back");
+    const back = button("← Back", "button header-back");
     back.addEventListener("click", onClick);
     headerStart.replaceChildren(back);
   };
