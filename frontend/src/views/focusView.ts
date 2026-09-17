@@ -133,6 +133,7 @@ function renderRevisionQuestion(
   score: number,
   onRetry: () => void,
 ): void {
+  clearFlashcardKeyboard(section);
   section.replaceChildren();
   if (questions.length === 0) {
     section.append(el("p", "prompt", "No quiz words available for this topic yet."));
@@ -179,13 +180,21 @@ function renderRevisionQuestion(
     answers.append(option);
   }
 
+  const showAnswer = (): void =>
+    renderRevisionFeedback(section, questions, index, score, null, onRetry);
+  const reveal = revealAnswerButton(showAnswer);
   const skip = button("Skip", "flashcard-nav-control revision-skip");
   skip.addEventListener("click", () =>
     renderRevisionQuestion(section, questions, index + 1, score, onRetry),
   );
   const navigation = el("div", "revision-question-actions");
-  navigation.append(skip);
+  navigation.append(reveal, skip);
   section.append(content, answers, navigation);
+  bindFlashcardKeyboard(section, {
+    onReveal: showAnswer,
+    onGrade: null,
+    onPrevious: null,
+  });
 }
 
 function renderRevisionFeedback(
@@ -193,20 +202,21 @@ function renderRevisionFeedback(
   questions: FocusRevisionQuestion[],
   index: number,
   score: number,
-  selectedAnswer: string,
+  selectedAnswer: string | null,
   onRetry: () => void,
 ): void {
+  clearFlashcardKeyboard(section);
   section.replaceChildren();
   const question = questions[index];
-  const correct = selectedAnswer === question.correct_answer;
+  const correct = selectedAnswer !== null && selectedAnswer === question.correct_answer;
   const content = el("div", "flashcard revision-card");
   content.append(
-    el("div", "question-type", correct ? "Correct" : "Review"),
+    el("div", "question-type", selectedAnswer === null ? "Answer" : correct ? "Correct" : "Review"),
     el("h2", "flashcard-word", question.word),
     el("p", "meaning-overview", question.correct_answer),
   );
 
-  if (!correct) {
+  if (selectedAnswer !== null && !correct) {
     content.append(el("p", "prompt", `You chose: ${selectedAnswer}`));
   }
 
@@ -227,7 +237,6 @@ function renderFlashcard(
   level: FocusLevel["level"],
   topic: FocusTopic,
   options: FocusViewOptions,
-  revealed = false,
 ): void {
   section.replaceChildren();
   section.classList.add("flashcard-screen");
@@ -261,18 +270,15 @@ function renderFlashcard(
   wordGroup.append(
     el("h2", "flashcard-word", shownWord),
     el("p", "word-meta", card.part_of_speech),
+    el("p", "meaning-overview", card.meaning_overview),
   );
-  if (revealed) wordGroup.append(el("p", "meaning-overview", card.meaning_overview));
   content.append(deckHeader, progressMeta, progress, wordGroup);
 
   const showPrevious = (): void => {
-    if (index > 0) renderFlashcard(section, cards, index - 1, level, topic, options, true);
+    if (index > 0) renderFlashcard(section, cards, index - 1, level, topic, options);
   };
   const showNext = (): void => {
     if (index < cards.length - 1) renderFlashcard(section, cards, index + 1, level, topic, options);
-  };
-  const revealCard = (): void => {
-    if (!revealed) renderFlashcard(section, cards, index, level, topic, options, true);
   };
   const gradeCard = (rating: FocusRating): void => {
     const player = getPlayer();
@@ -287,13 +293,10 @@ function renderFlashcard(
   next.disabled = index === cards.length - 1;
   next.addEventListener("click", showNext);
 
-  const studyAction = revealed
-    ? focusReviewActions(gradeCard)
-    : revealAnswerAction(revealCard);
-  section.append(content, studyAction, flashcardActions(previous, next));
+  section.append(content, focusReviewActions(gradeCard), flashcardActions(previous, next));
   bindFlashcardKeyboard(section, {
-    onReveal: revealed ? null : revealCard,
-    onGrade: revealed ? gradeCard : null,
+    onReveal: null,
+    onGrade: gradeCard,
     onPrevious: index > 0 ? showPrevious : null,
   });
 }
@@ -310,13 +313,11 @@ function focusReviewActions(onGrade: (rating: FocusRating) => void): HTMLElement
   return wrap;
 }
 
-function revealAnswerAction(onReveal: () => void): HTMLElement {
-  const wrap = el("div", "flashcard-reveal-row");
+function revealAnswerButton(onReveal: () => void): HTMLButtonElement {
   const reveal = button("Show answer", "flashcard-reveal");
   reveal.setAttribute("aria-keyshortcuts", "Space");
   reveal.addEventListener("click", onReveal);
-  wrap.append(reveal);
-  return wrap;
+  return reveal;
 }
 
 function levelCard(level: FocusLevel, onClick: () => void): HTMLButtonElement {
