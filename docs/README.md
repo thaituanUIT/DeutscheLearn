@@ -4,6 +4,7 @@ This folder documents the main DeutscheLearn feature areas and the operational p
 
 ## Feature Docs
 
+- [Backend Guide](BACKEND.md): backend architecture, module ownership, request lifecycle, data model, configuration, testing, and extension workflow.
 - [API](API.md): backend structure, public endpoints, admin authentication, and error behavior.
 - [Quiz](QUIZ.md): endless, practice, timed modes, leaderboard behavior, and question generation.
 - [Focus Vocabulary](FOCUS.md): CEFR/topic vocabulary cards, revision questions, and CSV import.
