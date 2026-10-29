@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-09-21T15:15:26.403445+00:00",
+  "comparison": "pgvector vs Qdrant",
+  "final_configurations": {
+    "pgvector": "R1-default-hnsw",
+    "qdrant": "R1-default-hnsw"
+  },
+  "baseline": "R0 exact equivalence must pass before any quality comparison",
+  "deciding_metrics": [
+    "Hit@5",
+    "MRR",
+    "recall_vs_exact@5",
+    "p95_latency_ms"
+  ],
+  "success_criteria": "Recommend the backend with statistically separable retrieval quality; if quality is indistinguishable, prefer lower latency/operational simplicity."
+}

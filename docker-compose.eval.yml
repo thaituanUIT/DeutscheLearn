@@ -1,0 +1,41 @@
+name: deutschelearn-retrieval-eval
+
+# Evaluation-only services. They deliberately use separate names, volumes, and
+# localhost-only ports so they cannot connect to or overwrite production.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: retrieval_eval
+      POSTGRES_USER: retrieval_eval
+      POSTGRES_PASSWORD: ${EVAL_POSTGRES_PASSWORD:-retrieval_eval_local_only}
+    ports:
+      - "127.0.0.1:${EVAL_POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - retrieval_eval_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retrieval_eval -d retrieval_eval"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: "no"
+
+  qdrant:
+    image: qdrant/qdrant:v1.16.3
+    ports:
+      - "127.0.0.1:${EVAL_QDRANT_HTTP_PORT:-56333}:6333"
+      - "127.0.0.1:${EVAL_QDRANT_GRPC_PORT:-56334}:6334"
+    volumes:
+      - retrieval_eval_qdrant:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/6333'"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: "no"
+
+volumes:
+  retrieval_eval_postgres:
+    name: deutschelearn_retrieval_eval_postgres
+  retrieval_eval_qdrant:
+    name: deutschelearn_retrieval_eval_qdrant

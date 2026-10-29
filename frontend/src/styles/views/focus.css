@@ -244,8 +244,14 @@
 }
 
 .flashcard-nav-control {
-  padding-bottom: 3px;
-  border-bottom: 1px solid currentColor;
+  min-width: 120px;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-weight: 600;
+  justify-content: center;
 }
 
 .revision-next {
