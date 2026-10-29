@@ -50,9 +50,12 @@
 .dictation-player { overflow: hidden; background: #111; aspect-ratio: 16 / 9; }
 .dictation-player-mount, .dictation-player iframe { display: block; width: 100%; height: 100%; border: 0; }
 .dictation-practice { display: grid; gap: 16px; }
+.dictation-progress { width: 100%; }
+.dictation-progress-track { display: block; overflow: hidden; width: 100%; height: 8px; background: var(--surface-raised); border-radius: 999px; }
+.dictation-progress-fill { display: block; width: 0; height: 100%; background: var(--accent); border-radius: inherit; transition: width 220ms ease; }
 .dictation-answer-panel { display: grid; gap: 10px; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 20px color-mix(in srgb, var(--text) 7%, transparent); }
 .dictation-answer-label { font-size: 15px; font-weight: 700; }
-.dictation-answer { width: 100%; min-height: 190px; padding: 16px; resize: vertical; color: var(--text); background: var(--surface-raised); border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; font-size: 18px; line-height: 1.65; transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease; }
+.dictation-answer { width: 100%; min-height: 120px; padding: 14px 16px; resize: vertical; color: var(--text); background: var(--surface-raised); border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; font-size: 18px; line-height: 1.55; transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease; }
 .dictation-answer:focus { outline: none; background: var(--surface); border-color: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 17%, transparent); }
 .dictation-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .dictation-controls > .button { display: flex; width: 100%; min-height: 50px; padding: 8px 10px; justify-content: center; border-radius: 7px; font-size: 14px; font-weight: 700; text-align: center; white-space: nowrap; }
@@ -85,7 +88,7 @@
   .dictation-source, .dictation-workspace { grid-template-columns: 1fr; }
   .dictation-practice-header { grid-template-columns: 1fr; gap: 12px; }
   .dictation-answer-panel { padding: 14px; }
-  .dictation-answer { min-height: 160px; font-size: 16px; }
+  .dictation-answer { min-height: 104px; font-size: 16px; }
   .dictation-controls { gap: 7px; }
   .dictation-controls > .button { min-height: 46px; padding: 7px 4px; font-size: 12px; }
 }
