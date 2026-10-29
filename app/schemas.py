@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -35,6 +36,23 @@ class DictationTranscriptIn(BaseModel):
     video_url: str = Field(min_length=11, max_length=2048)
 
 
+class DictationVideoReportIn(BaseModel):
+    reason: str = Field(pattern="^(not_german|inappropriate|broken|other)$")
+
+
+class DictationVideoModerationOut(BaseModel):
+    video_id: str
+    title: str
+    video_url: str
+    report_count: int
+    is_hidden: bool
+    created_at: datetime
+
+
+class DictationVideoModerationIn(BaseModel):
+    is_hidden: bool
+
+
 class DictationSegmentOut(BaseModel):
     start: float
     duration: float
@@ -43,9 +61,26 @@ class DictationSegmentOut(BaseModel):
 
 class DictationTranscriptOut(BaseModel):
     video_id: str
+    video_url: str
+    title: str
+    author_name: str | None
+    thumbnail_url: str | None
     language: str
     is_generated: bool
+    cache_hit: bool
     segments: list[DictationSegmentOut]
+
+
+class DictationVideoSummaryOut(BaseModel):
+    video_id: str
+    video_url: str
+    title: str
+    author_name: str | None
+    thumbnail_url: str | None
+    language: str
+    is_generated: bool
+    segment_count: int
+    created_at: datetime
 
 
 class QuestionOut(BaseModel):

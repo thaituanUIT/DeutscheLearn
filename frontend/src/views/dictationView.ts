@@ -1,5 +1,10 @@
-import { getDictationTranscript } from "../api/client";
-import type { DictationTranscript } from "../api/types";
+import {
+  getDictationTranscript,
+  getSavedDictationVideo,
+  listDictationVideos,
+  reportDictationVideo,
+} from "../api/client";
+import type { DictationTranscript, DictationVideoSummary } from "../api/types";
 import { button } from "../components/button";
 import { clear, el } from "../utils/dom";
 
@@ -9,46 +14,157 @@ export function dictationView(): HTMLElement {
   intro.append(
     el("p", "eyebrow", "HÖREN & SCHREIBEN"),
     el("h2", "", "German dictation"),
-    el("p", "muted", "Paste a YouTube link with German captions. Listen to each line, type what you hear, then check your transcription."),
+    el("p", "muted", "Choose a saved video or add a YouTube link. Captions are saved so the next learner can start without fetching them again."),
   );
 
+  const library = el("section", "dictation-library");
+  const libraryHeader = el("div", "dictation-library-header");
+  const libraryTitle = el("div", "dictation-library-title");
+  libraryTitle.append(
+    el("p", "eyebrow", "READY TO PRACTICE"),
+    el("h3", "", "Available videos"),
+    el("p", "muted", "Saved German transcripts shared with learners."),
+  );
+  const count = el("span", "dictation-video-count", "Loading…");
+  libraryHeader.append(libraryTitle, count);
+  const catalog = el("div", "dictation-video-grid");
+  const libraryStatus = el("p", "dictation-library-empty muted", "Loading saved videos…");
+  library.append(libraryHeader, libraryStatus, catalog);
+
+  const sourceHeading = el("div", "dictation-source-heading");
+  sourceHeading.append(
+    el("h3", "", "Add a video"),
+    el("p", "muted", "New links are checked once, then saved in the shared transcript library."),
+  );
   const form = el("form", "dictation-source");
   const label = el("label", "form-label", "YouTube video link");
   const input = el("input", "form-input") as HTMLInputElement;
   input.type = "url";
   input.placeholder = "https://www.youtube.com/watch?v=…";
   input.required = true;
-  const loadButton = button("Load German captions", "button button-primary");
+  const loadButton = button("Add video and start", "button button-primary");
   loadButton.type = "submit";
   label.append(input);
   form.append(label, loadButton);
-  const status = el("p", "dictation-status muted", "Captions are checked when you submit the link.");
+  const status = el("p", "dictation-status muted", "Your transcript will be saved for future practice.");
   const exercise = el("div", "dictation-exercise");
+
+  const updateStatus = (message: string, isError = false): void => {
+    status.className = `dictation-status ${isError ? "error" : "muted"}`;
+    status.textContent = message;
+  };
+
+  const refreshCatalog = async (): Promise<void> => {
+    try {
+      const videos = await listDictationVideos();
+      renderCatalog(catalog, libraryStatus, count, videos, async (videoId) => {
+        updateStatus("Loading saved transcript…");
+        clear(exercise);
+        try {
+          const transcript = await getSavedDictationVideo(videoId);
+          renderExercise(exercise, transcript);
+          exercise.scrollIntoView({ behavior: "smooth", block: "start" });
+          updateStatus(`Loaded saved transcript · ${transcript.segments.length} lines · no caption fetch needed.`);
+        } catch (error) {
+          updateStatus(readableError(error), true);
+        }
+      });
+    } catch (error) {
+      count.textContent = "";
+      libraryStatus.textContent = readableError(error);
+      libraryStatus.className = "dictation-library-empty error";
+    }
+  };
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const videoUrl = input.value.trim();
     if (!videoUrl) return;
     loadButton.disabled = true;
-    status.className = "dictation-status muted";
-    status.textContent = "Checking for German captions…";
+    updateStatus("Checking the shared library, then fetching captions if this video is new…");
     clear(exercise);
     void getDictationTranscript(videoUrl)
-      .then((transcript) => {
-        status.textContent = `${transcript.segments.length} lines loaded${transcript.is_generated ? " · automatic captions" : " · creator captions"}.`;
+      .then(async (transcript) => {
         renderExercise(exercise, transcript);
+        exercise.scrollIntoView({ behavior: "smooth", block: "start" });
+        updateStatus(
+          transcript.cache_hit
+            ? `Loaded saved transcript · ${transcript.segments.length} lines.`
+            : `Transcript saved for future learners · ${transcript.segments.length} lines${transcript.is_generated ? " · automatic captions" : " · creator captions"}.`,
+        );
+        await refreshCatalog();
       })
       .catch((error: unknown) => {
-        status.className = "dictation-status error";
-        status.textContent = readableError(error);
+        updateStatus(readableError(error), true);
       })
       .finally(() => {
         loadButton.disabled = false;
       });
   });
 
-  section.append(intro, form, status, exercise);
+  section.append(intro, library, sourceHeading, form, status, exercise);
+  void refreshCatalog();
   return section;
+}
+
+function renderCatalog(
+  catalog: HTMLElement,
+  emptyState: HTMLElement,
+  count: HTMLElement,
+  videos: DictationVideoSummary[],
+  onSelect: (videoId: string) => Promise<void>,
+): void {
+  clear(catalog);
+  count.textContent = `${videos.length} saved`;
+  if (videos.length === 0) {
+    emptyState.className = "dictation-library-empty muted";
+    emptyState.textContent = "No videos saved yet. Add a YouTube link below to create the first transcript.";
+    return;
+  }
+
+  emptyState.textContent = "Select a video to start dictation.";
+  emptyState.className = "dictation-library-empty muted";
+  for (const video of videos) {
+    const cardWrap = el("div", "dictation-video-card-wrap");
+    const card = button("", "dictation-video-card");
+    const imageWrap = el("span", "dictation-video-image");
+    const image = document.createElement("img");
+    image.src = video.thumbnail_url ?? `https://i.ytimg.com/vi/${encodeURIComponent(video.video_id)}/hqdefault.jpg`;
+    image.alt = "";
+    image.loading = "lazy";
+    image.addEventListener("error", () => imageWrap.classList.add("is-unavailable"), { once: true });
+    imageWrap.append(image, el("span", "dictation-play-badge", "▶"));
+
+    const details = el("span", "dictation-video-details");
+    const title = el("strong", "dictation-video-name", video.title);
+    const author = el("span", "dictation-video-author", video.author_name || "YouTube video");
+    const meta = el("span", "dictation-video-meta", `${video.segment_count} lines · ${video.language}`);
+    const kind = el("span", "dictation-video-kind", video.is_generated ? "Auto captions" : "Creator captions");
+    const action = el("span", "dictation-video-action", "Start dictation →");
+    details.append(title, author, meta, kind, action);
+    card.append(imageWrap, details);
+    card.setAttribute("aria-label", `Start dictation: ${video.title}`);
+    card.addEventListener("click", () => void onSelect(video.video_id));
+    const report = button("Report this video", "dictation-report-button");
+    report.type = "button";
+    report.title = "Report unsuitable or incorrect content";
+    report.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (!window.confirm("Report this video as unsuitable? It will be hidden after multiple independent reports.")) {
+        return;
+      }
+      report.disabled = true;
+      try {
+        await reportDictationVideo(video.video_id);
+        report.textContent = "Report received";
+      } catch (error) {
+        report.disabled = false;
+        report.textContent = readableError(error);
+      }
+    });
+    cardWrap.append(card, report);
+    catalog.append(cardWrap);
+  }
 }
 
 function renderExercise(host: HTMLElement, transcript: DictationTranscript): void {

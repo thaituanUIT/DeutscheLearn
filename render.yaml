@@ -28,6 +28,16 @@ services:
         sync: false
       - key: WEBSHARE_PROXY_PASSWORD
         sync: false
+      - key: DICTATION_NEW_VIDEOS_PER_IP_HOUR
+        value: "3"
+      - key: DICTATION_NEW_VIDEOS_PER_IP_DAY
+        value: "10"
+      - key: DICTATION_GLOBAL_NEW_VIDEOS_PER_DAY
+        value: "10"
+      - key: DICTATION_MAX_SAVED_VIDEOS
+        value: "500"
+      - key: DICTATION_RATE_LIMIT_SALT
+        sync: false
       - key: OPENROUTER_CHAT_MODEL
         value: google/gemma-4-31b-it:free
       - key: OPENROUTER_CHAT_FALLBACK_MODELS

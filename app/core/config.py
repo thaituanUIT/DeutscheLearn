@@ -44,6 +44,14 @@ class Settings(BaseSettings):
             "webshare_proxy_password",
         ),
     )
+    dictation_new_videos_per_ip_hour: int = Field(default=3, ge=1, le=100)
+    dictation_new_videos_per_ip_day: int = Field(default=10, ge=1, le=500)
+    dictation_global_new_videos_per_day: int = Field(default=10, ge=1, le=10000)
+    dictation_rate_limit_salt: str | None = None
+    dictation_max_transcript_chars: int = Field(default=20000, ge=1000, le=100000)
+    dictation_max_transcript_segments: int = Field(default=500, ge=10, le=5000)
+    dictation_max_saved_videos: int = Field(default=500, ge=1, le=50000)
+    dictation_hide_report_threshold: int = Field(default=3, ge=2, le=20)
     grammar_rate_limit_per_hour: int = 10
     grammar_similarity_threshold: float = 0.45
     grammar_relative_similarity_threshold: float = 0.85

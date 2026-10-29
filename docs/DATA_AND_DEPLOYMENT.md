@@ -50,9 +50,18 @@ STATIC_ASSETS_ENABLED=true
 ```
 
 Set both Webshare values to enable rotating residential proxies for YouTube caption requests.
-The app retries a blocked proxy up to three times. Keep the credentials in the environment and
+The existing `PROXY_USERNAME` and `PROXY_PASSWORD` names are also accepted. The app uses the
+library's default retry count for blocked proxies. Keep the credentials in the environment and
 never commit them. If only one value is set, dictation returns a configuration error instead of
 silently sending requests without the proxy.
+
+Dictation abuse controls apply only to new transcript fetches; cached videos remain available.
+Defaults allow 3 new videos per client per hour, 10 per client per day, and 10 globally per day,
+with a 500-video library cap and transcript limits of 20,000 characters / 500 segments. Public
+reports hide a video after three distinct client IPs report it. An admin can review reports at
+`GET /api/admin/dictation/reports` and restore a video with
+`PATCH /api/admin/dictation/videos/{video_id}` using `Authorization: Bearer <ADMIN_TOKEN>` and
+`{"is_hidden": false}`. All limits are configurable through `DICTATION_*` environment settings.
 
 Production must not use SQLite. The app rejects `ENVIRONMENT=production` when `DATABASE_URL` points to SQLite.
 

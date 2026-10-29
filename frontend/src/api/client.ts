@@ -4,6 +4,7 @@ import type {
   AdminReadingPassageSummary,
   AdminWord,
   DictationTranscript,
+  DictationVideoSummary,
   EndlessAnswer,
   EndlessStart,
   FocusCard,
@@ -32,6 +33,21 @@ export function getDictationTranscript(videoUrl: string): Promise<DictationTrans
   return request<DictationTranscript>("/api/dictation/transcript", {
     method: "POST",
     body: JSON.stringify({ video_url: videoUrl }),
+  });
+}
+
+export function listDictationVideos(): Promise<DictationVideoSummary[]> {
+  return request<DictationVideoSummary[]>("/api/dictation/videos");
+}
+
+export function getSavedDictationVideo(videoId: string): Promise<DictationTranscript> {
+  return request<DictationTranscript>(`/api/dictation/videos/${encodeURIComponent(videoId)}`);
+}
+
+export function reportDictationVideo(videoId: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/dictation/videos/${encodeURIComponent(videoId)}/report`, {
+    method: "POST",
+    body: JSON.stringify({ reason: "other" }),
   });
 }
 
