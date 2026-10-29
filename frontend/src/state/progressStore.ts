@@ -66,6 +66,7 @@ export function homeMetricsForPlayer(
       label: "GELESEN",
       value: storyTotal > 0 ? `${Math.min(storyReadCount, storyTotal)} / ${storyTotal}` : empty,
     },
+    dictation: { label: "HÖREN & SCHREIBEN", value: "YouTube" },
   };
 }
 

@@ -31,6 +31,23 @@ class WordOfDayOut(BaseModel):
     date: str
 
 
+class DictationTranscriptIn(BaseModel):
+    video_url: str = Field(min_length=11, max_length=2048)
+
+
+class DictationSegmentOut(BaseModel):
+    start: float
+    duration: float
+    text: str
+
+
+class DictationTranscriptOut(BaseModel):
+    video_id: str
+    language: str
+    is_generated: bool
+    segments: list[DictationSegmentOut]
+
+
 class QuestionOut(BaseModel):
     question_id: str
     word: str

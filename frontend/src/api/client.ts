@@ -3,6 +3,7 @@ import type {
   AdminReadingPassage,
   AdminReadingPassageSummary,
   AdminWord,
+  DictationTranscript,
   EndlessAnswer,
   EndlessStart,
   FocusCard,
@@ -26,6 +27,13 @@ import type {
   TimedStart,
   WordOfDay,
 } from "./types";
+
+export function getDictationTranscript(videoUrl: string): Promise<DictationTranscript> {
+  return request<DictationTranscript>("/api/dictation/transcript", {
+    method: "POST",
+    body: JSON.stringify({ video_url: videoUrl }),
+  });
+}
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
