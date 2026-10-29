@@ -48,7 +48,7 @@
 .dictation-status:empty { display: none; }
 .dictation-workspace { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr); gap: 24px; align-items: start; }
 .dictation-player { overflow: hidden; background: #111; aspect-ratio: 16 / 9; }
-.dictation-player iframe { display: block; width: 100%; height: 100%; border: 0; }
+.dictation-player-mount, .dictation-player iframe { display: block; width: 100%; height: 100%; border: 0; }
 .dictation-practice { display: grid; gap: 16px; }
 .dictation-answer { width: 100%; min-height: 120px; padding: 14px; resize: vertical; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px; font: inherit; }
 .dictation-controls { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -7,6 +7,7 @@ import {
 import type { DictationTranscript, DictationVideoSummary } from "../api/types";
 import { button } from "../components/button";
 import { clear, el } from "../utils/dom";
+import { loadYouTubeIframeApi, type YouTubePlayer } from "../utils/youtubeIframe";
 
 export function dictationView(): HTMLElement {
   const section = el("section", "dictation-view");
@@ -54,6 +55,13 @@ export function dictationView(): HTMLElement {
   status.setAttribute("aria-live", "polite");
   const exercise = el("div", "dictation-exercise");
   practicePanel.append(practiceHeader, status, exercise);
+  let disposeExercise: (() => void) | null = null;
+
+  const clearExercise = (): void => {
+    disposeExercise?.();
+    disposeExercise = null;
+    clear(exercise);
+  };
 
   const showPracticePanel = (title: string): void => {
     browsePanel.hidden = true;
@@ -66,7 +74,7 @@ export function dictationView(): HTMLElement {
   backButton.addEventListener("click", () => {
     practicePanel.hidden = true;
     browsePanel.hidden = false;
-    clear(exercise);
+    clearExercise();
     section.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
@@ -82,11 +90,13 @@ export function dictationView(): HTMLElement {
         const video = videos.find((item) => item.video_id === videoId);
         showPracticePanel(video?.title ?? "German dictation");
         updateStatus("Loading video…");
-        clear(exercise);
+        clearExercise();
         try {
           const transcript = await getSavedDictationVideo(videoId);
           practiceTitle.textContent = transcript.title;
-          renderExercise(exercise, transcript);
+          disposeExercise = renderExercise(exercise, transcript, () => {
+            updateStatus("YouTube could not play this video. Try another video.", true);
+          });
           updateStatus("Video ready.");
         } catch (error) {
           updateStatus(readableError(error), true);
@@ -106,11 +116,13 @@ export function dictationView(): HTMLElement {
     loadButton.disabled = true;
     showPracticePanel("Loading video…");
     updateStatus("Loading video…");
-    clear(exercise);
+    clearExercise();
     void getDictationTranscript(videoUrl)
       .then(async (transcript) => {
         practiceTitle.textContent = transcript.title;
-        renderExercise(exercise, transcript);
+        disposeExercise = renderExercise(exercise, transcript, () => {
+          updateStatus("YouTube could not play this video. Try another video.", true);
+        });
         updateStatus("Video ready.");
         await refreshCatalog();
       })
@@ -191,15 +203,15 @@ function renderCatalog(
   }
 }
 
-function renderExercise(host: HTMLElement, transcript: DictationTranscript): void {
+function renderExercise(
+  host: HTMLElement,
+  transcript: DictationTranscript,
+  onPlayerError: () => void,
+): () => void {
   const exercise = el("div", "dictation-workspace");
   const player = el("div", "dictation-player");
-  const iframe = el("iframe", "") as HTMLIFrameElement;
-  iframe.title = "YouTube dictation video";
-  iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-  iframe.allowFullscreen = true;
-  iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(transcript.video_id)}?playsinline=1&rel=0`;
-  player.append(iframe);
+  const playerMount = el("div", "dictation-player-mount");
+  player.append(playerMount);
 
   const practice = el("div", "dictation-practice");
   const progress = el("p", "eyebrow", `LINE 1 OF ${transcript.segments.length}`);
@@ -211,21 +223,51 @@ function renderExercise(host: HTMLElement, transcript: DictationTranscript): voi
   const play = button("▶ Replay line", "button button-secondary");
   const check = button("Check answer", "button button-primary");
   const reveal = button("Reveal transcript", "button button-quiet");
+  const next = button("Next line →", "button button-secondary");
   let index = 0;
+  let youtubePlayer: YouTubePlayer | null = null;
+  let disposed = false;
+  let lineEndWatcher: number | null = null;
 
-  const showLine = (): void => {
+  const clearLineEndWatcher = (): void => {
+    if (lineEndWatcher !== null) window.clearInterval(lineEndWatcher);
+    lineEndWatcher = null;
+  };
+
+  const watchLineEnd = (): void => {
+    clearLineEndWatcher();
+    lineEndWatcher = window.setInterval(() => {
+      if (!youtubePlayer || youtubePlayer.getPlayerState() !== 1) return;
+      const segment = transcript.segments[index];
+      const segmentEnd = segment.start + segment.duration;
+      if (youtubePlayer.getCurrentTime() >= segmentEnd) {
+        youtubePlayer.pauseVideo();
+        youtubePlayer.seekTo(segmentEnd, false);
+        clearLineEndWatcher();
+      }
+    }, 100);
+  };
+
+  const showLine = (autoplay = false): void => {
     const segment = transcript.segments[index];
     progress.textContent = `LINE ${index + 1} OF ${transcript.segments.length}`;
     answer.value = "";
     clear(feedback);
     reveal.textContent = "Reveal transcript";
     reveal.dataset.open = "false";
-    iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(transcript.video_id)}?playsinline=1&rel=0&start=${Math.floor(segment.start)}&end=${Math.ceil(segment.start + segment.duration)}`;
+    if (youtubePlayer) {
+      youtubePlayer.pauseVideo();
+      youtubePlayer.seekTo(segment.start, true);
+      if (autoplay) youtubePlayer.playVideo();
+    }
   };
 
   play.addEventListener("click", () => {
     const segment = transcript.segments[index];
-    iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(transcript.video_id)}?autoplay=1&playsinline=1&rel=0&start=${Math.floor(segment.start)}&end=${Math.ceil(segment.start + segment.duration)}`;
+    if (!youtubePlayer) return;
+    youtubePlayer.pauseVideo();
+    youtubePlayer.seekTo(segment.start, true);
+    youtubePlayer.playVideo();
   });
   check.addEventListener("click", () => {
     if (!answer.value.trim()) {
@@ -242,10 +284,9 @@ function renderExercise(host: HTMLElement, transcript: DictationTranscript): voi
     else clear(feedback);
   });
 
-  const next = button("Next line →", "button button-secondary");
   next.addEventListener("click", () => {
     index = (index + 1) % transcript.segments.length;
-    showLine();
+    showLine(true);
   });
   const controls = el("div", "dictation-controls");
   controls.append(play, check, reveal, next);
@@ -253,6 +294,52 @@ function renderExercise(host: HTMLElement, transcript: DictationTranscript): voi
   exercise.append(player, practice);
   host.replaceChildren(exercise);
   showLine();
+
+  void loadYouTubeIframeApi()
+    .then((youtube) => {
+      if (disposed) return;
+      youtubePlayer = new youtube.Player(playerMount, {
+        host: "https://www.youtube-nocookie.com",
+        videoId: transcript.video_id,
+        playerVars: {
+          playsinline: 1,
+          rel: 0,
+          cc_load_policy: 0,
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: (event) => {
+            if (disposed) {
+              event.target.destroy();
+              return;
+            }
+            youtubePlayer = event.target;
+            youtubePlayer.getIframe().title = "YouTube dictation video";
+            youtubePlayer.cueVideoById({
+              videoId: transcript.video_id,
+              startSeconds: transcript.segments[index].start,
+            });
+            play.disabled = false;
+            next.disabled = false;
+          },
+          onStateChange: (event) => {
+            if (event.data === 1) watchLineEnd();
+            else clearLineEndWatcher();
+          },
+          onError: onPlayerError,
+        },
+      });
+    })
+    .catch(onPlayerError);
+
+  play.disabled = true;
+  next.disabled = true;
+  return () => {
+    disposed = true;
+    clearLineEndWatcher();
+    youtubePlayer?.destroy();
+    youtubePlayer = null;
+  };
 }
 
 function renderDiff(host: HTMLElement, typed: string, target: string): void {
