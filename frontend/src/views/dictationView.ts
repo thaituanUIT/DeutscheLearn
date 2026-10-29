@@ -9,7 +9,12 @@ import { button } from "../components/button";
 import { clear, el } from "../utils/dom";
 import { loadYouTubeIframeApi, type YouTubePlayer } from "../utils/youtubeIframe";
 
-export function dictationView(): HTMLElement {
+type DictationViewOptions = {
+  onBack: () => void;
+  onBackChange: (handler: () => void) => void;
+};
+
+export function dictationView(options: DictationViewOptions): HTMLElement {
   const section = el("section", "dictation-view");
   const browsePanel = el("div", "dictation-browse-panel");
   const intro = el("div", "dictation-intro");
@@ -46,11 +51,9 @@ export function dictationView(): HTMLElement {
   const practicePanel = el("section", "dictation-practice-panel");
   practicePanel.hidden = true;
   const practiceHeader = el("div", "dictation-practice-header");
-  const backButton = button("← All videos", "button button-secondary");
-  backButton.type = "button";
   const practiceTitle = el("h2", "dictation-practice-title", "");
   practiceTitle.tabIndex = -1;
-  practiceHeader.append(backButton, practiceTitle);
+  practiceHeader.append(practiceTitle);
   const status = el("p", "dictation-status muted", "");
   status.setAttribute("aria-live", "polite");
   const exercise = el("div", "dictation-exercise");
@@ -63,20 +66,22 @@ export function dictationView(): HTMLElement {
     clear(exercise);
   };
 
+  const showBrowsePanel = (): void => {
+    practicePanel.hidden = true;
+    browsePanel.hidden = false;
+    clearExercise();
+    options.onBackChange(options.onBack);
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const showPracticePanel = (title: string): void => {
     browsePanel.hidden = true;
     practicePanel.hidden = false;
     practiceTitle.textContent = title;
     practiceTitle.focus({ preventScroll: true });
+    options.onBackChange(showBrowsePanel);
     section.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-
-  backButton.addEventListener("click", () => {
-    practicePanel.hidden = true;
-    browsePanel.hidden = false;
-    clearExercise();
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
 
   const updateStatus = (message: string, isError = false): void => {
     status.className = `dictation-status ${isError ? "error" : "muted"}`;
@@ -227,7 +232,7 @@ function renderExercise(
   const feedback = el("div", "dictation-feedback");
   const play = button("▶ Replay line", "button button-secondary");
   const check = button("Check answer", "button button-primary");
-  const reveal = button("Reveal transcript", "button button-quiet");
+  const reveal = button("Reveal transcript", "button button-quiet dictation-reveal-button");
   const next = button("Next line →", "button button-secondary");
   let index = 0;
   let youtubePlayer: YouTubePlayer | null = null;
@@ -294,8 +299,13 @@ function renderExercise(
     showLine(true);
   });
   const controls = el("div", "dictation-controls");
-  controls.append(play, check, reveal, next);
-  practice.append(progress, answerPanel, controls, feedback);
+  play.classList.add("dictation-replay-button");
+  check.classList.add("dictation-check-button");
+  next.classList.add("dictation-next-button");
+  controls.append(play, check, next);
+  const revealRow = el("div", "dictation-reveal-row");
+  revealRow.append(reveal);
+  practice.append(progress, answerPanel, controls, feedback, revealRow);
   exercise.append(player, practice);
   host.replaceChildren(exercise);
   showLine();

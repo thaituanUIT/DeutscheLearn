@@ -140,7 +140,12 @@ function draw(
     }
 
     if (mode === "dictation") {
-      mainHost.replaceChildren(dictationView());
+      mainHost.replaceChildren(
+        dictationView({
+          onBack: showHome,
+          onBackChange: renderHeaderBack,
+        }),
+      );
       return;
     }
 
