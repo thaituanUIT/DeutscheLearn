@@ -2,7 +2,7 @@ import { el } from "../utils/dom";
 import type { Mistake } from "../state/progressStore";
 import type { QuizMode } from "./quizView";
 
-export type HomeMode = QuizMode | "focus" | "story";
+export type HomeMode = QuizMode | "focus" | "story" | "dictation";
 
 export type HomeModeMetric = {
   label: string;
@@ -50,6 +50,12 @@ const modes: Array<{
     title: "Story",
     description: "Short passages with comprehension questions.",
     action: "Read stories",
+  },
+  {
+    mode: "dictation",
+    title: "Dictation",
+    description: "Listen to German videos, type what you hear, and check each line.",
+    action: "Start dictation",
   },
 ];
 

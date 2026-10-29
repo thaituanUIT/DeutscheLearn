@@ -21,10 +21,11 @@ import { homeView, type HomeMode } from "./homeView";
 import { leaderboardView, wordOfDayView } from "./leaderboardView";
 import { quizView } from "./quizView";
 import { storyView } from "./storyView";
+import { dictationView } from "./dictationView";
 
 type AppRoute = HomeMode | "home";
 
-const appRoutes = new Set<AppRoute>(["home", "endless", "practice", "timed", "focus", "story"]);
+const appRoutes = new Set<AppRoute>(["home", "endless", "practice", "timed", "focus", "story", "dictation"]);
 
 export async function renderApp(root: HTMLElement): Promise<void> {
   clear(root);
@@ -135,6 +136,11 @@ function draw(
           }) => grammarWidget?.updateContext(context),
         }),
       );
+      return;
+    }
+
+    if (mode === "dictation") {
+      mainHost.replaceChildren(dictationView({ onBack: showHome }));
       return;
     }
 

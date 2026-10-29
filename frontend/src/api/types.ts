@@ -12,6 +12,14 @@ export type WordOfDay = {
   date: string;
 };
 
+export type DictationSegment = { start: number; duration: number; text: string };
+export type DictationTranscript = {
+  video_id: string;
+  language: string;
+  is_generated: boolean;
+  segments: DictationSegment[];
+};
+
 export type QuizQuestion = {
   question_id: string;
   word: string;
