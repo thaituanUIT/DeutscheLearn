@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +26,18 @@ class Settings(BaseSettings):
     openrouter_chat_fallback_models: str = "openrouter/free"
     openrouter_http_referer: str | None = None
     openrouter_app_title: str = "DeutscheLearn"
+    webshare_proxy_username: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "WEBSHARE_PROXY_USERNAME", "WEBSHARE_USERNAME", "webshare_proxy_username"
+        ),
+    )
+    webshare_proxy_password: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "WEBSHARE_PROXY_PASSWORD", "WEBSHARE_PASSWORD", "webshare_proxy_password"
+        ),
+    )
     grammar_rate_limit_per_hour: int = 10
     grammar_similarity_threshold: float = 0.45
     grammar_relative_similarity_threshold: float = 0.85

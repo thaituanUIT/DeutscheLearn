@@ -140,7 +140,8 @@ def dictation_transcript(payload: DictationTranscriptIn) -> DictationTranscriptO
     video_id = youtube_video_id(payload.video_url)
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
-        from youtube_transcript_api._errors import YouTubeTranscriptApiException
+        from youtube_transcript_api._errors import RequestBlocked, YouTubeTranscriptApiException
+        from youtube_transcript_api.proxies import WebshareProxyConfig
     except ImportError as exc:
         logger.exception("YouTube transcript support is not installed")
         raise HTTPException(
@@ -149,7 +150,23 @@ def dictation_transcript(payload: DictationTranscriptIn) -> DictationTranscriptO
         ) from exc
 
     try:
-        transcript_api = YouTubeTranscriptApi()
+        settings = get_settings()
+        proxy_username = settings.webshare_proxy_username
+        proxy_password = settings.webshare_proxy_password
+        if bool(proxy_username) != bool(proxy_password):
+            logger.error("Webshare proxy configuration is incomplete")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Caption fetching is not configured correctly. Please try again later.",
+            )
+        proxy_config = None
+        if proxy_username and proxy_password:
+            proxy_config = WebshareProxyConfig(
+                proxy_username=proxy_username,
+                proxy_password=proxy_password,
+                retries_when_blocked=3,
+            )
+        transcript_api = YouTubeTranscriptApi(proxy_config=proxy_config)
         transcript_list = transcript_api.list(video_id)
         german_tracks = [
             transcript
@@ -163,6 +180,12 @@ def dictation_transcript(payload: DictationTranscriptIn) -> DictationTranscriptO
                 detail="No German captions were found for this video. Try another link with German captions.",
             )
         transcript = german_tracks[0].fetch()
+    except RequestBlocked as exc:
+        logger.warning("YouTube blocked transcript requests for video %s", video_id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="YouTube is temporarily blocking caption requests from the server. Please try again later.",
+        ) from exc
     except YouTubeTranscriptApiException as exc:
         logger.info("No usable German transcript for video %s: %s", video_id, type(exc).__name__)
         raise HTTPException(

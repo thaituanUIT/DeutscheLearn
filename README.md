@@ -87,11 +87,15 @@ COHERE_EMBEDDING_DIMENSION=1024
 OPENROUTER_API_KEY=
 OPENROUTER_CHAT_MODEL=google/gemma-4-31b-it:free
 OPENROUTER_CHAT_FALLBACK_MODELS=openrouter/free
+WEBSHARE_PROXY_USERNAME=
+WEBSHARE_PROXY_PASSWORD=
 GRAMMAR_SIMILARITY_THRESHOLD=0.45
 GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD=0.85
 ```
 
 On Render, use the included `render.yaml`. It provisions a web service plus Postgres and sets `COOKIE_SECURE=true`.
+Dictation uses Webshare when both proxy variables are set; without them, transcript requests connect directly.
+The proxy config rotates residential IPs and retries blocked requests up to three times.
 
 Do not run production with the default SQLite URL. Render web service disks are ephemeral, so
 `sqlite:///./quiz.db` can disappear on a new deploy. Create the service from `render.yaml`, or
@@ -194,11 +198,6 @@ them.
 ## GitHub Actions and Render
 
 The workflow in `.github/workflows/render-deploy.yml` runs backend linting, backend tests,
-frontend audit, and frontend build on pull requests and pushes to `main`.
-
-For Render deploys you have two options:
-
-1. Enable Render's normal GitHub auto-deploy for the service. Render will build from
-   `render.yaml` after each push to `main`.
-2. Or create a Render deploy hook and save it as a GitHub Actions secret named
-   `RENDER_DEPLOY_HOOK_URL`. The workflow will trigger that hook only after the build job passes.
+frontend audit, and frontend build before Render deploys. Keep Render's GitHub auto-deploy
+enabled; the workflow does not call a deploy hook, avoiding a second deploy/build for the same
+push.

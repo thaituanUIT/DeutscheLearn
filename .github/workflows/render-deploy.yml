@@ -1,4 +1,4 @@
-name: Build and Deploy to Render
+name: Build and Test
 
 on:
   push:
@@ -47,20 +47,3 @@ jobs:
 
       - name: Build frontend
         run: npm run build --prefix frontend
-
-  deploy:
-    name: Trigger Render deploy
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    env:
-      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-
-    steps:
-      - name: Trigger deploy hook
-        if: env.RENDER_DEPLOY_HOOK_URL != ''
-        run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
-
-      - name: Skip deploy hook
-        if: env.RENDER_DEPLOY_HOOK_URL == ''
-        run: echo "RENDER_DEPLOY_HOOK_URL is not set. Render GitHub auto-deploy can still deploy this push."

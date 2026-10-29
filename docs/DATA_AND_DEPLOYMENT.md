@@ -44,8 +44,15 @@ SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 COHERE_API_KEY=
 OPENROUTER_API_KEY=
+WEBSHARE_PROXY_USERNAME=
+WEBSHARE_PROXY_PASSWORD=
 STATIC_ASSETS_ENABLED=true
 ```
+
+Set both Webshare values to enable rotating residential proxies for YouTube caption requests.
+The app retries a blocked proxy up to three times. Keep the credentials in the environment and
+never commit them. If only one value is set, dictation returns a configuration error instead of
+silently sending requests without the proxy.
 
 Production must not use SQLite. The app rejects `ENVIRONMENT=production` when `DATABASE_URL` points to SQLite.
 
@@ -112,7 +119,7 @@ Important production settings:
 
 ## GitHub Actions
 
-The workflow in `.github/workflows/render-deploy.yml` runs backend checks and frontend build on pull requests and pushes to `main`. If `RENDER_DEPLOY_HOOK_URL` is configured, it triggers a Render deploy after successful checks.
+The workflow in `.github/workflows/render-deploy.yml` runs backend checks and the frontend build on pushes to `main`. Render's GitHub auto-deploy performs the deployment; the workflow does not call a deploy hook, preventing duplicate deploys for the same commit.
 
 ## Static Assets
 
