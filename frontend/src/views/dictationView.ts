@@ -191,7 +191,7 @@ function renderCatalog(
     report.title = "Report unsuitable or incorrect content";
     report.addEventListener("click", async (event) => {
       event.stopPropagation();
-      if (!window.confirm("Report this video as unsuitable? It will be hidden after multiple independent reports.")) {
+      if (!window.confirm("Send this video to the review queue? Reports do not hide videos automatically.")) {
         return;
       }
       report.disabled = true;
