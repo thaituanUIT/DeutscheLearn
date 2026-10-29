@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -43,9 +44,26 @@ class DictationSegmentOut(BaseModel):
 
 class DictationTranscriptOut(BaseModel):
     video_id: str
+    video_url: str
+    title: str
+    author_name: str | None
+    thumbnail_url: str | None
     language: str
     is_generated: bool
+    cache_hit: bool
     segments: list[DictationSegmentOut]
+
+
+class DictationVideoSummaryOut(BaseModel):
+    video_id: str
+    video_url: str
+    title: str
+    author_name: str | None
+    thumbnail_url: str | None
+    language: str
+    is_generated: bool
+    segment_count: int
+    created_at: datetime
 
 
 class QuestionOut(BaseModel):

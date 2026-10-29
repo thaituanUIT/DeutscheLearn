@@ -50,7 +50,8 @@ STATIC_ASSETS_ENABLED=true
 ```
 
 Set both Webshare values to enable rotating residential proxies for YouTube caption requests.
-The app retries a blocked proxy up to three times. Keep the credentials in the environment and
+The existing `PROXY_USERNAME` and `PROXY_PASSWORD` names are also accepted. The app uses the
+library's default retry count for blocked proxies. Keep the credentials in the environment and
 never commit them. If only one value is set, dictation returns a configuration error instead of
 silently sending requests without the proxy.
 

@@ -95,7 +95,8 @@ GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD=0.85
 
 On Render, use the included `render.yaml`. It provisions a web service plus Postgres and sets `COOKIE_SECURE=true`.
 Dictation uses Webshare when both proxy variables are set; without them, transcript requests connect directly.
-The proxy config rotates residential IPs and retries blocked requests up to three times.
+The existing `PROXY_USERNAME` and `PROXY_PASSWORD` names are also accepted. The proxy config uses the
+library's rotating residential setup and its default retry count for blocked requests.
 
 Do not run production with the default SQLite URL. Render web service disks are ephemeral, so
 `sqlite:///./quiz.db` can disappear on a new deploy. Create the service from `render.yaml`, or

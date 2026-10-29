@@ -7,9 +7,12 @@ from urllib import request as urlrequest
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
+import requests
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import ValidationError
+from requests.exceptions import RequestException, RetryError
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_or_create_player, require_player
@@ -18,6 +21,7 @@ from app.core.time import utc_now
 from app.db.models import (
     AnonymousPlayer,
     CachedWord,
+    DictationVideo,
     FocusWordEntry,
     GrammarQuestionLog,
     QuizAttempt,
@@ -46,6 +50,7 @@ from app.schemas import (
     DictationSegmentOut,
     DictationTranscriptIn,
     DictationTranscriptOut,
+    DictationVideoSummaryOut,
     EndlessAnswerIn,
     EndlessAnswerOut,
     EndlessStartOut,
@@ -135,9 +140,35 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@router.get("/dictation/videos", response_model=list[DictationVideoSummaryOut])
+def list_dictation_videos(
+    db: Session = Depends(get_db),
+    limit: int = Query(default=100, ge=1, le=100),
+) -> list[DictationVideoSummaryOut]:
+    videos = db.scalars(
+        select(DictationVideo).order_by(DictationVideo.created_at.desc()).limit(limit)
+    ).all()
+    return [DictationVideoSummaryOut.model_validate(video, from_attributes=True) for video in videos]
+
+
+@router.get("/dictation/videos/{video_id}", response_model=DictationTranscriptOut)
+def get_dictation_video(video_id: str, db: Session = Depends(get_db)) -> DictationTranscriptOut:
+    video = db.get(DictationVideo, video_id)
+    if video is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Saved video not found.")
+    return dictation_transcript_out(video, cache_hit=True)
+
+
 @router.post("/dictation/transcript", response_model=DictationTranscriptOut)
-def dictation_transcript(payload: DictationTranscriptIn) -> DictationTranscriptOut:
+def dictation_transcript(
+    payload: DictationTranscriptIn,
+    db: Session = Depends(get_db),
+) -> DictationTranscriptOut:
     video_id = youtube_video_id(payload.video_url)
+    cached_video = db.get(DictationVideo, video_id)
+    if cached_video is not None:
+        return dictation_transcript_out(cached_video, cache_hit=True)
+
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
         from youtube_transcript_api._errors import RequestBlocked, YouTubeTranscriptApiException
@@ -149,23 +180,23 @@ def dictation_transcript(payload: DictationTranscriptIn) -> DictationTranscriptO
             detail="YouTube transcript import is unavailable right now.",
         ) from exc
 
+    settings = get_settings()
+    proxy_username = settings.webshare_proxy_username
+    proxy_password = settings.webshare_proxy_password
+    if bool(proxy_username) != bool(proxy_password):
+        logger.error("Webshare proxy configuration is incomplete")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Caption fetching is not configured correctly. Please try again later.",
+        )
+    proxy_config = None
+    if proxy_username and proxy_password:
+        proxy_config = WebshareProxyConfig(
+            proxy_username=proxy_username,
+            proxy_password=proxy_password,
+        )
+
     try:
-        settings = get_settings()
-        proxy_username = settings.webshare_proxy_username
-        proxy_password = settings.webshare_proxy_password
-        if bool(proxy_username) != bool(proxy_password):
-            logger.error("Webshare proxy configuration is incomplete")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Caption fetching is not configured correctly. Please try again later.",
-            )
-        proxy_config = None
-        if proxy_username and proxy_password:
-            proxy_config = WebshareProxyConfig(
-                proxy_username=proxy_username,
-                proxy_password=proxy_password,
-                retries_when_blocked=3,
-            )
         transcript_api = YouTubeTranscriptApi(proxy_config=proxy_config)
         transcript_list = transcript_api.list(video_id)
         german_tracks = [
@@ -180,6 +211,15 @@ def dictation_transcript(payload: DictationTranscriptIn) -> DictationTranscriptO
                 detail="No German captions were found for this video. Try another link with German captions.",
             )
         transcript = german_tracks[0].fetch()
+    except RetryError as exc:
+        logger.warning("Caption requests were repeatedly rate-limited for video %s", video_id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Caption requests are being rate-limited by YouTube or the proxy. "
+                "Please try again later."
+            ),
+        ) from exc
     except RequestBlocked as exc:
         logger.warning("YouTube blocked transcript requests for video %s", video_id)
         raise HTTPException(
@@ -199,11 +239,79 @@ def dictation_transcript(payload: DictationTranscriptIn) -> DictationTranscriptO
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The German captions did not contain any usable speech. Try another video.",
         )
-    return DictationTranscriptOut(
+
+    canonical_url = f"https://www.youtube.com/watch?v={video_id}"
+    title, author_name, thumbnail_url = fetch_dictation_video_metadata(
+        canonical_url,
+        video_id,
+        proxy_config,
+    )
+    stored_video = DictationVideo(
         video_id=video_id,
+        video_url=canonical_url,
+        title=title,
+        author_name=author_name,
+        thumbnail_url=thumbnail_url,
         language=transcript.language,
         is_generated=transcript.is_generated,
-        segments=segments,
+        segments=[segment.model_dump() for segment in segments],
+        segment_count=len(segments),
+    )
+    db.add(stored_video)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        concurrent_video = db.get(DictationVideo, video_id)
+        if concurrent_video is not None:
+            return dictation_transcript_out(concurrent_video, cache_hit=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The transcript was loaded but could not be saved. Please try again.",
+        )
+    db.refresh(stored_video)
+    return dictation_transcript_out(stored_video, cache_hit=False)
+
+
+def dictation_transcript_out(video: DictationVideo, *, cache_hit: bool) -> DictationTranscriptOut:
+    return DictationTranscriptOut(
+        video_id=video.video_id,
+        video_url=video.video_url,
+        title=video.title,
+        author_name=video.author_name,
+        thumbnail_url=video.thumbnail_url,
+        language=video.language,
+        is_generated=video.is_generated,
+        cache_hit=cache_hit,
+        segments=video.segments,
+    )
+
+
+def fetch_dictation_video_metadata(
+    video_url: str,
+    video_id: str,
+    proxy_config: Any,
+) -> tuple[str, str | None, str | None]:
+    fallback_title = f"German dictation · {video_id}"
+    fallback_thumbnail = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+    proxies = proxy_config.to_requests_dict() if proxy_config is not None else None
+    try:
+        response = requests.get(
+            "https://www.youtube.com/oembed",
+            params={"url": video_url, "format": "json"},
+            proxies=proxies,
+            timeout=(3, 7),
+        )
+        response.raise_for_status()
+        metadata = response.json()
+    except (RequestException, ValueError) as exc:
+        logger.info("YouTube metadata unavailable for %s: %s", video_id, type(exc).__name__)
+        return fallback_title, None, fallback_thumbnail
+
+    return (
+        str(metadata.get("title") or fallback_title)[:500],
+        str(metadata["author_name"])[:255] if metadata.get("author_name") else None,
+        str(metadata.get("thumbnail_url") or fallback_thumbnail)[:1000],
     )
 
 

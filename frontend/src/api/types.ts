@@ -15,9 +15,25 @@ export type WordOfDay = {
 export type DictationSegment = { start: number; duration: number; text: string };
 export type DictationTranscript = {
   video_id: string;
+  video_url: string;
+  title: string;
+  author_name: string | null;
+  thumbnail_url: string | null;
   language: string;
   is_generated: boolean;
+  cache_hit: boolean;
   segments: DictationSegment[];
+};
+export type DictationVideoSummary = {
+  video_id: string;
+  video_url: string;
+  title: string;
+  author_name: string | null;
+  thumbnail_url: string | null;
+  language: string;
+  is_generated: boolean;
+  segment_count: number;
+  created_at: string;
 };
 
 export type QuizQuestion = {
