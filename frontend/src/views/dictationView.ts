@@ -11,19 +11,13 @@ import { clear, el } from "../utils/dom";
 export function dictationView(): HTMLElement {
   const section = el("section", "dictation-view");
   const intro = el("div", "dictation-intro");
-  intro.append(
-    el("p", "eyebrow", "HÖREN & SCHREIBEN"),
-    el("h2", "", "German dictation"),
-    el("p", "muted", "Choose a saved video or add a YouTube link. Captions are saved so the next learner can start without fetching them again."),
-  );
+  intro.append(el("h2", "", "German dictation"));
 
   const library = el("section", "dictation-library");
   const libraryHeader = el("div", "dictation-library-header");
   const libraryTitle = el("div", "dictation-library-title");
   libraryTitle.append(
-    el("p", "eyebrow", "READY TO PRACTICE"),
     el("h3", "", "Available videos"),
-    el("p", "muted", "Saved German transcripts shared with learners."),
   );
   const count = el("span", "dictation-video-count", "Loading…");
   libraryHeader.append(libraryTitle, count);
@@ -31,22 +25,20 @@ export function dictationView(): HTMLElement {
   const libraryStatus = el("p", "dictation-library-empty muted", "Loading saved videos…");
   library.append(libraryHeader, libraryStatus, catalog);
 
+  const addVideo = el("section", "dictation-add-video");
   const sourceHeading = el("div", "dictation-source-heading");
-  sourceHeading.append(
-    el("h3", "", "Add a video"),
-    el("p", "muted", "New links are checked once, then saved in the shared transcript library."),
-  );
+  sourceHeading.append(el("h3", "", "Can’t find the video you want?"));
   const form = el("form", "dictation-source");
-  const label = el("label", "form-label", "YouTube video link");
+  const label = el("label", "form-label", "Paste a YouTube link");
   const input = el("input", "form-input") as HTMLInputElement;
   input.type = "url";
   input.placeholder = "https://www.youtube.com/watch?v=…";
   input.required = true;
-  const loadButton = button("Add video and start", "button button-primary");
+  const loadButton = button("Start dictation", "button button-primary");
   loadButton.type = "submit";
   label.append(input);
   form.append(label, loadButton);
-  const status = el("p", "dictation-status muted", "Your transcript will be saved for future practice.");
+  const status = el("p", "dictation-status muted", "");
   const exercise = el("div", "dictation-exercise");
 
   const updateStatus = (message: string, isError = false): void => {
@@ -64,7 +56,7 @@ export function dictationView(): HTMLElement {
           const transcript = await getSavedDictationVideo(videoId);
           renderExercise(exercise, transcript);
           exercise.scrollIntoView({ behavior: "smooth", block: "start" });
-          updateStatus(`Loaded saved transcript · ${transcript.segments.length} lines · no caption fetch needed.`);
+          updateStatus("Video ready.");
         } catch (error) {
           updateStatus(readableError(error), true);
         }
@@ -81,7 +73,7 @@ export function dictationView(): HTMLElement {
     const videoUrl = input.value.trim();
     if (!videoUrl) return;
     loadButton.disabled = true;
-    updateStatus("Checking the shared library, then fetching captions if this video is new…");
+    updateStatus("Loading video…");
     clear(exercise);
     void getDictationTranscript(videoUrl)
       .then(async (transcript) => {
@@ -89,8 +81,8 @@ export function dictationView(): HTMLElement {
         exercise.scrollIntoView({ behavior: "smooth", block: "start" });
         updateStatus(
           transcript.cache_hit
-            ? `Loaded saved transcript · ${transcript.segments.length} lines.`
-            : `Transcript saved for future learners · ${transcript.segments.length} lines${transcript.is_generated ? " · automatic captions" : " · creator captions"}.`,
+            ? "Video ready."
+            : "Video ready. It’s now available for everyone.",
         );
         await refreshCatalog();
       })
@@ -102,7 +94,8 @@ export function dictationView(): HTMLElement {
       });
   });
 
-  section.append(intro, library, sourceHeading, form, status, exercise);
+  addVideo.append(sourceHeading, form);
+  section.append(intro, library, addVideo, status, exercise);
   void refreshCatalog();
   return section;
 }
@@ -115,14 +108,14 @@ function renderCatalog(
   onSelect: (videoId: string) => Promise<void>,
 ): void {
   clear(catalog);
-  count.textContent = `${videos.length} saved`;
+  count.textContent = `${videos.length} videos`;
   if (videos.length === 0) {
     emptyState.className = "dictation-library-empty muted";
-    emptyState.textContent = "No videos saved yet. Add a YouTube link below to create the first transcript.";
+    emptyState.textContent = "No videos yet.";
     return;
   }
 
-  emptyState.textContent = "Select a video to start dictation.";
+  emptyState.textContent = "Choose a video to start.";
   emptyState.className = "dictation-library-empty muted";
   for (const video of videos) {
     const cardWrap = el("div", "dictation-video-card-wrap");
@@ -133,15 +126,18 @@ function renderCatalog(
     image.alt = "";
     image.loading = "lazy";
     image.addEventListener("error", () => imageWrap.classList.add("is-unavailable"), { once: true });
-    imageWrap.append(image, el("span", "dictation-play-badge", "▶"));
+    imageWrap.append(
+      image,
+      el("span", "dictation-play-badge", "▶"),
+      el("span", "dictation-image-action", "Start dictation"),
+    );
 
     const details = el("span", "dictation-video-details");
     const title = el("strong", "dictation-video-name", video.title);
     const author = el("span", "dictation-video-author", video.author_name || "YouTube video");
     const meta = el("span", "dictation-video-meta", `${video.segment_count} lines · ${video.language}`);
     const kind = el("span", "dictation-video-kind", video.is_generated ? "Auto captions" : "Creator captions");
-    const action = el("span", "dictation-video-action", "Start dictation →");
-    details.append(title, author, meta, kind, action);
+    details.append(title, author, meta, kind);
     card.append(imageWrap, details);
     card.setAttribute("aria-label", `Start dictation: ${video.title}`);
     card.addEventListener("click", () => void onSelect(video.video_id));
