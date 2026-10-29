@@ -24,6 +24,10 @@ services:
         value: "1024"
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: WEBSHARE_PROXY_USERNAME
+        sync: false
+      - key: WEBSHARE_PROXY_PASSWORD
+        sync: false
       - key: OPENROUTER_CHAT_MODEL
         value: google/gemma-4-31b-it:free
       - key: OPENROUTER_CHAT_FALLBACK_MODELS
