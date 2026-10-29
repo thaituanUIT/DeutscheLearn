@@ -10,6 +10,7 @@ import { clear, el } from "../utils/dom";
 
 export function dictationView(): HTMLElement {
   const section = el("section", "dictation-view");
+  const browsePanel = el("div", "dictation-browse-panel");
   const intro = el("div", "dictation-intro");
   intro.append(el("h2", "", "German dictation"));
 
@@ -38,8 +39,36 @@ export function dictationView(): HTMLElement {
   loadButton.type = "submit";
   label.append(input);
   form.append(label, loadButton);
+  addVideo.append(sourceHeading, form);
+  browsePanel.append(intro, library, addVideo);
+
+  const practicePanel = el("section", "dictation-practice-panel");
+  practicePanel.hidden = true;
+  const practiceHeader = el("div", "dictation-practice-header");
+  const backButton = button("← All videos", "button button-secondary");
+  backButton.type = "button";
+  const practiceTitle = el("h2", "dictation-practice-title", "");
+  practiceTitle.tabIndex = -1;
+  practiceHeader.append(backButton, practiceTitle);
   const status = el("p", "dictation-status muted", "");
+  status.setAttribute("aria-live", "polite");
   const exercise = el("div", "dictation-exercise");
+  practicePanel.append(practiceHeader, status, exercise);
+
+  const showPracticePanel = (title: string): void => {
+    browsePanel.hidden = true;
+    practicePanel.hidden = false;
+    practiceTitle.textContent = title;
+    practiceTitle.focus({ preventScroll: true });
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  backButton.addEventListener("click", () => {
+    practicePanel.hidden = true;
+    browsePanel.hidden = false;
+    clear(exercise);
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 
   const updateStatus = (message: string, isError = false): void => {
     status.className = `dictation-status ${isError ? "error" : "muted"}`;
@@ -50,12 +79,14 @@ export function dictationView(): HTMLElement {
     try {
       const videos = await listDictationVideos();
       renderCatalog(catalog, libraryStatus, count, videos, async (videoId) => {
-        updateStatus("Loading saved transcript…");
+        const video = videos.find((item) => item.video_id === videoId);
+        showPracticePanel(video?.title ?? "German dictation");
+        updateStatus("Loading video…");
         clear(exercise);
         try {
           const transcript = await getSavedDictationVideo(videoId);
+          practiceTitle.textContent = transcript.title;
           renderExercise(exercise, transcript);
-          exercise.scrollIntoView({ behavior: "smooth", block: "start" });
           updateStatus("Video ready.");
         } catch (error) {
           updateStatus(readableError(error), true);
@@ -73,20 +104,18 @@ export function dictationView(): HTMLElement {
     const videoUrl = input.value.trim();
     if (!videoUrl) return;
     loadButton.disabled = true;
+    showPracticePanel("Loading video…");
     updateStatus("Loading video…");
     clear(exercise);
     void getDictationTranscript(videoUrl)
       .then(async (transcript) => {
+        practiceTitle.textContent = transcript.title;
         renderExercise(exercise, transcript);
-        exercise.scrollIntoView({ behavior: "smooth", block: "start" });
-        updateStatus(
-          transcript.cache_hit
-            ? "Video ready."
-            : "Video ready. It’s now available for everyone.",
-        );
+        updateStatus("Video ready.");
         await refreshCatalog();
       })
       .catch((error: unknown) => {
+        practiceTitle.textContent = "Couldn’t load this video";
         updateStatus(readableError(error), true);
       })
       .finally(() => {
@@ -94,8 +123,7 @@ export function dictationView(): HTMLElement {
       });
   });
 
-  addVideo.append(sourceHeading, form);
-  section.append(intro, library, addVideo, status, exercise);
+  section.append(browsePanel, practicePanel);
   void refreshCatalog();
   return section;
 }
