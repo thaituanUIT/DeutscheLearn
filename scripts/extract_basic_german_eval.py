@@ -51,7 +51,7 @@ def normalize_text(text: str) -> str:
 
 
 def digest(source: str, section: str, content: str) -> str:
-    return hashlib.sha256(f"{source}\n{section}\n{content}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{source}\n{section}\n{content}".encode()).hexdigest()
 
 
 def is_unit_heading(text: str, size: float) -> bool:
@@ -107,7 +107,7 @@ def extract_tables(page: fitz.Page) -> list[str]:
     lines: list[str] = []
     try:
         tables = page.find_tables().tables
-    except Exception:
+    except (RuntimeError, ValueError):
         return lines
     for table in tables:
         lines.extend(linearize_table_rows(table.extract()))

@@ -12,7 +12,7 @@ import statistics
 import sys
 import time
 import uuid
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -160,7 +160,7 @@ def cohere_embed_batch(texts: list[str], input_type: str) -> list[list[float]]:
             from app.core.config import get_settings
 
             api_key = get_settings().cohere_api_key
-        except Exception:
+        except (ImportError, ValueError):
             api_key = None
     if not api_key:
         raise BenchmarkError("COHERE_API_KEY is not configured")
@@ -245,7 +245,7 @@ def qdrant_memory_bytes() -> int:
         result = qdrant("GET", f"/collections/{COLLECTION}")
         payload = result.get("result", {})
         return int(payload.get("vectors_count") or payload.get("points_count") or 0) * COHERE_DIM * 4
-    except Exception:
+    except (BenchmarkError, TypeError, ValueError):
         return 0
 
 
@@ -391,28 +391,27 @@ def pg_memory_bytes(conn: psycopg.Connection) -> int:
 
 def seed_pg(chunks: list[dict[str, Any]], vectors: list[list[float]]) -> float:
     start = time.perf_counter()
-    with psycopg.connect(PG_DSN) as conn:
-        with conn.cursor() as cur:
-            cur.execute("create extension if not exists vector with schema extensions")
-            cur.execute("drop index if exists grammar_chunks_embedding_hnsw_benchmark")
-            cur.execute("delete from grammar_chunks where document_id = 'basic-german-benchmark'")
-            cur.execute("delete from grammar_documents where id = 'basic-german-benchmark'")
-            cur.execute(
-                """
+    with psycopg.connect(PG_DSN) as conn, conn.cursor() as cur:
+        cur.execute("create extension if not exists vector with schema extensions")
+        cur.execute("drop index if exists grammar_chunks_embedding_hnsw_benchmark")
+        cur.execute("delete from grammar_chunks where document_id = 'basic-german-benchmark'")
+        cur.execute("delete from grammar_documents where id = 'basic-german-benchmark'")
+        cur.execute(
+            """
                 insert into grammar_documents
                     (id, title, level, topic, source_path, source_kind, metadata_json,
                      content_hash, created_at, updated_at)
                 values
                     ('basic-german-benchmark', 'Basic German', 'mixed', 'grammar',
                      'dev/BasicGerman.pdf', 'pdf', '{}', %s, now(), now())
-                """,
-                (sha256_bytes(PDF_PATH()),),
-            )
-            for index, (chunk, vector) in enumerate(zip(chunks, vectors, strict=True)):
-                title = chunk["section_path"].split(" > ")[-1][:200]
-                metadata = json.dumps({"section_path": chunk["section_path"], "part": chunk["part"]})
-                cur.execute(
-                    """
+            """,
+            (sha256_bytes(PDF_PATH()),),
+        )
+        for index, (chunk, vector) in enumerate(zip(chunks, vectors, strict=True)):
+            title = chunk["section_path"].split(" > ")[-1][:200]
+            metadata = json.dumps({"section_path": chunk["section_path"], "part": chunk["part"]})
+            cur.execute(
+                """
                     insert into grammar_chunks
                         (id, document_id, title, section, level, topic, source_path, source_kind,
                          page_start, page_end, metadata_json, content, content_hash, sort_order,
@@ -421,24 +420,24 @@ def seed_pg(chunks: list[dict[str, Any]], vectors: list[list[float]]) -> float:
                         (%s, 'basic-german-benchmark', %s, %s, 'mixed', 'grammar',
                          'dev/BasicGerman.pdf', 'pdf', %s, %s, %s, %s, %s, %s,
                          cast(%s as extensions.vector), now(), now())
-                    """,
-                    (
-                        chunk["id"],
-                        title,
-                        chunk["section_path"][:200],
-                        chunk["pages"][0],
-                        chunk["pages"][1],
-                        metadata,
-                        chunk["content"],
-                        chunk["content_hash"],
-                        index,
-                        vector_literal(vector),
-                    ),
-                )
-            cur.execute(
-                "create index grammar_chunks_embedding_hnsw_benchmark "
-                "on grammar_chunks using hnsw (embedding extensions.vector_cosine_ops)"
+                """,
+                (
+                    chunk["id"],
+                    title,
+                    chunk["section_path"][:200],
+                    chunk["pages"][0],
+                    chunk["pages"][1],
+                    metadata,
+                    chunk["content"],
+                    chunk["content_hash"],
+                    index,
+                    vector_literal(vector),
+                ),
             )
+        cur.execute(
+            "create index grammar_chunks_embedding_hnsw_benchmark "
+            "on grammar_chunks using hnsw (embedding extensions.vector_cosine_ops)"
+        )
     return time.perf_counter() - start
 
 
@@ -718,24 +717,24 @@ def cumulative_spend() -> float:
     if not NOTEBOOK.exists():
         return 0.0
     total = 0.0
-    for line in NOTEBOOK.read_text(encoding="utf-8").splitlines():
+    for line_number, line in enumerate(NOTEBOOK.read_text(encoding="utf-8").splitlines(), start=1):
         if not line.strip():
             continue
         try:
             total += float(json.loads(line).get("spend_usd", 0.0))
-        except Exception:
-            continue
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise BenchmarkError(f"invalid spend entry in lab notebook at line {line_number}") from exc
     if total > SPEND_CAP:
         raise BenchmarkError(f"spend cap exceeded: ${total:.2f}")
     return round(total, 4)
 
 
 def git_commit() -> str:
-    try:
-        import subprocess
+    import subprocess
 
+    try:
         return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True).strip()
-    except Exception:
+    except (OSError, subprocess.CalledProcessError):
         return "unknown"
 
 
@@ -841,7 +840,7 @@ def mc_nemar(cases: list[dict[str, Any]], left: dict[str, dict[str, Any]], right
     n = b + c
     if n == 0:
         return 1.0
-    tail = sum(math.comb(n, i) for i in range(0, min(b, c) + 1)) / (2**n)
+    tail = sum(math.comb(n, i) for i in range(min(b, c) + 1)) / (2**n)
     return min(1.0, 2 * tail)
 
 
@@ -894,7 +893,7 @@ def write_report(context: dict[str, Any]) -> None:
         "",
         "## Corpus",
         "",
-        f"- Source: `dev/BasicGerman.pdf`",
+        "- Source: `dev/BasicGerman.pdf`",
         f"- Chunks: {context['chunk_stats']['chunks']}",
         f"- Grammar points: {context['chunk_stats']['grammar_points']}",
         f"- Mean chars: {context['chunk_stats']['mean_chars']}",
