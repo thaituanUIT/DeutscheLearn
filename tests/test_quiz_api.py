@@ -51,8 +51,8 @@ def test_spa_html_is_not_cached_across_deploys() -> None:
 
 
 def test_grammar_ask_debug_requires_admin_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
-    monkeypatch.setattr("app.api.routes.check_rate_limit", lambda learner_id, ip: None)
+    monkeypatch.setattr("app.api.security.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.grammar.check_rate_limit", lambda learner_id, ip: None)
 
     seen_debug: list[bool] = []
 
@@ -65,7 +65,7 @@ def test_grammar_ask_debug_requires_admin_token(monkeypatch: pytest.MonkeyPatch)
             retrieval_debug={"retrieved": []} if kwargs["include_debug"] else None,
         )
 
-    monkeypatch.setattr("app.api.routes.answer_grammar_question", fake_answer)
+    monkeypatch.setattr("app.api.grammar.answer_grammar_question", fake_answer)
 
     with TestClient(app) as client:
         no_admin = client.post(
@@ -89,7 +89,7 @@ def test_grammar_ask_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_rate_limit(learner_id: str | None, ip: str) -> None:
         raise PermissionError("rate_limited")
 
-    monkeypatch.setattr("app.api.routes.check_rate_limit", fake_rate_limit)
+    monkeypatch.setattr("app.api.grammar.check_rate_limit", fake_rate_limit)
 
     with TestClient(app) as client:
         response = client.post(
@@ -103,12 +103,12 @@ def test_grammar_ask_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_grammar_ask_provider_failure_returns_error_without_citations(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("app.api.routes.check_rate_limit", lambda learner_id, ip: None)
+    monkeypatch.setattr("app.api.grammar.check_rate_limit", lambda learner_id, ip: None)
 
     def fail_answer(**kwargs) -> GrammarAnswer:
         raise GrammarServiceError("OpenRouter response did not include an answer")
 
-    monkeypatch.setattr("app.api.routes.answer_grammar_question", fail_answer)
+    monkeypatch.setattr("app.api.grammar.answer_grammar_question", fail_answer)
 
     with TestClient(app) as client:
         response = client.post(
@@ -121,7 +121,7 @@ def test_grammar_ask_provider_failure_returns_error_without_citations(
 
 
 def test_admin_words_require_valid_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
 
     with TestClient(app) as client:
         missing = client.get("/api/admin/words")
@@ -132,7 +132,7 @@ def test_admin_words_require_valid_token(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_admin_word_crud(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     word = f"Adminwort-{uuid4()}"
     headers = {"Authorization": "Bearer secret"}
 
@@ -170,7 +170,7 @@ def test_admin_word_crud(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_admin_word_rejects_unknown_focus_topic(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     word = f"InvalidTopic-{uuid4()}"
     headers = {"Authorization": "Bearer secret"}
 
@@ -208,7 +208,7 @@ def test_admin_word_rejects_unknown_focus_topic(monkeypatch: pytest.MonkeyPatch)
 def test_admin_word_rejects_unknown_focus_topic_without_replacing_existing_entries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     word = f"PreserveTopic-{uuid4()}"
     headers = {"Authorization": "Bearer secret"}
 
@@ -254,7 +254,7 @@ def test_admin_word_rejects_unknown_focus_topic_without_replacing_existing_entri
 
 
 def test_admin_word_import_preview_and_commit(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     word = f"ImportWord-{uuid4()}"
     headers = {"Authorization": "Bearer secret"}
     payload = {
@@ -294,7 +294,7 @@ def test_admin_word_import_preview_and_commit(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_admin_word_import_blocks_invalid_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     word = f"BlockedImport-{uuid4()}"
     headers = {"Authorization": "Bearer secret"}
 
@@ -387,7 +387,7 @@ def test_focus_seed_import_preserves_admin_focus_entries(tmp_path) -> None:
 
 
 def test_admin_reading_passage_crud(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     headers = {"Authorization": "Bearer secret"}
 
     payload = {
@@ -433,7 +433,7 @@ def test_admin_reading_passage_crud(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_admin_goethe_a2_teil_1_uses_model_choice_format(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     headers = {"Authorization": "Bearer secret"}
     payload = {
         "group": "goethe",
@@ -480,7 +480,7 @@ def test_admin_goethe_rejects_inherited_true_false_answers(
     level: str,
     part: str,
 ) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     payload = {
         "group": "goethe",
         "level": level,
@@ -510,7 +510,7 @@ def test_admin_goethe_rejects_inherited_true_false_answers(
 
 
 def test_admin_goethe_b1_teil_1_keeps_model_true_false_format(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     payload = {
         "group": "goethe",
         "level": "B1",
@@ -540,7 +540,7 @@ def test_admin_goethe_b1_teil_1_keeps_model_true_false_format(monkeypatch: pytes
 
 
 def test_admin_reading_import_json(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     passage_id = f"import-reading-{uuid4()}"
     headers = {"Authorization": "Bearer secret"}
     payload = {
@@ -598,7 +598,7 @@ def test_admin_reading_import_json(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_admin_reading_import_rejects_invalid_question(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.api.routes.get_settings", lambda: Settings(admin_token="secret"))
+    monkeypatch.setattr("app.api.admin.get_settings", lambda: Settings(admin_token="secret"))
     passage_id = f"bad-reading-{uuid4()}"
     headers = {"Authorization": "Bearer secret"}
 
