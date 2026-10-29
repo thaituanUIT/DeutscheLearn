@@ -149,7 +149,20 @@ def dictation_transcript(payload: DictationTranscriptIn) -> DictationTranscriptO
         ) from exc
 
     try:
-        transcript = YouTubeTranscriptApi().fetch(video_id, languages=["de"])
+        transcript_api = YouTubeTranscriptApi()
+        transcript_list = transcript_api.list(video_id)
+        german_tracks = [
+            transcript
+            for transcript in transcript_list
+            if transcript.language_code.casefold().startswith("de")
+        ]
+        german_tracks.sort(key=lambda transcript: transcript.is_generated)
+        if not german_tracks:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="No German captions were found for this video. Try another link with German captions.",
+            )
+        transcript = german_tracks[0].fetch()
     except YouTubeTranscriptApiException as exc:
         logger.info("No usable German transcript for video %s: %s", video_id, type(exc).__name__)
         raise HTTPException(
