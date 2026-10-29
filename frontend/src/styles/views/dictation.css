@@ -3,7 +3,7 @@
 .dictation-view [hidden] { display: none !important; }
 .dictation-browse-panel, .dictation-practice-panel { display: grid; gap: 24px; }
 .dictation-practice-panel { gap: 18px; }
-.dictation-practice-header { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: center; }
+.dictation-practice-header { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: center; }
 .dictation-practice-title { overflow-wrap: anywhere; margin: 0; font-size: var(--text-title-size); line-height: var(--text-title-line); }
 .dictation-practice-title:focus { outline: none; }
 .dictation-intro { display: grid; gap: 8px; max-width: 680px; }
@@ -50,21 +50,44 @@
 .dictation-player { overflow: hidden; background: #111; aspect-ratio: 16 / 9; }
 .dictation-player-mount, .dictation-player iframe { display: block; width: 100%; height: 100%; border: 0; }
 .dictation-practice { display: grid; gap: 16px; }
-.dictation-answer { width: 100%; min-height: 120px; padding: 14px; resize: vertical; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px; font: inherit; }
-.dictation-controls { display: flex; flex-wrap: wrap; gap: 8px; }
-.dictation-feedback { min-height: 32px; padding-top: 12px; border-top: 1px solid var(--border); }
-.dictation-score { margin: 0 0 12px; font-weight: 650; }
-.dictation-diff, .dictation-gold { margin: 0; line-height: 1.9; overflow-wrap: anywhere; }
-.dictation-word { padding: 2px 3px; border-radius: 2px; }
-.dictation-word.is-match { color: var(--text); }
+.dictation-answer-panel { display: grid; gap: 10px; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 20px color-mix(in srgb, var(--text) 7%, transparent); }
+.dictation-answer-label { font-size: 15px; font-weight: 700; }
+.dictation-answer { width: 100%; min-height: 190px; padding: 16px; resize: vertical; color: var(--text); background: var(--surface-raised); border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; font-size: 18px; line-height: 1.65; transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease; }
+.dictation-answer:focus { outline: none; background: var(--surface); border-color: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 17%, transparent); }
+.dictation-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.dictation-controls > .button { display: flex; width: 100%; min-height: 50px; padding: 8px 10px; justify-content: center; border-radius: 7px; font-size: 14px; font-weight: 700; text-align: center; white-space: nowrap; }
+.dictation-controls > .dictation-replay-button { color: var(--accent-fg); background: var(--accent); border-color: var(--accent); }
+.dictation-controls > .dictation-replay-button:hover { background: color-mix(in srgb, var(--accent) 82%, var(--text)); border-color: color-mix(in srgb, var(--accent) 82%, var(--text)); }
+.dictation-controls > .dictation-check-button { color: var(--primary-fg); background: var(--primary); border-color: var(--primary); }
+.dictation-controls > .dictation-check-button:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.dictation-controls > .dictation-next-button { color: var(--gold-fg); background: var(--gold); border-color: var(--gold); }
+.dictation-controls > .dictation-next-button:hover { background: color-mix(in srgb, var(--gold) 82%, var(--text)); border-color: color-mix(in srgb, var(--gold) 82%, var(--text)); }
+.dictation-reveal-row { display: flex; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--border); }
+.dictation-reveal-button { min-height: 42px; padding: 0 14px; color: var(--red); background: var(--red-subtle); border-color: color-mix(in srgb, var(--red) 42%, var(--border)); border-radius: 7px; font-size: 13px; font-weight: 650; }
+.dictation-reveal-button:hover { color: #fff; background: var(--red); border-color: var(--red); }
+.dictation-feedback { min-height: 32px; }
+.dictation-feedback:not(:empty) { display: grid; gap: 12px; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 20px color-mix(in srgb, var(--text) 7%, transparent); }
+.dictation-result-heading { margin: 0; font-size: 17px; line-height: 1.3; }
+.dictation-score { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 12px 14px; background: var(--accent-subtle); border-left: 4px solid var(--accent); }
+.dictation-score.is-partial { background: color-mix(in srgb, var(--gold) 18%, var(--surface)); border-left-color: var(--gold); }
+.dictation-score.is-low { background: var(--red-subtle); border-left-color: var(--red); }
+.dictation-score-value { min-width: 56px; font-size: 24px; font-weight: 750; line-height: 1; }
+.dictation-score-copy { font-weight: 650; }
+.dictation-diff, .dictation-gold { margin: 0; line-height: 2; overflow-wrap: anywhere; }
+.dictation-diff { padding: 14px; background: var(--surface-raised); border-radius: 7px; font-size: 16px; }
+.dictation-word { padding: 3px 4px; border-radius: 4px; }
+.dictation-word.is-match { color: var(--text); background: var(--accent-subtle); }
 .dictation-word.is-missing { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); text-decoration: underline; }
 .dictation-word.is-extra { color: var(--gold); text-decoration: line-through; }
 .dictation-gold { padding: 12px; background: var(--surface-raised, var(--surface)); }
 @media (max-width: 760px) {
   .dictation-library, .dictation-add-video { padding: 16px; }
   .dictation-source, .dictation-workspace { grid-template-columns: 1fr; }
-  .dictation-controls > button { flex: 1 1 42%; }
   .dictation-practice-header { grid-template-columns: 1fr; gap: 12px; }
+  .dictation-answer-panel { padding: 14px; }
+  .dictation-answer { min-height: 160px; font-size: 16px; }
+  .dictation-controls { gap: 7px; }
+  .dictation-controls > .button { min-height: 46px; padding: 7px 4px; font-size: 12px; }
 }
 @media (max-width: 900px) {
   .dictation-video-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

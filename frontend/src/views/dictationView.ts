@@ -9,7 +9,12 @@ import { button } from "../components/button";
 import { clear, el } from "../utils/dom";
 import { loadYouTubeIframeApi, type YouTubePlayer } from "../utils/youtubeIframe";
 
-export function dictationView(): HTMLElement {
+type DictationViewOptions = {
+  onBack: () => void;
+  onBackChange: (handler: () => void) => void;
+};
+
+export function dictationView(options: DictationViewOptions): HTMLElement {
   const section = el("section", "dictation-view");
   const browsePanel = el("div", "dictation-browse-panel");
   const intro = el("div", "dictation-intro");
@@ -46,11 +51,9 @@ export function dictationView(): HTMLElement {
   const practicePanel = el("section", "dictation-practice-panel");
   practicePanel.hidden = true;
   const practiceHeader = el("div", "dictation-practice-header");
-  const backButton = button("← All videos", "button button-secondary");
-  backButton.type = "button";
   const practiceTitle = el("h2", "dictation-practice-title", "");
   practiceTitle.tabIndex = -1;
-  practiceHeader.append(backButton, practiceTitle);
+  practiceHeader.append(practiceTitle);
   const status = el("p", "dictation-status muted", "");
   status.setAttribute("aria-live", "polite");
   const exercise = el("div", "dictation-exercise");
@@ -63,20 +66,22 @@ export function dictationView(): HTMLElement {
     clear(exercise);
   };
 
+  const showBrowsePanel = (): void => {
+    practicePanel.hidden = true;
+    browsePanel.hidden = false;
+    clearExercise();
+    options.onBackChange(options.onBack);
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const showPracticePanel = (title: string): void => {
     browsePanel.hidden = true;
     practicePanel.hidden = false;
     practiceTitle.textContent = title;
     practiceTitle.focus({ preventScroll: true });
+    options.onBackChange(showBrowsePanel);
     section.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-
-  backButton.addEventListener("click", () => {
-    practicePanel.hidden = true;
-    browsePanel.hidden = false;
-    clearExercise();
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
 
   const updateStatus = (message: string, isError = false): void => {
     status.className = `dictation-status ${isError ? "error" : "muted"}`;
@@ -215,14 +220,19 @@ function renderExercise(
 
   const practice = el("div", "dictation-practice");
   const progress = el("p", "eyebrow", `LINE 1 OF ${transcript.segments.length}`);
+  const answerPanel = el("div", "dictation-answer-panel");
+  const answerLabel = el("label", "dictation-answer-label", "Your answer");
   const answer = el("textarea", "dictation-answer") as HTMLTextAreaElement;
-  answer.rows = 4;
+  answer.rows = 6;
   answer.placeholder = "Type what you hear…";
   answer.setAttribute("aria-label", "Type the German line you hear");
+  answerLabel.htmlFor = "dictation-answer-input";
+  answer.id = "dictation-answer-input";
+  answerPanel.append(answerLabel, answer);
   const feedback = el("div", "dictation-feedback");
   const play = button("▶ Replay line", "button button-secondary");
   const check = button("Check answer", "button button-primary");
-  const reveal = button("Reveal transcript", "button button-quiet");
+  const reveal = button("Reveal transcript", "button button-quiet dictation-reveal-button");
   const next = button("Next line →", "button button-secondary");
   let index = 0;
   let youtubePlayer: YouTubePlayer | null = null;
@@ -289,8 +299,13 @@ function renderExercise(
     showLine(true);
   });
   const controls = el("div", "dictation-controls");
-  controls.append(play, check, reveal, next);
-  practice.append(progress, answer, controls, feedback);
+  play.classList.add("dictation-replay-button");
+  check.classList.add("dictation-check-button");
+  next.classList.add("dictation-next-button");
+  controls.append(play, check, next);
+  const revealRow = el("div", "dictation-reveal-row");
+  revealRow.append(reveal);
+  practice.append(progress, answerPanel, controls, feedback, revealRow);
   exercise.append(player, practice);
   host.replaceChildren(exercise);
   showLine();
@@ -357,7 +372,13 @@ function renderDiff(host: HTMLElement, typed: string, target: string): void {
   }
   const matched = Math.max(0, right.length - rows[left.length][right.length]);
   const score = right.length ? Math.round((matched / right.length) * 100) : 0;
-  const summary = el("p", "dictation-score", `${score}% word match · spelling and umlauts count`);
+  const scoreLevel = score >= 80 ? "is-strong" : score >= 50 ? "is-partial" : "is-low";
+  const heading = el("h3", "dictation-result-heading", "Your result");
+  const summary = el("div", `dictation-score ${scoreLevel}`);
+  summary.append(
+    el("strong", "dictation-score-value", `${score}%`),
+    el("span", "dictation-score-copy", `${matched} of ${right.length} words matched`),
+  );
   const diff = el("p", "dictation-diff");
   let i = left.length;
   let j = right.length;
@@ -375,7 +396,7 @@ function renderDiff(host: HTMLElement, typed: string, target: string): void {
     const node = el("span", `dictation-word is-${token.kind}`, token.text);
     diff.append(node, document.createTextNode(" "));
   }
-  host.replaceChildren(summary, diff);
+  host.replaceChildren(heading, summary, diff);
 }
 
 function words(text: string): Array<{ text: string; normalized: string }> {
