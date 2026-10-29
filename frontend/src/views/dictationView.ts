@@ -102,7 +102,7 @@ export function dictationView(options: DictationViewOptions): HTMLElement {
           disposeExercise = renderExercise(exercise, transcript, () => {
             updateStatus("YouTube could not play this video. Try another video.", true);
           });
-          updateStatus("Video ready.");
+          updateStatus("");
         } catch (error) {
           updateStatus(readableError(error), true);
         }
@@ -128,7 +128,7 @@ export function dictationView(options: DictationViewOptions): HTMLElement {
         disposeExercise = renderExercise(exercise, transcript, () => {
           updateStatus("YouTube could not play this video. Try another video.", true);
         });
-        updateStatus("Video ready.");
+        updateStatus("");
         await refreshCatalog();
       })
       .catch((error: unknown) => {
@@ -219,11 +219,19 @@ function renderExercise(
   player.append(playerMount);
 
   const practice = el("div", "dictation-practice");
-  const progress = el("p", "eyebrow", `LINE 1 OF ${transcript.segments.length}`);
+  const progress = el("div", "dictation-progress");
+  progress.setAttribute("role", "progressbar");
+  progress.setAttribute("aria-label", "Dictation progress");
+  progress.setAttribute("aria-valuemin", "1");
+  progress.setAttribute("aria-valuemax", String(transcript.segments.length));
+  const progressTrack = el("span", "dictation-progress-track");
+  const progressFill = el("span", "dictation-progress-fill");
+  progressTrack.append(progressFill);
+  progress.append(progressTrack);
   const answerPanel = el("div", "dictation-answer-panel");
   const answerLabel = el("label", "dictation-answer-label", "Your answer");
   const answer = el("textarea", "dictation-answer") as HTMLTextAreaElement;
-  answer.rows = 6;
+  answer.rows = 3;
   answer.placeholder = "Type what you hear…";
   answer.setAttribute("aria-label", "Type the German line you hear");
   answerLabel.htmlFor = "dictation-answer-input";
@@ -260,7 +268,9 @@ function renderExercise(
 
   const showLine = (autoplay = false): void => {
     const segment = transcript.segments[index];
-    progress.textContent = `LINE ${index + 1} OF ${transcript.segments.length}`;
+    progress.setAttribute("aria-valuenow", String(index + 1));
+    progress.setAttribute("aria-valuetext", `Line ${index + 1} of ${transcript.segments.length}`);
+    progressFill.style.width = `${((index + 1) / transcript.segments.length) * 100}%`;
     answer.value = "";
     clear(feedback);
     reveal.textContent = "Reveal transcript";
@@ -377,7 +387,7 @@ function renderDiff(host: HTMLElement, typed: string, target: string): void {
   const summary = el("div", `dictation-score ${scoreLevel}`);
   summary.append(
     el("strong", "dictation-score-value", `${score}%`),
-    el("span", "dictation-score-copy", `${matched} of ${right.length} words matched`),
+    el("span", "dictation-score-copy", score === 100 ? "All words correct" : `${matched} of ${right.length} words matched`),
   );
   const diff = el("p", "dictation-diff");
   let i = left.length;
@@ -396,7 +406,7 @@ function renderDiff(host: HTMLElement, typed: string, target: string): void {
     const node = el("span", `dictation-word is-${token.kind}`, token.text);
     diff.append(node, document.createTextNode(" "));
   }
-  host.replaceChildren(heading, summary, diff);
+  host.replaceChildren(...(score === 100 ? [heading, summary] : [heading, summary, diff]));
 }
 
 function words(text: string): Array<{ text: string; normalized: string }> {
