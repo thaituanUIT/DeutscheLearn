@@ -29,13 +29,19 @@ class Settings(BaseSettings):
     webshare_proxy_username: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
-            "WEBSHARE_PROXY_USERNAME", "WEBSHARE_USERNAME", "webshare_proxy_username"
+            "WEBSHARE_PROXY_USERNAME",
+            "WEBSHARE_USERNAME",
+            "PROXY_USERNAME",
+            "webshare_proxy_username",
         ),
     )
     webshare_proxy_password: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
-            "WEBSHARE_PROXY_PASSWORD", "WEBSHARE_PASSWORD", "webshare_proxy_password"
+            "WEBSHARE_PROXY_PASSWORD",
+            "WEBSHARE_PASSWORD",
+            "PROXY_PASSWORD",
+            "webshare_proxy_password",
         ),
     )
     grammar_rate_limit_per_hour: int = 10
