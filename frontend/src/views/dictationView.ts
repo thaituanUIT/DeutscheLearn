@@ -18,7 +18,7 @@ export function dictationView(options: DictationViewOptions): HTMLElement {
   const section = el("section", "dictation-view");
   const browsePanel = el("div", "dictation-browse-panel");
   const intro = el("div", "dictation-intro");
-  intro.append(el("h2", "", "German dictation"));
+  intro.append(el("h2", "", "Hörtippen"));
 
   const library = el("section", "dictation-library");
   const libraryHeader = el("div", "dictation-library-header");
@@ -93,8 +93,8 @@ export function dictationView(options: DictationViewOptions): HTMLElement {
       const videos = await listDictationVideos();
       renderCatalog(catalog, libraryStatus, count, videos, async (videoId) => {
         const video = videos.find((item) => item.video_id === videoId);
-        showPracticePanel(video?.title ?? "German dictation");
-        updateStatus("Loading video…");
+        showPracticePanel(video?.title ?? "Hörtippen");
+        updateStatus("");
         clearExercise();
         try {
           const transcript = await getSavedDictationVideo(videoId);
@@ -119,8 +119,8 @@ export function dictationView(options: DictationViewOptions): HTMLElement {
     const videoUrl = input.value.trim();
     if (!videoUrl) return;
     loadButton.disabled = true;
-    showPracticePanel("Loading video…");
-    updateStatus("Loading video…");
+    showPracticePanel("Hörtippen");
+    updateStatus("");
     clearExercise();
     void getDictationTranscript(videoUrl)
       .then(async (transcript) => {

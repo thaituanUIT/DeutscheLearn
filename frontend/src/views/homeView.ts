@@ -53,9 +53,9 @@ const modes: Array<{
   },
   {
     mode: "dictation",
-    title: "Dictation",
-    description: "Listen to German videos, type what you hear, and check each line.",
-    action: "Start dictation",
+    title: "Hörtippen",
+    description: "German video dictation, one line at a time.",
+    action: "Start listening",
   },
 ];
 
