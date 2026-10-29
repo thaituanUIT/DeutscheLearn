@@ -44,6 +44,13 @@ export function getSavedDictationVideo(videoId: string): Promise<DictationTransc
   return request<DictationTranscript>(`/api/dictation/videos/${encodeURIComponent(videoId)}`);
 }
 
+export function reportDictationVideo(videoId: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/dictation/videos/${encodeURIComponent(videoId)}/report`, {
+    method: "POST",
+    body: JSON.stringify({ reason: "other" }),
+  });
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...options,

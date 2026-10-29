@@ -36,6 +36,23 @@ class DictationTranscriptIn(BaseModel):
     video_url: str = Field(min_length=11, max_length=2048)
 
 
+class DictationVideoReportIn(BaseModel):
+    reason: str = Field(pattern="^(not_german|inappropriate|broken|other)$")
+
+
+class DictationVideoModerationOut(BaseModel):
+    video_id: str
+    title: str
+    video_url: str
+    report_count: int
+    is_hidden: bool
+    created_at: datetime
+
+
+class DictationVideoModerationIn(BaseModel):
+    is_hidden: bool
+
+
 class DictationSegmentOut(BaseModel):
     start: float
     duration: float

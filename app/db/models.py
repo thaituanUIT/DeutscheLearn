@@ -94,6 +94,25 @@ class DictationVideo(Base):
     is_generated: Mapped[bool] = mapped_column(Boolean, nullable=False)
     segments: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
     segment_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    report_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False, index=True)
+
+
+class DictationFetchCounter(Base):
+    __tablename__ = "dictation_fetch_counters"
+
+    bucket_key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False, index=True)
+
+
+class DictationVideoReport(Base):
+    __tablename__ = "dictation_video_reports"
+
+    video_id: Mapped[str] = mapped_column(ForeignKey("dictation_videos.video_id", ondelete="CASCADE"), primary_key=True)
+    reporter_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    reason: Mapped[str] = mapped_column(String(40), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False, index=True)
 
 

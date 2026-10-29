@@ -1,4 +1,9 @@
-import { getDictationTranscript, getSavedDictationVideo, listDictationVideos } from "../api/client";
+import {
+  getDictationTranscript,
+  getSavedDictationVideo,
+  listDictationVideos,
+  reportDictationVideo,
+} from "../api/client";
 import type { DictationTranscript, DictationVideoSummary } from "../api/types";
 import { button } from "../components/button";
 import { clear, el } from "../utils/dom";
@@ -120,6 +125,7 @@ function renderCatalog(
   emptyState.textContent = "Select a video to start dictation.";
   emptyState.className = "dictation-library-empty muted";
   for (const video of videos) {
+    const cardWrap = el("div", "dictation-video-card-wrap");
     const card = button("", "dictation-video-card");
     const imageWrap = el("span", "dictation-video-image");
     const image = document.createElement("img");
@@ -139,7 +145,25 @@ function renderCatalog(
     card.append(imageWrap, details);
     card.setAttribute("aria-label", `Start dictation: ${video.title}`);
     card.addEventListener("click", () => void onSelect(video.video_id));
-    catalog.append(card);
+    const report = button("Report this video", "dictation-report-button");
+    report.type = "button";
+    report.title = "Report unsuitable or incorrect content";
+    report.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (!window.confirm("Report this video as unsuitable? It will be hidden after multiple independent reports.")) {
+        return;
+      }
+      report.disabled = true;
+      try {
+        await reportDictationVideo(video.video_id);
+        report.textContent = "Report received";
+      } catch (error) {
+        report.disabled = false;
+        report.textContent = readableError(error);
+      }
+    });
+    cardWrap.append(card, report);
+    catalog.append(cardWrap);
   }
 }
 
