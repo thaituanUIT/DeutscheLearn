@@ -1,5 +1,11 @@
 @layer views {
 .dictation-view { display: grid; gap: 24px; max-width: 1120px; margin: 0 auto; }
+.dictation-view [hidden] { display: none !important; }
+.dictation-browse-panel, .dictation-practice-panel { display: grid; gap: 24px; }
+.dictation-practice-panel { gap: 18px; }
+.dictation-practice-header { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: center; }
+.dictation-practice-title { overflow-wrap: anywhere; margin: 0; font-size: var(--text-title-size); line-height: var(--text-title-line); }
+.dictation-practice-title:focus { outline: none; }
 .dictation-intro { display: grid; gap: 8px; max-width: 680px; }
 .dictation-intro h2 { margin: 0; font-size: var(--text-title-size); line-height: var(--text-title-line); }
 .dictation-intro p { margin: 0; }
@@ -58,6 +64,7 @@
   .dictation-library, .dictation-add-video { padding: 16px; }
   .dictation-source, .dictation-workspace { grid-template-columns: 1fr; }
   .dictation-controls > button { flex: 1 1 42%; }
+  .dictation-practice-header { grid-template-columns: 1fr; gap: 12px; }
 }
 @media (max-width: 900px) {
   .dictation-video-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
