@@ -3,9 +3,7 @@ import type { DictationTranscript } from "../api/types";
 import { button } from "../components/button";
 import { clear, el } from "../utils/dom";
 
-type DictationOptions = { onBack: () => void };
-
-export function dictationView(options: DictationOptions): HTMLElement {
+export function dictationView(): HTMLElement {
   const section = el("section", "dictation-view");
   const intro = el("div", "dictation-intro");
   intro.append(
@@ -49,9 +47,7 @@ export function dictationView(options: DictationOptions): HTMLElement {
       });
   });
 
-  const back = button("← Back to modes", "button button-quiet");
-  back.addEventListener("click", options.onBack);
-  section.append(back, intro, form, status, exercise);
+  section.append(intro, form, status, exercise);
   return section;
 }
 

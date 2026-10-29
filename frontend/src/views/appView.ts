@@ -140,7 +140,7 @@ function draw(
     }
 
     if (mode === "dictation") {
-      mainHost.replaceChildren(dictationView({ onBack: showHome }));
+      mainHost.replaceChildren(dictationView());
       return;
     }
 
