@@ -173,6 +173,66 @@ wheels = [
 ]
 
 [[package]]
+name = "defusedxml"
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/d5/c66da9b79e5bdb124974bfe172b4daf3c984ebd9c2a06e2b8a4dc7331c72/defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69", size = 75520, upload-time = "2021-03-08T10:59:26.269Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61", size = 25604, upload-time = "2021-03-08T10:59:24.45Z" },
+]
+
+[[package]]
+name = "deutschelearn"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "alembic" },
+    { name = "anyio" },
+    { name = "duden" },
+    { name = "fastapi" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pydantic-settings" },
+    { name = "requests" },
+    { name = "sqlalchemy" },
+    { name = "uvicorn" },
+    { name = "youtube-transcript-api" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "beautifulsoup4" },
+    { name = "httpx" },
+    { name = "pymupdf4llm" },
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.16.0" },
+    { name = "anyio", specifier = ">=4.0.0,<4.10.0" },
+    { name = "duden", specifier = ">=0.19.2" },
+    { name = "fastapi", specifier = "==0.116.1" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0" },
+    { name = "pydantic-settings", specifier = ">=2.10.0" },
+    { name = "requests", specifier = ">=2.32.0" },
+    { name = "sqlalchemy", specifier = ">=2.0.0" },
+    { name = "uvicorn", specifier = ">=0.35.0" },
+    { name = "youtube-transcript-api", specifier = ">=1.2.3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "beautifulsoup4", specifier = ">=4.12.0" },
+    { name = "httpx", specifier = ">=0.28.0" },
+    { name = "pymupdf4llm", specifier = ">=0.0.27" },
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "ruff", specifier = ">=0.12.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.35.0" },
+]
+
+[[package]]
 name = "duden"
 version = "0.19.2"
 source = { registry = "https://pypi.org/simple" }
@@ -208,55 +268,6 @@ version = "25.12.19"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl", hash = "sha256:7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4", size = 26661, upload-time = "2025-12-19T23:16:13.622Z" },
-]
-
-[[package]]
-name = "deutschelearn"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "alembic" },
-    { name = "anyio" },
-    { name = "duden" },
-    { name = "fastapi" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pydantic-settings" },
-    { name = "requests" },
-    { name = "sqlalchemy" },
-    { name = "uvicorn" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "beautifulsoup4" },
-    { name = "httpx" },
-    { name = "pymupdf4llm" },
-    { name = "pytest" },
-    { name = "ruff" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = ">=1.16.0" },
-    { name = "anyio", specifier = ">=4.0.0,<4.10.0" },
-    { name = "duden", specifier = ">=0.19.2" },
-    { name = "fastapi", specifier = "==0.116.1" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0" },
-    { name = "pydantic-settings", specifier = ">=2.10.0" },
-    { name = "requests", specifier = ">=2.32.0" },
-    { name = "sqlalchemy", specifier = ">=2.0.0" },
-    { name = "uvicorn", specifier = ">=0.35.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "beautifulsoup4", specifier = ">=4.12.0" },
-    { name = "httpx", specifier = ">=0.28.0" },
-    { name = "pymupdf4llm", specifier = ">=0.0.27" },
-    { name = "pytest", specifier = ">=8.0.0" },
-    { name = "ruff", specifier = ">=0.12.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.35.0" },
 ]
 
 [[package]]
@@ -1568,4 +1579,17 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/1c/a8d02a7a9f92804daba7f861ba539cf6c25765d8b2a7d7c8ea355c79deb8/websockets-17.0-pp311-pypy311_pp73-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:60ed4a3b760ed8db9a0c2c01ad65b2c253603b0edd7236ef24dbe363e417f31b", size = 212348, upload-time = "2026-07-29T18:07:11.29Z" },
     { url = "https://files.pythonhosted.org/packages/6e/14/ac6da556d66c5f5fcf21e2f8468cd303262ae46a7f460bb481425d77ed42/websockets-17.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:69852d81e27f53bb69db752c55ecbbb73a0988692c654bafd1651d3e51441476", size = 213586, upload-time = "2026-07-29T18:07:13.442Z" },
     { url = "https://files.pythonhosted.org/packages/9d/b4/9b5bd8ad82a7ace4e4a497aed083b6a9bf9076b1ea1a0bf5831686b4af71/websockets-17.0-py3-none-any.whl", hash = "sha256:0c24d62cafaca7dc1631e9f3bf0672fa83f010e66a2aeff4d00727b18addcd8e", size = 206871, upload-time = "2026-07-29T18:07:15.156Z" },
+]
+
+[[package]]
+name = "youtube-transcript-api"
+version = "1.2.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "defusedxml" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/60/43/4104185a2eaa839daa693b30e15c37e7e58795e8e09ec414f22b3db54bec/youtube_transcript_api-1.2.4.tar.gz", hash = "sha256:b72d0e96a335df599d67cee51d49e143cff4f45b84bcafc202ff51291603ddcd", size = 469839, upload-time = "2026-01-29T09:09:17.088Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/be/95/129ea37efd6cd6ed00f62baae6543345c677810b8a3bf0026756e1d3cf3c/youtube_transcript_api-1.2.4-py3-none-any.whl", hash = "sha256:03878759356da5caf5edac77431780b91448fb3d8c21d4496015bdc8a7bc43ff", size = 485227, upload-time = "2026-01-29T09:09:15.427Z" },
 ]

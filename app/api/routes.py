@@ -1,7 +1,10 @@
 import json
 import logging
+import re
 from secrets import compare_digest
+from typing import Any
 from urllib import request as urlrequest
+from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
@@ -40,6 +43,9 @@ from app.schemas import (
     AdminWordIn,
     AdminWordOut,
     AdminWordPatchIn,
+    DictationSegmentOut,
+    DictationTranscriptIn,
+    DictationTranscriptOut,
     EndlessAnswerIn,
     EndlessAnswerOut,
     EndlessStartOut,
@@ -127,6 +133,96 @@ def _has_admin_bearer(authorization: str | None) -> bool:
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.post("/dictation/transcript", response_model=DictationTranscriptOut)
+def dictation_transcript(payload: DictationTranscriptIn) -> DictationTranscriptOut:
+    video_id = youtube_video_id(payload.video_url)
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+        from youtube_transcript_api._errors import YouTubeTranscriptApiException
+    except ImportError as exc:
+        logger.exception("YouTube transcript support is not installed")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="YouTube transcript import is unavailable right now.",
+        ) from exc
+
+    try:
+        transcript = YouTubeTranscriptApi().fetch(video_id, languages=["de"])
+    except YouTubeTranscriptApiException as exc:
+        logger.info("No usable German transcript for video %s: %s", video_id, type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No German captions were found for this video. Try another link with German captions.",
+        ) from exc
+
+    segments = group_transcript_snippets(transcript)
+    if not segments:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The German captions did not contain any usable speech. Try another video.",
+        )
+    return DictationTranscriptOut(
+        video_id=video_id,
+        language=transcript.language,
+        is_generated=transcript.is_generated,
+        segments=segments,
+    )
+
+
+def youtube_video_id(video_url: str) -> str:
+    parsed = urlparse(video_url.strip())
+    host = (parsed.hostname or "").lower()
+    video_id = ""
+    if host in {"youtu.be", "www.youtu.be"}:
+        video_id = parsed.path.strip("/").split("/")[0]
+    elif host in {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"}:
+        if parsed.path == "/watch":
+            video_id = parse_qs(parsed.query).get("v", [""])[0]
+        else:
+            match = re.fullmatch(r"/(?:embed|shorts|live)/([\w-]{11})/?", parsed.path)
+            video_id = match.group(1) if match else ""
+    if not re.fullmatch(r"[\w-]{11}", video_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Enter a valid YouTube video link.",
+        )
+    return video_id
+
+
+def group_transcript_snippets(transcript: Any) -> list[DictationSegmentOut]:
+    result: list[DictationSegmentOut] = []
+    current_text: list[str] = []
+    current_start = 0.0
+    current_end = 0.0
+
+    def flush() -> None:
+        if current_text:
+            result.append(
+                DictationSegmentOut(
+                    start=current_start,
+                    duration=max(0.25, current_end - current_start),
+                    text=" ".join(current_text).strip(),
+                )
+            )
+
+    for snippet in transcript:
+        text = " ".join(snippet.text.split())
+        if not text:
+            continue
+        start = float(snippet.start)
+        end = start + float(snippet.duration)
+        if not current_text:
+            current_start = start
+        current_text.append(text)
+        current_end = end
+        combined = " ".join(current_text)
+        if re.search(r"[.!?…][\"'»)]?$", text) or len(combined) >= 120:
+            flush()
+            current_text = []
+    flush()
+    return result
 
 
 @router.post("/grammar/ask", response_model=GrammarAskOut)
