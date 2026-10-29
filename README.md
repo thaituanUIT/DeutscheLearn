@@ -100,7 +100,8 @@ library's rotating residential setup and its default retry count for blocked req
 Only uncached videos count toward the default limits: 3 per client per hour, 10 per day, and 10
 new transcripts globally per day. The shared catalog caps at 500 videos; transcript size is capped
 at 20,000 characters and 500 segments. Cached videos remain available after fetch quotas are reached.
-These limits can be changed with the `DICTATION_*` environment settings in `app/core/config.py`.
+Reports are rate-limited and queued for admin review; they do not hide videos automatically. These
+limits can be changed with the `DICTATION_*` environment settings in `app/core/config.py`.
 
 Do not run production with the default SQLite URL. Render web service disks are ephemeral, so
 `sqlite:///./quiz.db` can disappear on a new deploy. Create the service from `render.yaml`, or
