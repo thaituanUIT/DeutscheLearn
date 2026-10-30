@@ -6,7 +6,7 @@ Anonymous German language learning app with multiple learning modes.
 
 - Cookie-based anonymous player identity.
 - Random generated display names.
-- Multiple learning modes: flashcards, Goethe-Institut styled exercises, and grammar assistant.
+- Multiple learning modes: flashcards, letter-scramble vocabulary practice, Goethe-Institut styled exercises, and grammar assistant.
 - Mistake-aware RAG tutoring: wrong quiz/story answers can be sent as structured context so the assistant explains the exact learner error with cited grammar notes.
 - Lightweight RAG data loop: grammar questions are logged with status, context type, route, and cited chunks so unanswered questions can drive corpus expansion and eval cases.
 - Modular TypeScript frontend with Vite.

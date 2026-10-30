@@ -1,3 +1,4 @@
+import "../styles/views/focus.css";
 import {
   focusCardsFromWords,
   focusLevelsFromWords,
@@ -9,7 +10,7 @@ import {
 import type { FocusCard, FocusLevel, FocusRevisionQuestion, FocusTopic } from "../api/types";
 import { button } from "../components/button";
 import { getPlayer } from "../state/playerStore";
-import { recordFocusReview } from "../state/progressStore";
+import { recordFocusReview, type FocusReviewUndo } from "../state/progressStore";
 import { el } from "../utils/dom";
 import { formatCount } from "../utils/format";
 
@@ -19,16 +20,22 @@ type FocusViewOptions = {
 };
 
 type FocusRating = "again" | "hard" | "good" | "easy";
+type FocusRatingReceipt = {
+  cardIndex: number;
+  rating: FocusRating;
+  undo: FocusReviewUndo;
+};
 
 const FOCUS_RATINGS: ReadonlyArray<{
   rating: FocusRating;
   label: string;
+  dueLabel: string;
   shortcut: string;
 }> = [
-  { rating: "again", label: "Again", shortcut: "1" },
-  { rating: "hard", label: "Hard", shortcut: "2" },
-  { rating: "good", label: "Good", shortcut: "3" },
-  { rating: "easy", label: "Easy", shortcut: "4" },
+  { rating: "again", label: "Again", dueLabel: "Due today", shortcut: "1" },
+  { rating: "hard", label: "Hard", dueLabel: "Due in 1 day", shortcut: "2" },
+  { rating: "good", label: "Good", dueLabel: "Due in 3 days", shortcut: "3" },
+  { rating: "easy", label: "Easy", dueLabel: "Due in 7 days", shortcut: "4" },
 ];
 
 const flashcardKeyHandlers = new WeakMap<HTMLElement, (event: KeyboardEvent) => void>();
@@ -106,7 +113,7 @@ async function renderFlashcards(
   section.replaceChildren(el("p", "prompt", "Loading flashcards..."));
   try {
     const cards = shuffle(focusCardsFromWords(await getFocusWordsCorpus(), level, topic.topic));
-    renderFlashcard(section, cards, 0, level, topic, options);
+    renderFlashcard(section, cards, 0, level, topic, options, new Set());
   } catch (error) {
     renderRetryError(
       section,
@@ -253,6 +260,8 @@ function renderFlashcard(
   level: FocusLevel["level"],
   topic: FocusTopic,
   options: FocusViewOptions,
+  revealedCards: Set<number>,
+  previousRating?: FocusRatingReceipt,
 ): void {
   section.replaceChildren();
   section.classList.add("flashcard-screen");
@@ -264,8 +273,9 @@ function renderFlashcard(
 
   const card = cards[index];
   const shownWord = card.article ? `${card.article} ${card.word}` : card.word;
+  const isRevealed = revealedCards.has(index);
   const content = el("div", "flashcard");
-  const quiz = button("Quiz", "flashcard-quiz-link");
+  const quiz = button("5-question quiz", "flashcard-quiz-link");
   quiz.addEventListener("click", () => renderRevision(section, level, topic, options));
   const deckHeader = el("div", "flashcard-deck-header");
   deckHeader.append(el("div", "question-type", `${card.level} · ${card.topic_label}`), quiz);
@@ -283,24 +293,45 @@ function renderFlashcard(
   progress.append(progressFill);
 
   const wordGroup = el("div", "flashcard-word-group");
-  wordGroup.append(
-    el("h2", "flashcard-word", shownWord),
-    el("p", "word-meta", card.part_of_speech),
-    el("p", "meaning-overview", card.meaning_overview),
-  );
+  const focusPoint = isRevealed
+    ? el("h2", "flashcard-word", shownWord)
+    : el("h2", "focus-recall-meaning", card.meaning_overview);
+  focusPoint.tabIndex = -1;
+  if (isRevealed) {
+    wordGroup.append(focusPoint, el("p", "word-meta", card.part_of_speech), el("p", "meaning-overview", card.meaning_overview));
+  } else {
+    wordGroup.append(
+      el("p", "focus-recall-instruction", "Recall the German word and article."),
+      focusPoint,
+      el("p", "word-meta", card.part_of_speech),
+    );
+  }
   content.append(deckHeader, progressMeta, progress, wordGroup);
 
   const showPrevious = (): void => {
-    if (index > 0) renderFlashcard(section, cards, index - 1, level, topic, options);
+    if (index > 0) renderFlashcard(section, cards, index - 1, level, topic, options, revealedCards, previousRating);
   };
   const showNext = (): void => {
-    if (index < cards.length - 1) renderFlashcard(section, cards, index + 1, level, topic, options);
+    if (index < cards.length - 1) renderFlashcard(section, cards, index + 1, level, topic, options, revealedCards, previousRating);
   };
   const gradeCard = (rating: FocusRating): void => {
+    if (!isRevealed) return;
     const player = getPlayer();
-    if (player) recordFocusReview(player.player_id, card, rating);
-    if (index < cards.length - 1) renderFlashcard(section, cards, index + 1, level, topic, options);
-    else renderDeckComplete(section, cards.length, level, topic, options);
+    const undo = player ? recordFocusReview(player.player_id, card, rating) : null;
+    const receipt = undo ? { cardIndex: index, rating, undo } : undefined;
+    if (index < cards.length - 1) {
+      renderFlashcard(section, cards, index + 1, level, topic, options, revealedCards, receipt);
+    } else {
+      renderDeckComplete(
+        section,
+        cards.length,
+        level,
+        topic,
+        options,
+        receipt,
+        () => renderFlashcard(section, cards, index, level, topic, options, revealedCards),
+      );
+    }
   };
 
   const previous = button("Previous", "flashcard-nav-control flashcard-previous");
@@ -310,10 +341,34 @@ function renderFlashcard(
   next.disabled = index === cards.length - 1;
   next.addEventListener("click", showNext);
 
-  section.append(content, focusReviewActions(gradeCard), flashcardActions(previous, next));
+  if (previousRating) {
+    section.append(focusReviewUndoNotice(previousRating, () => {
+      renderFlashcard(section, cards, previousRating.cardIndex, level, topic, options, revealedCards);
+    }));
+  }
+  section.append(content);
+  if (isRevealed) {
+    section.append(
+      el("p", "focus-review-guidance", "Choose how well you recalled the word to set when it returns."),
+      focusReviewActions(gradeCard),
+    );
+  } else {
+    const reveal = button("Reveal word and article", "button primary focus-reveal");
+    reveal.setAttribute("aria-keyshortcuts", "Space");
+    reveal.addEventListener("click", () => {
+      revealedCards.add(index);
+      renderFlashcard(section, cards, index, level, topic, options, revealedCards, previousRating);
+    });
+    section.append(reveal);
+  }
+  section.append(flashcardActions(previous, next));
+  focusPoint.focus({ preventScroll: true });
   bindFlashcardKeyboard(section, {
-    onReveal: null,
-    onGrade: gradeCard,
+    onReveal: isRevealed ? null : () => {
+      revealedCards.add(index);
+      renderFlashcard(section, cards, index, level, topic, options, revealedCards, previousRating);
+    },
+    onGrade: isRevealed ? gradeCard : null,
     onPrevious: index > 0 ? showPrevious : null,
   });
 }
@@ -324,6 +379,8 @@ function renderDeckComplete(
   level: FocusLevel["level"],
   topic: FocusTopic,
   options: FocusViewOptions,
+  lastRating?: FocusRatingReceipt,
+  onUndoLastRating?: () => void,
 ): void {
   clearFlashcardKeyboard(section);
   const result = el("div", "result focus-deck-complete");
@@ -336,6 +393,7 @@ function renderDeckComplete(
     el("p", "prompt", `You reviewed all ${cardCount} cards in this deck.`),
   );
   const actions = el("div", "actions focus-deck-complete-actions");
+  if (lastRating && onUndoLastRating) actions.append(focusReviewUndoNotice(lastRating, onUndoLastRating));
   const review = button("Review this deck again", "button primary");
   review.addEventListener("click", () => void renderFlashcards(section, level, topic, options));
   const chooseTopic = button("Choose another topic", "button");
@@ -362,14 +420,45 @@ function renderRetryError(
 
 function focusReviewActions(onGrade: (rating: FocusRating) => void): HTMLElement {
   const wrap = el("div", "actions focus-review-actions");
-  for (const { rating, label, shortcut } of FOCUS_RATINGS) {
+  for (const { rating, label, dueLabel, shortcut } of FOCUS_RATINGS) {
     const control = button("", `button focus-grade focus-grade-${rating}`);
     control.setAttribute("aria-keyshortcuts", shortcut);
-    control.append(el("span", "focus-grade-label", label), el("kbd", "focus-grade-shortcut", shortcut));
+    control.append(
+      el("span", "focus-grade-label", label),
+      el("span", "focus-grade-interval", dueLabel),
+      el("kbd", "focus-grade-shortcut", shortcut),
+    );
     control.addEventListener("click", () => onGrade(rating));
     wrap.append(control);
   }
   return wrap;
+}
+
+function focusReviewUndoNotice(
+  receipt: FocusRatingReceipt,
+  onUndo: () => void,
+): HTMLElement {
+  const notice = el("div", "focus-review-undo");
+  const rating = FOCUS_RATINGS.find((item) => item.rating === receipt.rating);
+  const message = el(
+    "p",
+    "focus-review-undo-message",
+    `Rated ${rating?.label ?? "card"} · ${rating?.dueLabel.toLowerCase() ?? "schedule updated"}.`,
+  );
+  message.setAttribute("role", "status");
+  message.setAttribute("aria-live", "polite");
+  message.setAttribute("aria-atomic", "true");
+  const undo = button("Undo rating", "button focus-undo");
+  undo.addEventListener("click", () => {
+    if (!receipt.undo()) {
+      message.textContent = "This rating is no longer available to undo.";
+      undo.disabled = true;
+      return;
+    }
+    onUndo();
+  });
+  notice.append(message, undo);
+  return notice;
 }
 
 function revealAnswerButton(onReveal: () => void): HTMLButtonElement {
@@ -385,22 +474,28 @@ function levelCard(level: FocusLevel, onClick: () => void): HTMLButtonElement {
   card.disabled = isEmpty;
   card.setAttribute("aria-disabled", String(isEmpty));
   card.addEventListener("click", onClick);
-  card.append(
-    el("strong", "", level.level),
-    el("span", "", formatCount(level.topic_count, "topic", { zeroLabel: "No" })),
-    el("span", "", isEmpty ? "No material has been added yet." : formatCount(level.word_count, "word")),
+  const metrics = el("span", "focus-option-metrics");
+  metrics.append(
+    focusOptionMetric("Topics", formatCount(level.topic_count, "topic", { zeroLabel: "No" })),
+    focusOptionMetric("Words", isEmpty ? "No material available" : formatCount(level.word_count, "word")),
   );
+  card.append(el("strong", "", level.level), metrics);
   return card;
 }
 
 function topicCard(topic: FocusTopic, onClick: () => void): HTMLButtonElement {
   const card = button("", "focus-option topic-option");
   card.addEventListener("click", onClick);
-  card.append(
-    el("strong", "", topic.label),
-    el("span", "", formatCount(topic.word_count, "word", { zeroLabel: "No" })),
-  );
+  const metrics = el("span", "focus-option-metrics");
+  metrics.append(focusOptionMetric("Words", formatCount(topic.word_count, "word", { zeroLabel: "No" })));
+  card.append(el("strong", "", topic.label), metrics);
   return card;
+}
+
+function focusOptionMetric(label: string, value: string): HTMLElement {
+  const metric = el("span", "focus-option-metric");
+  metric.append(el("span", "focus-option-metric-label", label), el("span", "focus-option-metric-value", value));
+  return metric;
 }
 
 function cardActions(...nodes: HTMLElement[]): HTMLElement {

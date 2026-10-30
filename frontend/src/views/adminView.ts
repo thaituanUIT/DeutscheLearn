@@ -1,3 +1,4 @@
+import "../styles/views/admin.css";
 import {
   createAdminReadingPassage,
   createAdminWord,

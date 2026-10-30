@@ -1,3 +1,4 @@
+import "../styles/views/story.css";
 import {
   submitStoryAnswer,
 } from "../api/client";
@@ -26,7 +27,7 @@ import type {
 import { button } from "../components/button";
 import { goethePartLabel, partLabel } from "../goethe/readingSpecs";
 import { getPlayer } from "../state/playerStore";
-import { addStoryMistakes, recordStoryRead } from "../state/progressStore";
+import { addStoryMistakes, recordStoryComplete, loadStoryDraft, saveStoryDraft, isStoryCompleted } from "../state/progressStore";
 import { stimulusInstruction, stimulusRenderer, type StimulusViewModel } from "../stimuli/templates";
 import { el } from "../utils/dom";
 import { formatCount } from "../utils/format";
@@ -45,6 +46,8 @@ type StorySession = {
   passage: StoryPassage;
   selections: Record<string, string>;
   results: Record<string, StoryQuestionResult> | null;
+  onChooseAnother: () => void;
+  completionSaved?: boolean;
 };
 
 type StoryQuestionResult = StoryAnswer & {
@@ -67,7 +70,7 @@ async function renderStoryGroups(section: HTMLElement, options: StoryViewOptions
     const intro = el("div");
     intro.append(
       el("div", "question-type", "Story mode"),
-      el("h2", "focus-title", "Choose a reading topic"),
+      el("h2", "focus-title", "Choose reading or exam practice"),
     );
 
     const grid = el("div", "focus-grid story-group-grid");
@@ -220,12 +223,14 @@ async function renderStoryReader(
     const passage = storyPassageFromCorpus(await getStoryCorpus(), passageId);
     if (!passage) throw new Error("Story passage not found");
     const player = getPlayer();
-    if (player) recordStoryRead(player.player_id, passage);
+    const draft = player ? loadStoryDraft(player.player_id, passage) : null;
     options.onGrammarContextChange({
       passage: { title: passage.title, text: passage.passage_text },
       wrongAnswer: null,
     });
-    renderStoryPractice(section, { passage, selections: {}, results: null }, options);
+    renderStoryPractice(section, { passage, selections: draft?.selections ?? {}, results: null,
+      onChooseAnother: () => renderStoryPassages(section, group, level, part, options),
+    }, options);
   } catch (error) {
     renderRetryError(
       section,
@@ -269,7 +274,7 @@ function renderStoryPractice(
   const panel = el("div", "story-question-panel");
   const summary = el("div", "story-question-summary");
   summary.append(
-    el("h2", "focus-title", "Questions"),
+    el("h2", "focus-title", isReviewed ? `Results: ${score} / ${session.passage.questions.length} correct` : "Questions"),
     el(
       "p",
       "story-score",
@@ -280,81 +285,139 @@ function renderStoryPractice(
   );
   panel.append(summary);
 
+  const status = summary.querySelector(".story-score")!;
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  const guidance = el("p", "story-score", "Answer every question, then submit to complete this reading.");
+  summary.append(guidance);
+  const storageNotice = el("p", "story-score", session.completionSaved === false
+    ? "Answers submitted. Completion could not be saved on this device."
+    : !isReviewed && answeredCount > 0 ? "Draft restored. Continue where you left off." : "");
+  storageNotice.setAttribute("role", "status");
+  let submitting = false;
+  const inputs: HTMLInputElement[] = [];
   const questions = el("div", "story-question-list");
+  const submit = button("Submit answers", "button primary");
+  submit.disabled = answeredCount < session.passage.questions.length;
   for (const [index, question] of session.passage.questions.entries()) {
-    const selectedAnswerId = session.selections[question.id];
     const result = session.results?.[question.id];
-    const block = el("div", "story-question-block");
-    block.append(
-      el("div", "question-type", `Question ${index + 1}`),
-      el("h3", "story-question-title", question.prompt),
-    );
-
+    const block = el("fieldset", "story-question-block");
+    const legend = el("legend", "story-question-title", `${index + 1}. ${question.prompt}`);
+    legend.lang = "de";
+    block.append(legend);
     const answers = el("div", "story-answer-list");
     for (const answer of question.answers) {
-      const classes = ["answer-option"];
-      if (answer.id === selectedAnswerId) classes.push("selected-answer");
-      if (result && answer.id === result.correct_answer_id) classes.push("correct-answer");
-      if (result && answer.id === result.selected_answer_id && !result.correct) classes.push("wrong-answer");
-      const option = button(answer.answer_text, classes.join(" "));
-      option.disabled = isReviewed;
-      option.addEventListener("click", () => {
+      const label = el("label", "answer-option story-answer-option");
+      label.classList.toggle("selected-answer", answer.id === session.selections[question.id]);
+      label.classList.toggle("correct-answer", !!result && answer.id === result.correct_answer_id);
+      label.classList.toggle("wrong-answer", !!result && !result.correct && answer.id === result.selected_answer_id);
+      const input = el("input");
+      input.type = "radio";
+      input.name = `story-${session.passage.id}-${question.id}`;
+      input.value = answer.id;
+      input.checked = answer.id === session.selections[question.id];
+      input.disabled = isReviewed;
+      inputs.push(input);
+      const text = el("span", "", answer.answer_text);
+      text.lang = "de";
+      label.append(input, text);
+      input.addEventListener("change", () => {
+        if (submitting || isReviewed) return;
         session.selections[question.id] = answer.id;
-        renderStoryPractice(section, session, options);
+        for (const choice of answers.querySelectorAll("label")) {
+          choice.classList.toggle("selected-answer", choice.querySelector("input")!.checked);
+        }
+        const count = Object.keys(session.selections).length;
+        status.textContent = `${count} / ${session.passage.questions.length} answered`;
+        submit.disabled = count < session.passage.questions.length;
+        const player = getPlayer();
+        const saved = player && saveStoryDraft(player.player_id, session.passage, session.selections);
+        storageNotice.textContent = saved ? "Draft saved on this device." : "Draft could not be saved. Keep this page open to retain your answers.";
       });
-      answers.append(option);
+      answers.append(label);
     }
     block.append(answers);
-
     if (result) {
       const feedback = el("div", "story-feedback");
-      feedback.append(
-        el("div", "question-type", result.correct ? "Correct" : "Review"),
-        el("p", "story-review-answer", result.correct_answer_text),
-      );
-      block.append(feedback);
-      if (result.explanation) {
-        block.append(el("p", "story-explanation", result.explanation));
+      feedback.append(el("strong", "", result.correct ? "Correct" : "Incorrect"));
+      if (!result.correct) {
+        const correct = el("p", "story-review-answer", `Correct answer: ${result.correct_answer_text}`);
+        feedback.append(correct);
       }
+      if (result.explanation) feedback.append(el("p", "story-explanation", result.explanation));
+      block.append(feedback);
     }
     questions.append(block);
   }
   panel.append(questions);
-
   const controls = el("div", "story-question-controls");
+  const inlineError = el("p", "error");
+  inlineError.setAttribute("role", "alert");
   if (isReviewed) {
-    const retry = button("Try again", "button primary");
-    retry.addEventListener("click", () =>
-      renderStoryPractice(section, { passage: session.passage, selections: {}, results: null }, options),
-    );
-    controls.append(retry);
+    guidance.textContent = "Reading completed. Review your answers or choose another reading.";
+    const another = button("Choose another reading", "button primary");
+    another.addEventListener("click", session.onChooseAnother);
+    const retry = button("Try again", "button");
+    retry.addEventListener("click", () => {
+      renderStoryPractice(section, { ...session, selections: {}, results: null, completionSaved: undefined }, options);
+    });
+    controls.append(another, retry);
   } else {
-    const submit = button("Submit answers", "button primary");
-    submit.disabled = answeredCount < session.passage.questions.length;
     submit.addEventListener("click", async () => {
+      if (submitting || submit.disabled) return;
+      submitting = true;
+      const submitted = { ...session.selections };
+      inputs.forEach((input) => { input.disabled = true; });
       submit.disabled = true;
-      submit.textContent = "Checking...";
+      submit.textContent = "Checking…";
+      panel.setAttribute("aria-busy", "true");
+      inlineError.textContent = "";
       try {
-        const results = await Promise.all(
-          session.passage.questions.map(async (item) => {
-            const selected = session.selections[item.id];
-            const answer = await submitStoryAnswer(item.id, selected);
-            return [item.id, { ...answer, selected_answer_id: selected }] as const;
-          }),
-        );
+        const results = await Promise.all(session.passage.questions.map(async (item) => {
+          const selected = submitted[item.id];
+          const answer = await submitStoryAnswer(item.id, selected);
+          return [item.id, { ...answer, selected_answer_id: selected }] as const;
+        }));
         session.results = Object.fromEntries(results);
+        const player = getPlayer();
+        if (player) {
+          session.completionSaved = recordStoryComplete(player.player_id, session.passage, submitted);
+        }
         recordStoryMistakes(session);
+        // The learner may have navigated away while the request was pending.
+        if (!section.contains(panel)) return;
         renderStoryPractice(section, session, options);
-      } catch (error) {
+      } catch {
+        if (!section.contains(panel)) return;
+        submitting = false;
+        inputs.forEach((input) => { input.disabled = false; });
         submit.disabled = false;
         submit.textContent = "Submit answers";
-        options.onError(error instanceof Error ? error.message : "Could not submit answers");
+        panel.removeAttribute("aria-busy");
+        inlineError.textContent = "Could not check your answers. Your selections are retained; submit again to retry.";
       }
     });
     controls.append(submit);
   }
+  summary.append(storageNotice);
+  controls.append(inlineError);
   panel.append(controls);
-  section.replaceChildren(storyPracticeLayout(session.passage, panel));
+  const existing = section.querySelector(".story-question-panel");
+  if (existing) {
+    existing.replaceWith(panel);
+  } else {
+    section.replaceChildren(storyPracticeLayout(session.passage, panel));
+  }
+  if (isReviewed) {
+    const layout = panel.closest<HTMLElement>(".story-practice-layout")!;
+    layout.dataset.readerView = "questions";
+    layout.querySelectorAll(".story-mobile-switch button").forEach((control, index) => {
+      control.setAttribute("aria-pressed", String(index === 1));
+    });
+    const heading = summary.querySelector("h2")!;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
 }
 
 function recordStoryMistakes(session: StorySession): void {
@@ -454,7 +517,24 @@ function storyPracticeLayout(passage: StoryPassage, questionPanel: HTMLElement):
       ? "story-practice-layout goethe-practice-layout"
       : "story-practice-layout",
   );
-  layout.append(storyContent(passage), questionPanel);
+  const content = storyContent(passage);
+  content.lang = "de";
+  layout.dataset.readerView = "passage";
+  const switcher = el("div", "story-mobile-switch");
+  switcher.setAttribute("aria-label", "Reading view");
+  const read = button("Read passage", "button compact-button");
+  const answer = button("Questions", "button compact-button");
+  read.setAttribute("aria-pressed", "true");
+  answer.setAttribute("aria-pressed", "false");
+  const choose = (view: string) => {
+    layout.dataset.readerView = view;
+    read.setAttribute("aria-pressed", String(view === "passage"));
+    answer.setAttribute("aria-pressed", String(view === "questions"));
+  };
+  read.addEventListener("click", () => choose("passage"));
+  answer.addEventListener("click", () => choose("questions"));
+  switcher.append(read, answer);
+  layout.append(switcher, content, questionPanel);
   return layout;
 }
 
@@ -479,8 +559,7 @@ function groupCard(group: StoryGroup, onClick: () => void): HTMLButtonElement {
   const card = button("", "focus-option story-group-option");
   card.addEventListener("click", onClick);
   card.append(
-    el("strong", "", group.label),
-    el("span", "", group.group === "general" ? "A1, A2, B1, B2 stories" : "Exam-style reading practice"),
+    storyChoiceTitle(group.label, group.group === "general" ? "A1, A2, B1, B2 stories" : "Exam-style reading practice"),
     el("span", "", `${formatStoryItemCount(group.passage_count, group.group)} · ${formatCount(group.question_count, "question", { zeroLabel: "No" })}`),
   );
   return card;
@@ -516,14 +595,25 @@ function partCard(part: StoryPart, level: StoryLevel["level"], onClick: () => vo
 
 function passageCard(passage: StoryPassageSummary, onClick: () => void): HTMLButtonElement {
   const card = button("", "focus-option topic-option story-option");
-  card.disabled = passage.question_count === 0;
+
   card.addEventListener("click", onClick);
   card.append(
-    el("strong", "", passage.title),
-    el("span", "", passage.topic ? topicLabel(passage.topic) : "General"),
+    storyChoiceTitle(passage.title, passage.topic ? topicLabel(passage.topic) : "General"),
     el("span", "", passage.question_count === 0 ? "No questions yet" : formatCount(passage.question_count, "question")),
   );
+  const player = getPlayer();
+  if (player) {
+    const fullPassage = storyPassageFromCorpus(getCachedStoryPassages() ?? [], passage.id);
+    if (fullPassage && loadStoryDraft(player.player_id, fullPassage)) card.append(el("span", "", "Continue draft"));
+    else if (isStoryCompleted(player.player_id, passage.id)) card.append(el("span", "", "Completed"));
+  }
   return card;
+}
+
+function storyChoiceTitle(title: string, description: string): HTMLElement {
+  const content = el("span", "story-choice-title");
+  content.append(el("strong", "", title), el("span", "", description));
+  return content;
 }
 
 function storyPassagesIntro(

@@ -2,7 +2,6 @@ import { getCurrentPlayer, getLeaderboard, getWordOfDay } from "../api/client";
 import {
   getCachedFocusWords,
   getCachedStoryPassages,
-  prefetchDictationVideos,
   prefetchFocusWords,
   prefetchStoryPassages,
 } from "../api/queryClient";
@@ -18,32 +17,31 @@ import { setPlayer } from "../state/playerStore";
 import { homeMetricsForPlayer, recentMistakes } from "../state/progressStore";
 import { getQuizState } from "../state/quizStore";
 import { clear, el } from "../utils/dom";
-import { focusView } from "./focusView";
 import { homeView, type HomeMode } from "./homeView";
 import { leaderboardView, wordOfDayView } from "./leaderboardView";
-import { abandonTimedRun, quizView } from "./quizView";
-import { storyView } from "./storyView";
-import { dictationView } from "./dictationView";
+import type { QuizMode } from "./quizView";
 
 type AppRoute = HomeMode | "home";
 
-const appRoutes = new Set<AppRoute>(["home", "endless", "practice", "timed", "focus", "story", "dictation"]);
+const appRoutes = new Set<AppRoute>([
+  "home",
+  "endless",
+  "practice",
+  "timed",
+  "focus",
+  "scramble",
+  "story",
+  "dictation",
+]);
 
 export async function renderApp(root: HTMLElement): Promise<void> {
   clear(root);
   root.append(el("div", "shell", "Loading..."));
-  void prefetchStoryPassages();
-  void prefetchFocusWords();
-  void prefetchDictationVideos();
 
   try {
-    const [player, leaderboard, wordOfDay] = await Promise.all([
-      getCurrentPlayer(),
-      getLeaderboard(),
-      getWordOfDay(),
-    ]);
+    const player = await getCurrentPlayer();
     setPlayer(player);
-    draw(root, player, leaderboard, wordOfDay);
+    draw(root, player, Promise.allSettled([getLeaderboard(), getWordOfDay()]));
   } catch (error) {
     clear(root);
     const shell = el("div", "shell");
@@ -61,16 +59,20 @@ export async function renderApp(root: HTMLElement): Promise<void> {
 function draw(
   root: HTMLElement,
   player: Player,
-  initialLeaderboard: LeaderboardEntry[],
-  wordOfDay: WordOfDay,
+  sidebarData: Promise<[
+    PromiseSettledResult<LeaderboardEntry[]>,
+    PromiseSettledResult<WordOfDay>,
+  ]>,
 ): void {
-  let leaderboard = initialLeaderboard;
+  let leaderboard: LeaderboardEntry[] = [];
+  let wordOfDay: WordOfDay | null = null;
   let bestScore = player.best_endless_score;
   let grammarWidget: ReturnType<typeof mountGrammarWidget> | null = null;
   let refreshedHomeMetrics = false;
   let currentRoute: AppRoute = readRoute();
   let routeInitialized = false;
   let restoringTimedRoute = false;
+  let modeRequestId = 0;
 
   const shell = el("div", "shell");
   const playerNode = el("div", "player");
@@ -81,13 +83,24 @@ function draw(
   const mainHost = el("div");
   const sidebar = el("div", "sidebar");
   const leaderboardHost = el("div");
+  const wordOfDayHost = el("div");
   const renderLeaderboard = (): void => {
     leaderboardHost.replaceChildren(leaderboardView(leaderboard));
+  };
+  const renderWordOfDay = (): void => {
+    wordOfDayHost.replaceChildren(
+      wordOfDay
+        ? wordOfDayView(wordOfDay)
+        : el("aside", "panel word-card muted", "Loading word of the day…"),
+    );
   };
 
   const showHome = (syncRoute = true): void => {
     if (syncRoute && !confirmLeavingTimedRun("home")) return;
-    if (currentRoute === "timed") abandonTimedRun();
+    if (currentRoute === "timed") {
+      void import("./quizView").then(({ abandonTimedRun }) => abandonTimedRun()).catch(() => undefined);
+    }
+    modeRequestId += 1;
     currentRoute = "home";
     if (syncRoute) writeRoute("home");
     grammarWidget?.updateContext({ route: "home", passage: null, wrongAnswer: null });
@@ -104,7 +117,7 @@ function draw(
       }),
     );
     const more = el("details", "home-more");
-    more.append(el("summary", "", "Word of the day and leaderboard"), wordOfDayView(wordOfDay), leaderboardHost);
+    more.append(el("summary", "", "Word of the day and leaderboard"), wordOfDayHost, leaderboardHost);
     sidebar.replaceChildren(more);
     layout.replaceChildren(mainHost, sidebar);
     if (!refreshedHomeMetrics) {
@@ -123,66 +136,74 @@ function draw(
 
   const showMode = (mode: HomeMode, syncRoute = true): void => {
     if (syncRoute && !confirmLeavingTimedRun(mode)) return;
-    if (currentRoute === "timed" && mode !== "timed") abandonTimedRun();
+    if (currentRoute === "timed" && mode !== "timed") {
+      void import("./quizView").then(({ abandonTimedRun }) => abandonTimedRun()).catch(() => undefined);
+    }
     currentRoute = mode;
+    const requestId = ++modeRequestId;
     if (syncRoute) writeRoute(mode);
     grammarWidget?.updateContext({ route: mode, passage: null, wrongAnswer: null });
     layout.className = mode === "story" ? "layout mode-layout story-mode-layout" : "layout mode-layout";
     layout.replaceChildren(mainHost);
     renderHeaderBack(showHome);
+    mainHost.replaceChildren(el("p", "prompt", "Loading practice…"));
+    void loadModeView(mode, requestId).then((view) => {
+      if (view && requestId === modeRequestId && currentRoute === mode) mainHost.replaceChildren(view);
+    }).catch((error) => {
+      if (requestId === modeRequestId && currentRoute === mode) {
+        showError(error instanceof Error ? error.message : "Could not load this practice mode.");
+      }
+    });
+  };
+
+  const loadModeView = async (mode: HomeMode, requestId: number): Promise<HTMLElement | null> => {
     if (mode === "focus") {
-      mainHost.replaceChildren(
-        focusView({
-          onBack: showHome,
-          onBackChange: renderHeaderBack,
-        }),
-      );
-      return;
+      const { focusView } = await import("./focusView");
+      if (requestId !== modeRequestId || currentRoute !== mode) return null;
+      return focusView({ onBack: showHome, onBackChange: renderHeaderBack });
     }
-
+    if (mode === "scramble") {
+      const { scrambleView } = await import("./scrambleView");
+      if (requestId !== modeRequestId || currentRoute !== mode) return null;
+      return scrambleView({ onBack: showHome, onBackChange: renderHeaderBack });
+    }
     if (mode === "story") {
-      mainHost.replaceChildren(
-        storyView({
-          onBack: showHome,
-          onBackChange: renderHeaderBack,
-          onError: showError,
-          onGrammarContextChange: (context: {
-            passage?: GrammarPassageContext | null;
-            wrongAnswer?: GrammarWrongAnswerContext | null;
-          }) => grammarWidget?.updateContext(context),
-        }),
-      );
-      return;
-    }
-
-    if (mode === "dictation") {
-      mainHost.replaceChildren(
-        dictationView({
-          onBack: showHome,
-          onBackChange: renderHeaderBack,
-        }),
-      );
-      return;
-    }
-
-    mainHost.replaceChildren(
-      quizView({
-        mode,
-        bestScore,
-        onLeaderboardRefresh: async () => {
-          leaderboard = await getLeaderboard();
-          const ownBest = leaderboard.find((entry) => entry.display_name === player.display_name);
-          if (ownBest) bestScore = Math.max(bestScore, ownBest.score);
-          renderLeaderboard();
-          return leaderboard;
-        },
+      const { storyView } = await import("./storyView");
+      if (requestId !== modeRequestId || currentRoute !== mode) return null;
+      return storyView({
         onBack: showHome,
-        onRender: () => undefined,
-        onGrammarContextChange: (context: { wrongAnswer?: GrammarWrongAnswerContext | null }) =>
-          grammarWidget?.updateContext(context),
+        onBackChange: renderHeaderBack,
         onError: showError,
-      }),
-    );
+        onGrammarContextChange: (context: {
+          passage?: GrammarPassageContext | null;
+          wrongAnswer?: GrammarWrongAnswerContext | null;
+        }) => grammarWidget?.updateContext(context),
+      });
+    }
+    if (mode === "dictation") {
+      const { dictationView } = await import("./dictationView");
+      if (requestId !== modeRequestId || currentRoute !== mode) return null;
+      return dictationView({ onBack: showHome, onBackChange: renderHeaderBack });
+    }
+
+    const { quizView } = await import("./quizView");
+    if (requestId !== modeRequestId || currentRoute !== mode) return null;
+    return quizView({
+      mode: mode as QuizMode,
+      bestScore,
+      onLeaderboardRefresh: async () => {
+        leaderboard = await getLeaderboard();
+        const ownBest = leaderboard.find((entry) => entry.display_name === player.display_name);
+        if (ownBest) bestScore = Math.max(bestScore, ownBest.score);
+        renderLeaderboard();
+        return leaderboard;
+      },
+      onBack: showHome,
+      onRender: () => undefined,
+      onGrammarContextChange: (context: { wrongAnswer?: GrammarWrongAnswerContext | null }) =>
+        grammarWidget?.updateContext(context),
+      onError: showError,
+    });
   };
 
   const showError = (message: string): void => {
@@ -200,6 +221,21 @@ function draw(
   };
 
   renderLeaderboard();
+  renderWordOfDay();
+  void sidebarData.then(([leaderboardResult, wordOfDayResult]) => {
+    if (leaderboardResult.status === "fulfilled") {
+      leaderboard = leaderboardResult.value;
+      renderLeaderboard();
+    } else {
+      leaderboardHost.replaceChildren(el("p", "muted", "Leaderboard is temporarily unavailable."));
+    }
+    if (wordOfDayResult.status === "fulfilled") {
+      wordOfDay = wordOfDayResult.value;
+      renderWordOfDay();
+    } else {
+      wordOfDayHost.replaceChildren(el("p", "muted", "Word of the day is temporarily unavailable."));
+    }
+  });
   const renderRoute = (): void => {
     const route = readRoute();
     if (restoringTimedRoute) {
@@ -214,7 +250,9 @@ function draw(
         window.history.forward();
         return;
       }
-      if (currentRoute === "timed") abandonTimedRun();
+      if (currentRoute === "timed") {
+        void import("./quizView").then(({ abandonTimedRun }) => abandonTimedRun()).catch(() => undefined);
+      }
       currentRoute = route;
     }
     if (route === "home") {

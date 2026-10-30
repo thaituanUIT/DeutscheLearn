@@ -2,6 +2,14 @@
 
 Reading exercises power both general reading practice and Goethe-Institut style tasks.
 
+## Learner Progress
+
+A passage is completed after all answers have been successfully submitted, regardless of score. Opening a passage does not count as completion; older progress that tracked opens is not counted as completed.
+
+Answer selections are saved on this device for the current anonymous learner, with up to 20 passage drafts retained. Returning to a passage restores valid selections; successful submission clears its draft. The reading list shows Continue draft or Completed where applicable. Storage failures leave the current exercise usable and show a saving warning.
+
+On mobile, Read passage and Questions switch between the two panes without rebuilding them. Answering preserves scroll position and keyboard focus. While answers are being checked, choices and submission are locked; failures retain selections for retry.
+
 ## Data Model
 
 Reading content is stored as `Stimulus` rows with related `Item` and `ItemOption` rows.
