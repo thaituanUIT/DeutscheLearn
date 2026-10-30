@@ -529,14 +529,14 @@ function imageOrLinkOnly(line: string): boolean {
 
 function renderCitations(citations: GrammarCitation[]): HTMLElement {
   const wrap = el("div", "grammar-citations");
-  for (const citation of citations) {
+  citations.forEach((citation, index) => {
     const item = el("div", "grammar-citation");
-    const chip = button(citationLabel(citation), "grammar-citation-chip");
+    const chip = button(`[${index + 1}] ${citationLabel(citation)}`, "grammar-citation-chip");
     const source = el("p", "grammar-citation-source", citation.content);
     chip.addEventListener("click", () => item.classList.toggle("expanded"));
     item.append(chip, source);
     wrap.append(item);
-  }
+  });
   return wrap;
 }
 

@@ -54,7 +54,7 @@ TERM_ALIASES = {
     "genitiv": {"genitiv", "genitive"},
     "article": {"article", "articles", "artikel"},
 }
-ANSWER_CACHE_VERSION = "grammar-answer-v5"
+ANSWER_CACHE_VERSION = "grammar-answer-v7"
 logger = logging.getLogger(__name__)
 
 
@@ -413,24 +413,16 @@ def retrieve_grammar_chunks(
             with vector_candidates as (
                 select
                     id,
-                    title,
-                    section,
-                    content,
-                    level,
-                    topic,
-                    source_path,
-                    source_kind,
-                    page_start,
-                    page_end,
-                    content_hash,
-                    1 - (embedding <=> cast(:embedding as extensions.vector)) as similarity
+                    row_number() over (
+                        order by embedding <=> cast(:embedding as extensions.vector), id
+                    ) as vector_rank
                 from grammar_chunks
                 order by embedding <=> cast(:embedding as extensions.vector)
                 limit 24
             ),
-            scored as (
+            keyword_candidates as (
                 select
-                    *,
+                    id,
                     ts_rank_cd(
                         to_tsvector(
                             'simple',
@@ -439,8 +431,56 @@ def retrieve_grammar_chunks(
                             coalesce(content, '')
                         ),
                         plainto_tsquery('simple', :query_text)
-                    ) as keyword_score
-                from vector_candidates
+                    ) as keyword_score,
+                    row_number() over (
+                        order by ts_rank_cd(
+                            to_tsvector(
+                                'simple',
+                                coalesce(title, '') || ' ' ||
+                                coalesce(section, '') || ' ' ||
+                                coalesce(content, '')
+                            ),
+                            plainto_tsquery('simple', :query_text)
+                        ) desc, id
+                    ) as keyword_rank
+                from grammar_chunks
+                where to_tsvector(
+                    'simple',
+                    coalesce(title, '') || ' ' ||
+                    coalesce(section, '') || ' ' ||
+                    coalesce(content, '')
+                ) @@ plainto_tsquery('simple', :query_text)
+                order by keyword_score desc, id
+                limit 24
+            ),
+            candidate_ids as (
+                select id from vector_candidates
+                union
+                select id from keyword_candidates
+            ),
+            scored as (
+                select
+                    chunk.id,
+                    chunk.title,
+                    chunk.section,
+                    chunk.content,
+                    chunk.level,
+                    chunk.topic,
+                    chunk.source_path,
+                    chunk.source_kind,
+                    chunk.page_start,
+                    chunk.page_end,
+                    chunk.content_hash,
+                    1 - (chunk.embedding <=> cast(:embedding as extensions.vector)) as similarity,
+                    coalesce(keyword.keyword_score, 0.0) as keyword_score,
+                    (
+                        coalesce(1.0 / (60 + vector.vector_rank), 0.0) +
+                        coalesce(1.0 / (60 + keyword.keyword_rank), 0.0)
+                    ) as hybrid_score
+                from candidate_ids candidate
+                join grammar_chunks chunk on chunk.id = candidate.id
+                left join vector_candidates vector on vector.id = candidate.id
+                left join keyword_candidates keyword on keyword.id = candidate.id
             )
             select
                 id,
@@ -456,7 +496,7 @@ def retrieve_grammar_chunks(
                 content_hash,
                 similarity,
                 keyword_score,
-                similarity * 0.70 + least(keyword_score, 1.0) * 0.30 as hybrid_score
+                hybrid_score
             from scored
             order by hybrid_score desc, similarity desc
             limit 12
@@ -505,6 +545,8 @@ def generate_answer(
                 "content": (
                     "You are a German grammar tutor. Answer only from the provided grammar notes. "
                     "Do not use outside knowledge, even if you know the answer. "
+                    "Cite each grammar rule or example with the matching source number, such as [1]. "
+                    "Use only source numbers shown in the notes; never invent a citation. "
                     "Answer in the language the learner asked in. Explain in plain terms suited to a beginner. "
                     "Keep German grammar terms in German. Give at least one German example sentence. "
                     "If a rule has a simple case and an advanced exception, lead with the simple case. "

@@ -36,12 +36,14 @@ logger = logging.getLogger(__name__)
 @router.get("/dictation/videos", response_model=list[DictationVideoSummaryOut])
 def list_dictation_videos(
     db: Session = Depends(get_db),
-    limit: int = Query(default=100, ge=1, le=100),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ) -> list[DictationVideoSummaryOut]:
     videos = db.scalars(
         select(DictationVideo)
         .where(DictationVideo.is_hidden.is_(False))
-        .order_by(DictationVideo.created_at.desc())
+        .order_by(DictationVideo.created_at.desc(), DictationVideo.video_id.desc())
+        .offset(offset)
         .limit(limit)
     ).all()
     return [
@@ -302,31 +304,51 @@ def enforce_dictation_fetch_limits(db: Session, client_ip: str) -> None:
     settings = get_settings()
     now = datetime.now(UTC)
     naive_now = now.replace(tzinfo=None)
-    global_bucket_key = f"global:day:{now:%Y%m%d}"
+    client_key = dictation_client_key(client_ip)
+    buckets = [
+        (
+            f"client:{client_key}:hour:{now:%Y%m%d%H}",
+            settings.dictation_new_videos_per_ip_hour,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+        ),
+        (
+            f"client:{client_key}:day:{now:%Y%m%d}",
+            settings.dictation_new_videos_per_ip_day,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+        ),
+        (
+            f"global:day:{now:%Y%m%d}",
+            settings.dictation_global_new_videos_per_day,
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        ),
+    ]
+    insert = _counter_insert(db)
     try:
         db.execute(
             delete(DictationFetchCounter).where(
                 DictationFetchCounter.updated_at < naive_now - timedelta(days=2)
             )
         )
+        for bucket_key, maximum, error_status in buckets:
+            count = _reserve_counter(db, insert, bucket_key, maximum, naive_now)
+            if count is None:
+                db.rollback()
+                if error_status == status.HTTP_503_SERVICE_UNAVAILABLE:
+                    logger.warning("Daily dictation transcript fetch budget exhausted")
+                    detail = "New transcript requests are paused for today. Saved videos remain available."
+                else:
+                    detail = "You've added several new videos recently. Try again later; saved videos remain available."
+                raise HTTPException(status_code=error_status, detail=detail)
         db.commit()
+    except HTTPException:
+        raise
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Could not prune expired dictation fetch counters")
+        logger.exception("Could not reserve dictation fetch quota")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Transcript fetching is temporarily unavailable. Saved videos remain available.",
         ) from exc
-    global_counter = db.get(DictationFetchCounter, global_bucket_key)
-    if (
-        global_counter
-        and global_counter.request_count >= settings.dictation_global_new_videos_per_day
-    ):
-        logger.warning("Daily dictation transcript fetch budget exhausted")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="New transcript requests are paused for today. Saved videos remain available.",
-        )
 
 
 def enforce_dictation_report_limits(db: Session, client_ip: str) -> None:
@@ -351,39 +373,20 @@ def enforce_dictation_report_limits(db: Session, client_ip: str) -> None:
                 DictationFetchCounter.updated_at < naive_now - timedelta(days=2)
             )
         )
-        db.commit()
-        global_counter = db.get(DictationFetchCounter, global_bucket_key)
-        if (
-            global_counter
-            and global_counter.request_count >= settings.dictation_global_reports_per_day
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="The report queue is full for today. Please try again later.",
-            )
         for bucket_key, maximum in (
             (client_bucket_key, settings.dictation_reports_per_ip_day),
             (global_bucket_key, settings.dictation_global_reports_per_day),
         ):
-            statement = insert(DictationFetchCounter).values(
-                bucket_key=bucket_key,
-                request_count=1,
-                updated_at=naive_now,
-            )
-            statement = statement.on_conflict_do_update(
-                index_elements=[DictationFetchCounter.bucket_key],
-                set_={
-                    "request_count": DictationFetchCounter.request_count + 1,
-                    "updated_at": naive_now,
-                },
-            ).returning(DictationFetchCounter.request_count)
-            count = int(db.scalar(statement) or 0)
-            db.commit()
-            if count > maximum:
+            count = _reserve_counter(db, insert, bucket_key, maximum, naive_now)
+            if count is None:
+                db.rollback()
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail="You've sent several reports recently. Please try again later.",
                 )
+        db.commit()
+    except HTTPException:
+        raise
     except SQLAlchemyError as exc:
         db.rollback()
         logger.exception("Could not reserve dictation report quota")
@@ -392,11 +395,8 @@ def enforce_dictation_report_limits(db: Session, client_ip: str) -> None:
             detail="Reporting is temporarily unavailable.",
         ) from exc
 
-    client_key = dictation_client_key(client_ip)
-    client_buckets = [
-        (f"client:{client_key}:hour:{now:%Y%m%d%H}", settings.dictation_new_videos_per_ip_hour),
-        (f"client:{client_key}:day:{now:%Y%m%d}", settings.dictation_new_videos_per_ip_day),
-    ]
+
+def _counter_insert(db: Session):
     dialect = db.get_bind().dialect.name
     insert = (
         pg_insert if dialect == "postgresql" else sqlite_insert if dialect == "sqlite" else None
@@ -404,67 +404,29 @@ def enforce_dictation_report_limits(db: Session, client_ip: str) -> None:
     if insert is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Transcript fetching is unavailable with this database configuration.",
+            detail="Dictation rate limits are unavailable with this database configuration.",
         )
-    counts: list[tuple[int, int]] = []
-    try:
-        for bucket_key, maximum in client_buckets:
-            statement = insert(DictationFetchCounter).values(
-                bucket_key=bucket_key,
-                request_count=1,
-                updated_at=naive_now,
-            )
-            statement = statement.on_conflict_do_update(
-                index_elements=[DictationFetchCounter.bucket_key],
-                set_={
-                    "request_count": DictationFetchCounter.request_count + 1,
-                    "updated_at": naive_now,
-                },
-            ).returning(DictationFetchCounter.request_count)
-            count = db.scalar(statement)
-            counts.append((int(count or 0), maximum))
-        db.commit()
-    except SQLAlchemyError as exc:
-        db.rollback()
-        logger.exception("Could not reserve dictation fetch quota")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Transcript fetching is temporarily unavailable. Saved videos remain available.",
-        ) from exc
-    if any(count > maximum for count, maximum in counts):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="You've added several new videos recently. Try again later; saved videos remain available.",
-        )
+    return insert
 
+
+def _reserve_counter(
+    db: Session, insert, bucket_key: str, maximum: int, now: datetime
+) -> int | None:
     statement = insert(DictationFetchCounter).values(
-        bucket_key=global_bucket_key,
+        bucket_key=bucket_key,
         request_count=1,
-        updated_at=naive_now,
+        updated_at=now,
     )
     statement = statement.on_conflict_do_update(
         index_elements=[DictationFetchCounter.bucket_key],
         set_={
             "request_count": DictationFetchCounter.request_count + 1,
-            "updated_at": naive_now,
+            "updated_at": now,
         },
+        where=DictationFetchCounter.request_count < maximum,
     ).returning(DictationFetchCounter.request_count)
-    try:
-        global_count = int(db.scalar(statement) or 0)
-        db.commit()
-    except SQLAlchemyError as exc:
-        db.rollback()
-        logger.exception("Could not reserve global dictation fetch budget")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Transcript fetching is temporarily unavailable. Saved videos remain available.",
-        ) from exc
-    if global_count > settings.dictation_global_new_videos_per_day:
-        logger.warning("Daily dictation transcript fetch budget exhausted")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="New transcript requests are paused for today. Saved videos remain available.",
-        )
+    count = db.scalar(statement)
+    return int(count) if count is not None else None
 
 
 def dictation_transcript_out(video: DictationVideo, *, cache_hit: bool) -> DictationTranscriptOut:

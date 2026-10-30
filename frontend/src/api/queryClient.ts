@@ -42,7 +42,7 @@ export function prefetchFocusWords(): Promise<void> {
 export function prefetchDictationVideos(): Promise<void> {
   return queryClient.prefetchQuery({
     queryKey: DICTATION_VIDEOS_QUERY_KEY,
-    queryFn: listDictationVideos,
+    queryFn: fetchAllDictationVideos,
     staleTime: DICTATION_VIDEOS_STALE_TIME,
   });
 }
@@ -54,9 +54,21 @@ export function getCachedDictationVideos(): DictationVideoSummary[] | undefined 
 export function getDictationVideosCatalog(): Promise<DictationVideoSummary[]> {
   return queryClient.fetchQuery({
     queryKey: DICTATION_VIDEOS_QUERY_KEY,
-    queryFn: listDictationVideos,
+    queryFn: fetchAllDictationVideos,
     staleTime: DICTATION_VIDEOS_STALE_TIME,
   });
+}
+
+async function fetchAllDictationVideos(): Promise<DictationVideoSummary[]> {
+  const pageSize = 500;
+  const videos: DictationVideoSummary[] = [];
+  let offset = 0;
+  while (true) {
+    const page = await listDictationVideos(pageSize, offset);
+    videos.push(...page);
+    if (page.length < pageSize) return videos;
+    offset += page.length;
+  }
 }
 
 export function invalidateDictationVideos(): Promise<void> {

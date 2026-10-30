@@ -66,6 +66,9 @@ PostgreSQL is isolated on the internal `private` network.
 | --- | --- |
 | `app/main.py` | FastAPI construction, lifespan startup, static assets, and SPA fallback |
 | `app/api/routes.py` | `/api` route handlers, HTTP errors, transactions, and response assembly |
+| `app/api/admin.py` | Admin vocabulary routes and shared admin validation/import helpers |
+| `app/api/admin_reading.py` | Admin reading passage routes, payload conversion, and upload handling |
+| `app/api/dictation.py` | Dictation catalog, transcript fetching, quotas, reports, and moderation |
 | `app/api/deps.py` | Database dependency and anonymous-player cookie dependencies |
 | `app/core/config.py` | Typed environment configuration and startup invariants |
 | `app/core/time.py` | UTC time helper used by persistence code |

@@ -17,10 +17,10 @@ This project uses a small, resource-conscious RAG pipeline for the grammar assis
 4. Embeddings and metadata are stored in `grammar_chunks`.
 5. User questions are embedded with Cohere using `input_type="search_query"`.
 6. `app/services/grammar.py` retrieves vector candidates from Postgres pgvector.
-7. Retrieved candidates are reranked with a lightweight hybrid score:
+7. The service gathers up to 24 vector matches and up to 24 independent full-text matches. It combines their ranks with reciprocal-rank fusion:
 
 ```text
-hybrid_score = semantic_similarity * 0.70 + keyword_score * 0.30
+rrf_score = 1 / (60 + vector_rank) + 1 / (60 + keyword_rank)
 ```
 
 8. The service applies the configured semantic threshold and sends only the accepted top chunks to the chat model.
@@ -74,6 +74,8 @@ Delete chunks that no longer exist in the source corpus:
 uv run python scripts/ingest_grammar.py --changed-only --delete-missing
 ```
 
+When `--source-kind` is `markdown` or `pdf`, `--delete-missing` only removes stale chunks of that source kind. It refuses to run if extraction produces no chunks. An ingestion run also clears cached answers so responses and citations reflect the refreshed corpus.
+
 Useful source filters:
 
 ```bash
@@ -87,17 +89,18 @@ uv run python scripts/ingest_grammar.py --source-kind pdf
 
 The runtime retrieval path is intentionally cheap:
 
-- retrieve the top vector candidates from pgvector
-- compute PostgreSQL full-text rank over `title`, `section`, and `content`
-- combine semantic and keyword scores
-- order by the hybrid score
+- retrieve vector candidates and full-text candidates independently
+- combine candidate ranks with reciprocal-rank fusion
+- order by the fused score, using semantic similarity to break ties
 - reject short or vague queries before retrieval
 - apply `GRAMMAR_SIMILARITY_THRESHOLD`
 - drop chunks below `GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD` times the top raw similarity score
 - cap accepted chunks at six after filtering and deduplication
 - send at most six citations to the chat model
 
-This is not a heavy cross-encoder reranker. It is a low-cost precision improvement for exact grammar terms, article forms, and short learner questions.
+PostgreSQL deployments create an HNSW cosine index on `grammar_chunks.embedding` and a GIN full-text index on title, section, and content through Alembic migrations. Runtime ordering uses cosine distance and the indexed `simple` text configuration.
+
+This is not a heavy cross-encoder reranker. It is a low-cost way to recover exact grammar terms and article forms that do not land in the vector top 24.
 
 ## Configuration
 
@@ -117,7 +120,7 @@ The Cohere model and dimension are intentionally pinned. Changing either require
 
 ## Evaluation
 
-Golden retrieval cases live in `evals/golden.jsonl`.
+The locked backend-comparison set lives in `evals/golden.jsonl`. Threshold calibration uses learner-style cases in `evals/learner_questions.jsonl` by default, with expected source sections and answer points.
 
 Run the current eval summary:
 
@@ -125,11 +128,19 @@ Run the current eval summary:
 uv run python scripts/eval_grammar.py
 ```
 
-The eval sweeps absolute floors and records the selected calibration in `evals/results.json`.
+The eval accepts `required_sections` labels from the learner cases (matching retrieved section labels) and legacy `required_chunks` IDs. It sweeps absolute floors and records the selected calibration in `evals/results.json`.
 The current choice is `GRAMMAR_SIMILARITY_THRESHOLD=0.45` with
 `GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD=0.85`, calibrated against Cohere
 `embed-multilingual-v3.0` at 1024 dimensions. Changing the embedding model invalidates this
 calibration.
+
+Generate answer-review packets with each expected point and retrieved passage beside the model output:
+
+```bash
+uv run python scripts/eval_grammar_answers.py
+```
+
+Review `evals/answer_review.jsonl` for unsupported claims, missing expected points, and mismatched sources. This uses the configured Cohere and OpenRouter services; it is separate from the retrieval-only calibration.
 
 Run focused tests for the RAG pieces:
 
@@ -143,6 +154,8 @@ Recommended retrieval metrics:
 - `MRR`
 - full-hit rate for multi-chunk questions
 - abstain rate for unanswerable questions
+
+Generated answers include numbered source references that match the expandable citation chips in the widget. The current retrieval calibration does not score answer faithfulness; use `expected_points` as the basis for a separate human or model-judged generation evaluation before changing prompts or models.
 
 Evaluate retrieval separately from answer generation. If the expected chunks are missing, fix ingestion or retrieval before changing the prompt.
 

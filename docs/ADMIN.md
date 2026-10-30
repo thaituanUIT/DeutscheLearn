@@ -1,6 +1,6 @@
 # Admin
 
-Admin features manage vocabulary and reading exercise content. All admin routes require a bearer token.
+Admin features manage vocabulary, reading exercise content, and reported dictation videos. All admin routes require a bearer token.
 
 ## Configuration
 
@@ -88,6 +88,17 @@ Validation rules:
 - Goethe `teil_2` adverts must use `image`, `website_box`, or `ad_box`.
 - Goethe `teil_3` validates structured render content.
 - Each question must have exactly one correct answer.
+
+## Dictation Video Moderation
+
+The Dictation tab in `/admin` lists videos reported by learners, with report counts and current visibility. Open a video on YouTube to review it, then hide it from or restore it to the learner library.
+
+Routes:
+
+- `GET /api/admin/dictation/reports`
+- `PATCH /api/admin/dictation/videos/{video_id}` with `{"is_hidden": true}` to hide or `false` to restore
+
+Reported videos remain in the queue after moderation so admins can restore them later.
 
 ## Stimulus Image Uploads
 

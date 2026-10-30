@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-30T06:00:15Z",
+  "generatedAt": "2026-10-30T18:41:52Z",
   "title": "Design System: DeutscheLearn",
   "extensions": {
     "colorMeta": {
@@ -253,11 +253,6 @@
         "name": "interactive-lift",
         "value": "0 14px 28px color-mix(in srgb, var(--text) 16%, transparent)",
         "purpose": "Hover feedback on video thumbnails."
-      },
-      {
-        "name": "soft-answer-panel",
-        "value": "0 6px 20px color-mix(in srgb, var(--text) 7%, transparent)",
-        "purpose": "Subtle separation for dictation answer and feedback areas."
       }
     ],
     "motion": [
@@ -346,7 +341,7 @@
       "kind": "card",
       "description": "A media-specific card for choosing a captioned video; keep this exception limited to video browsing.",
       "html": "<button class=\"ds-video-card\"><span class=\"ds-video-image\"><span class=\"ds-video-play\" aria-hidden=\"true\">▶</span></span><span class=\"ds-video-copy\"><strong>Deutsch lernen im Alltag</strong><small>Die Maus · 4 min</small></span></button>",
-      "css": ".ds-video-card { display: grid; align-content: start; overflow: hidden; padding: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease; } .ds-video-card:hover { border-color: var(--text); transform: translateY(-3px); box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 14%, transparent); } .ds-video-card:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; } .ds-video-image { display: grid; min-height: 120px; place-items: center; background: var(--surface-raised); } .ds-video-play { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); } .ds-video-copy { display: grid; gap: 6px; padding: 12px; } .ds-video-copy small { color: var(--muted-text); font-size: 13px; }"
+      "css": ".ds-video-card { display: grid; align-content: start; overflow: hidden; padding: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease; } .ds-video-card:hover { border-color: var(--border-strong, var(--text)); transform: translateY(-4px) scale(1.015); box-shadow: 0 14px 28px color-mix(in srgb, var(--text) 16%, transparent); } .ds-video-card:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; } .ds-video-image { display: grid; aspect-ratio: 16 / 9; place-items: center; background: var(--surface-raised); } .ds-video-play { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); } .ds-video-copy { display: grid; gap: 6px; padding: 12px; } .ds-video-copy small { color: var(--muted-text); font-size: 13px; }"
     }
   ],
   "narrative": {

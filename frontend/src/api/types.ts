@@ -36,6 +36,15 @@ export type DictationVideoSummary = {
   created_at: string;
 };
 
+export type AdminDictationVideo = {
+  video_id: string;
+  title: string;
+  video_url: string;
+  report_count: number;
+  is_hidden: boolean;
+  created_at: string;
+};
+
 export type QuizQuestion = {
   question_id: string;
   word: string;
