@@ -79,6 +79,10 @@ def main() -> None:
     )
     chunks = [chunk for doc in docs for chunk in chunk_doc(doc)]
     print(f"Found {len(docs)} documents and {len(chunks)} chunks.")
+    if args.delete_missing and not chunks:
+        parser.error(
+            "--delete-missing requires at least one extracted chunk to avoid clearing a source"
+        )
     if args.dry_run or args.extract_only:
         for chunk in chunks:
             page = page_label(chunk)
@@ -210,7 +214,23 @@ def main() -> None:
 
         if args.delete_missing:
             ids = [chunk.chunk_id for chunk in chunks]
-            conn.execute(text("delete from grammar_chunks where not (id = any(:ids))"), {"ids": ids})
+            if args.source_kind == "all":
+                conn.execute(
+                    text("delete from grammar_chunks where not (id = any(:ids))"),
+                    {"ids": ids},
+                )
+            else:
+                conn.execute(
+                    text(
+                        "delete from grammar_chunks "
+                        "where source_kind = :source_kind and not (id = any(:ids))"
+                    ),
+                    {"source_kind": args.source_kind, "ids": ids},
+                )
+
+        # Ingestion can change chunk text, metadata, or membership. Cached answers
+        # include both answer text and citations, so clear them after any real run.
+        conn.execute(text("delete from grammar_answer_cache"))
 
 
 def load_documents(

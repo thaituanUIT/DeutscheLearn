@@ -74,6 +74,8 @@ Delete chunks that no longer exist in the source corpus:
 uv run python scripts/ingest_grammar.py --changed-only --delete-missing
 ```
 
+When `--source-kind` is `markdown` or `pdf`, `--delete-missing` only removes stale chunks of that source kind. It refuses to run if extraction produces no chunks. An ingestion run also clears cached answers so responses and citations reflect the refreshed corpus.
+
 Useful source filters:
 
 ```bash
@@ -96,6 +98,8 @@ The runtime retrieval path is intentionally cheap:
 - drop chunks below `GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD` times the top raw similarity score
 - cap accepted chunks at six after filtering and deduplication
 - send at most six citations to the chat model
+
+PostgreSQL deployments create an HNSW cosine index on `grammar_chunks.embedding` through the Alembic migration. The runtime query orders by cosine distance so pgvector can use this index as the corpus grows.
 
 This is not a heavy cross-encoder reranker. It is a low-cost precision improvement for exact grammar terms, article forms, and short learner questions.
 
@@ -125,7 +129,7 @@ Run the current eval summary:
 uv run python scripts/eval_grammar.py
 ```
 
-The eval sweeps absolute floors and records the selected calibration in `evals/results.json`.
+The eval accepts `required_sections` labels from the golden set (matching retrieved section paths) and legacy `required_chunks` IDs. It sweeps absolute floors and records the selected calibration in `evals/results.json`.
 The current choice is `GRAMMAR_SIMILARITY_THRESHOLD=0.45` with
 `GRAMMAR_RELATIVE_SIMILARITY_THRESHOLD=0.85`, calibrated against Cohere
 `embed-multilingual-v3.0` at 1024 dimensions. Changing the embedding model invalidates this

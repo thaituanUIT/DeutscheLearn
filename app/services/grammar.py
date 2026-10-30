@@ -54,7 +54,7 @@ TERM_ALIASES = {
     "genitiv": {"genitiv", "genitive"},
     "article": {"article", "articles", "artikel"},
 }
-ANSWER_CACHE_VERSION = "grammar-answer-v5"
+ANSWER_CACHE_VERSION = "grammar-answer-v6"
 logger = logging.getLogger(__name__)
 
 

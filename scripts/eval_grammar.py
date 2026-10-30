@@ -28,6 +28,7 @@ DEFAULT_ABSOLUTE_FLOORS = [round(value / 100, 2) for value in range(30, 71, 5)]
 class CaseResult:
     case: dict[str, Any]
     retrieved_ids: list[str]
+    retrieved_sections: list[str]
     abstained: bool
 
 
@@ -77,7 +78,14 @@ def parse_args() -> argparse.Namespace:
 def load_cases() -> list[dict[str, Any]]:
     if not GOLDEN_PATH.exists():
         raise SystemExit(f"Missing {GOLDEN_PATH}")
-    return [json.loads(line) for line in GOLDEN_PATH.read_text(encoding="utf-8").splitlines() if line]
+    cases = [json.loads(line) for line in GOLDEN_PATH.read_text(encoding="utf-8").splitlines() if line]
+    for index, case in enumerate(cases, start=1):
+        target_key, targets = required_targets(case)
+        if not isinstance(targets, list) or any(not isinstance(target, str) for target in targets):
+            raise SystemExit(f"Golden case {index} has invalid {target_key} targets")
+        if case.get("answerable", True) and not targets:
+            raise SystemExit(f"Answerable golden case {index} must define retrieval targets")
+    return cases
 
 
 def parse_floors(value: str) -> list[float]:
@@ -120,7 +128,9 @@ def evaluate_floor(
     for raw in raw_results:
         case = raw["case"]
         if not raw["query_quality"]["retrievable"]:
-            case_results.append(CaseResult(case=case, retrieved_ids=[], abstained=True))
+            case_results.append(
+                CaseResult(case=case, retrieved_ids=[], retrieved_sections=[], abstained=True)
+            )
             continue
         accepted, _debug = filter_grammar_chunks(
             raw["citations"],
@@ -129,7 +139,12 @@ def evaluate_floor(
         )
         retrieved_ids = [citation.chunk_id for citation in accepted]
         case_results.append(
-            CaseResult(case=case, retrieved_ids=retrieved_ids, abstained=len(retrieved_ids) == 0)
+            CaseResult(
+                case=case,
+                retrieved_ids=retrieved_ids,
+                retrieved_sections=[citation.section for citation in accepted],
+                abstained=len(retrieved_ids) == 0,
+            )
         )
 
     answerable = [result for result in case_results if result.case["answerable"]]
@@ -149,8 +164,9 @@ def full_hit_at_k(results: list[CaseResult]) -> float:
         return 0.0
     hits = 0
     for result in results:
-        required = set(result.case["required_chunks"])
-        retrieved = set(result.retrieved_ids)
+        target_key, required_values = required_targets(result.case)
+        required = set(required_values)
+        retrieved = set(retrieved_targets(result, target_key))
         if required and required <= retrieved:
             hits += 1
     return hits / len(results)
@@ -160,12 +176,27 @@ def precision(results: list[CaseResult]) -> float:
     retrieved_count = 0
     relevant_count = 0
     for result in results:
-        required = set(result.case["required_chunks"])
-        retrieved_count += len(result.retrieved_ids)
-        relevant_count += len(required & set(result.retrieved_ids))
+        target_key, required_values = required_targets(result.case)
+        required = set(required_values)
+        retrieved = set(retrieved_targets(result, target_key))
+        retrieved_count += len(retrieved)
+        relevant_count += len(required & retrieved)
     if retrieved_count == 0:
         return 0.0
     return relevant_count / retrieved_count
+
+
+def required_targets(case: dict[str, Any]) -> tuple[str, list[str]]:
+    """Return the evaluation target type and labels from a golden case."""
+    if "required_sections" in case:
+        return "section", case["required_sections"]
+    return "chunk", case.get("required_chunks", [])
+
+
+def retrieved_targets(result: CaseResult, target_key: str) -> list[str]:
+    if target_key == "section":
+        return result.retrieved_sections
+    return result.retrieved_ids
 
 
 def abstention_rate(results: list[CaseResult]) -> float:
