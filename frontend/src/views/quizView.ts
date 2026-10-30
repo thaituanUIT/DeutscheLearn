@@ -46,6 +46,13 @@ export function quizView(options: QuizViewOptions): HTMLElement {
   return section;
 }
 
+export function abandonTimedRun(): void {
+  stopTimedTimer();
+  pendingAnswerKey = null;
+  const state = getQuizState();
+  if (state.running) finishAttempt(state.score, state.totalQuestions);
+}
+
 function renderStart(section: HTMLElement, options: QuizViewOptions): void {
   stopTimedTimer();
   pendingAnswerKey = null;
@@ -147,6 +154,7 @@ async function handleAnswer(
 
     if (options.mode === "timed") {
       const answer = await submitTimedAnswer(state.attemptId, questionId, choice);
+      if (!getQuizState().running) return;
       recordCurrentQuizAnswer(options.mode, choice, answer.correct_answer);
       if (!answer.attempt_finished && answer.next_question) {
         advanceQuestion(
@@ -229,6 +237,7 @@ function renderEndlessFeedback(
 ): void {
   section.replaceChildren();
   const content = el("div", "result");
+  announceResult(content);
   content.append(
     el("h2", "", "Correct"),
     el("p", "answered-word", answeredWord),
@@ -248,6 +257,7 @@ function renderPracticeFeedback(
 ): void {
   section.replaceChildren();
   const content = el("div", "result");
+  announceResult(content);
   content.append(
     el("h2", "", correct ? "Correct" : "Not quite"),
     el("p", "prompt", correct ? "Keep going." : `Correct answer: ${correctAnswer}.`),
@@ -268,6 +278,7 @@ function renderResult(
 ): void {
   section.replaceChildren();
   const content = el("div", "result");
+  announceResult(content);
   content.append(
     el("h2", "", "Run finished"),
     el("p", "prompt", `Final streak: ${score}. Correct answer: ${correctAnswer}.`),
@@ -291,6 +302,7 @@ function renderTimedResult(
   stopTimedTimer();
   section.replaceChildren();
   const content = el("div", "result");
+  announceResult(content);
   content.append(
     el("h2", "", "Time up"),
     el("p", "prompt", `Final score: ${score} correct from ${totalQuestions} answers.`),
@@ -299,6 +311,12 @@ function renderTimedResult(
   const retry = button("Try timed again", "button primary");
   retry.addEventListener("click", () => renderStart(section, options));
   section.append(stats(options), content, retry);
+}
+
+function announceResult(node: HTMLElement): void {
+  node.setAttribute("role", "status");
+  node.setAttribute("aria-live", "polite");
+  node.setAttribute("aria-atomic", "true");
 }
 
 function sessionSummary(summary: SessionSummary): HTMLElement {

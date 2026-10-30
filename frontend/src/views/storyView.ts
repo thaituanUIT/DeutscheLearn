@@ -77,7 +77,9 @@ async function renderStoryGroups(section: HTMLElement, options: StoryViewOptions
 
     section.replaceChildren(intro, grid);
   } catch (error) {
-    options.onError(error instanceof Error ? error.message : "Could not load story topics");
+    renderRetryError(section, error instanceof Error ? error.message : "Could not load story topics", () =>
+      renderStoryGroups(section, options),
+    );
   }
 }
 
@@ -109,7 +111,12 @@ async function renderStoryLevels(
 
     section.replaceChildren(intro, grid);
   } catch (error) {
-    options.onError(error instanceof Error ? error.message : "Could not load story levels");
+    renderRetryError(
+      section,
+      error instanceof Error ? error.message : "Could not load story levels",
+      () => renderStoryLevels(section, group, options),
+      groupLabel(group),
+    );
   }
 }
 
@@ -127,7 +134,7 @@ async function renderStoryParts(
     const intro = el("div");
     intro.append(
       el("div", "question-type", `Goethe-Institut · ${level}`),
-      el("h2", "focus-title", "Choose a Teil"),
+      el("h2", "focus-title", "Choose a part"),
     );
 
     const grid = el("div", "focus-grid goethe-parts-grid");
@@ -137,7 +144,12 @@ async function renderStoryParts(
 
     section.replaceChildren(intro, grid);
   } catch (error) {
-    options.onError(error instanceof Error ? error.message : "Could not load Goethe parts");
+    renderRetryError(
+      section,
+      error instanceof Error ? error.message : "Could not load Goethe parts",
+      () => renderStoryParts(section, level, options),
+      `Goethe-Institut · ${level}`,
+    );
   }
 }
 
@@ -176,13 +188,20 @@ async function renderStoryPassages(
     if (passages.length === 0) {
       section.replaceChildren(
         intro,
-        el("p", "prompt", group === "goethe" ? "No Übungen are available here yet." : "No stories are available here yet."),
+        el("p", "prompt", group === "goethe" ? "No exercises are available here yet." : "No stories are available here yet."),
       );
       return;
     }
     section.replaceChildren(intro, grid);
   } catch (error) {
-    options.onError(error instanceof Error ? error.message : "Could not load stories");
+    renderRetryError(
+      section,
+      error instanceof Error ? error.message : "Could not load stories",
+      () => renderStoryPassages(section, group, level, part, options),
+      part
+        ? `${groupLabel(group)} · ${level} · ${learnerPartLabel(goethePartLabel(level, part))}`
+        : `${groupLabel(group)} · ${level}`,
+    );
   }
 }
 
@@ -208,7 +227,14 @@ async function renderStoryReader(
     });
     renderStoryPractice(section, { passage, selections: {}, results: null }, options);
   } catch (error) {
-    options.onError(error instanceof Error ? error.message : "Could not load story");
+    renderRetryError(
+      section,
+      error instanceof Error ? error.message : "Could not load story",
+      () => renderStoryReader(section, passageId, group, level, part, options),
+      part
+        ? `${groupLabel(group)} · ${level} · ${learnerPartLabel(goethePartLabel(level, part))}`
+        : `${groupLabel(group)} · ${level}`,
+    );
   }
 }
 
@@ -376,7 +402,7 @@ function sourceChoiceContent(passage: StoryPassage): HTMLElement {
     content: null,
   });
   content.append(
-    el("div", "question-type", `${passage.level} · ${partLabel(passage.part ?? "teil_2")}`),
+    el("div", "question-type", `${passage.level} · ${learnerPartLabel(partLabel(passage.part ?? "teil_2"))}`),
     el("h2", "story-title", passage.title),
     el("p", "goethe-task-prompt", instruction || passage.passage_text),
   );
@@ -401,7 +427,7 @@ function sourceChoiceContent(passage: StoryPassage): HTMLElement {
 function noticeContent(passage: StoryPassage): HTMLElement {
   const content = el("article", "story-passage goethe-exercise notice-exercise");
   content.append(
-    el("div", "question-type", `${passage.level} · ${partLabel(passage.part ?? "teil_3")}`),
+    el("div", "question-type", `${passage.level} · ${learnerPartLabel(partLabel(passage.part ?? "teil_3"))}`),
     el("h2", "story-title", passage.title),
     stimulusRenderer(stimulusFromPassage(passage)),
   );
@@ -481,8 +507,8 @@ function partCard(part: StoryPart, level: StoryLevel["level"], onClick: () => vo
   const card = button("", "focus-option goethe-part-option");
   card.addEventListener("click", onClick);
   card.append(
-    el("strong", "", goethePartLabel(level, part.part)),
-    el("span", "", formatCount(part.passage_count, "Übung", { plural: "Übungen", zeroLabel: "No" })),
+    el("strong", "", learnerPartLabel(goethePartLabel(level, part.part))),
+    el("span", "", formatCount(part.passage_count, "exercise", { plural: "exercises", zeroLabel: "No" })),
     el("span", "", formatCount(part.question_count, "question", { zeroLabel: "No" })),
   );
   return card;
@@ -507,8 +533,8 @@ function storyPassagesIntro(
 ): HTMLElement {
   const intro = el("div");
   intro.append(
-    el("div", "question-type", part ? `${groupLabel(group)} · ${level} · ${goethePartLabel(level, part)}` : level),
-    el("h2", "focus-title", group === "goethe" ? "Choose an Übung" : "Choose a story"),
+    el("div", "question-type", part ? `${groupLabel(group)} · ${level} · ${learnerPartLabel(goethePartLabel(level, part))}` : level),
+    el("h2", "focus-title", group === "goethe" ? "Choose an exercise" : "Choose a story"),
   );
   return intro;
 }
@@ -536,8 +562,28 @@ function formatStoryItemCount(
   group: StoryGroup["group"],
   options: { zeroLabel?: string } = {},
 ): string {
-  if (group === "goethe") return formatCount(count, "Übung", { plural: "Übungen", ...options });
+  if (group === "goethe") return formatCount(count, "exercise", { plural: "exercises", ...options });
   return formatCount(count, "story", options);
+}
+
+function learnerPartLabel(label: string): string {
+  return label.replace(/^Teil\b/, "Part");
+}
+
+function renderRetryError(
+  section: HTMLElement,
+  message: string,
+  retryAction: () => void,
+  contextLabel?: string,
+): void {
+  const error = el("p", "error", message);
+  error.setAttribute("role", "alert");
+  const retry = button("Try again", "button compact-button");
+  retry.addEventListener("click", retryAction);
+  const state = el("div", "load-error");
+  if (contextLabel) state.append(el("div", "question-type", contextLabel));
+  state.append(error, retry);
+  section.replaceChildren(state);
 }
 
 function topicLabel(topic: string): string {

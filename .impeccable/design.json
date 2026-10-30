@@ -1,0 +1,391 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-30T06:00:15Z",
+  "title": "Design System: DeutscheLearn",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Deep Study Blue",
+        "canonical": "#08327d",
+        "tonalRamp": [
+          "oklch(15% 0.066 261.2)",
+          "oklch(25% 0.110 261.2)",
+          "oklch(35% 0.135 261.2)",
+          "oklch(45% 0.135 261.2)",
+          "oklch(55% 0.135 261.2)",
+          "oklch(65% 0.135 261.2)",
+          "oklch(80% 0.101 261.2)",
+          "oklch(95% 0.024 261.2)"
+        ]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Deep Study Blue Hover",
+        "canonical": "#052459",
+        "tonalRamp": [
+          "oklch(15% 0.063 260.4)",
+          "oklch(25% 0.102 260.4)",
+          "oklch(35% 0.102 260.4)",
+          "oklch(45% 0.102 260.4)",
+          "oklch(55% 0.102 260.4)",
+          "oklch(65% 0.102 260.4)",
+          "oklch(80% 0.101 260.4)",
+          "oklch(95% 0.024 260.4)"
+        ]
+      },
+      "primary-fg": {
+        "role": "neutral",
+        "displayName": "Primary Action Text",
+        "canonical": "#fbfbfb",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(45% 0.000 89.9)",
+          "oklch(55% 0.000 89.9)",
+          "oklch(65% 0.000 89.9)",
+          "oklch(80% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "accent": {
+        "role": "secondary",
+        "displayName": "Quiet Teal",
+        "canonical": "#558a86",
+        "tonalRamp": [
+          "oklch(15% 0.026 189.6)",
+          "oklch(25% 0.043 189.6)",
+          "oklch(35% 0.057 189.6)",
+          "oklch(45% 0.057 189.6)",
+          "oklch(55% 0.057 189.6)",
+          "oklch(65% 0.057 189.6)",
+          "oklch(80% 0.057 189.6)",
+          "oklch(95% 0.057 189.6)"
+        ]
+      },
+      "accent-subtle": {
+        "role": "secondary",
+        "displayName": "Pale Teal Surface",
+        "canonical": "#e9f0ef",
+        "tonalRamp": [
+          "oklch(15% 0.008 186.9)",
+          "oklch(25% 0.008 186.9)",
+          "oklch(35% 0.008 186.9)",
+          "oklch(45% 0.008 186.9)",
+          "oklch(55% 0.008 186.9)",
+          "oklch(65% 0.008 186.9)",
+          "oklch(80% 0.008 186.9)",
+          "oklch(95% 0.008 186.9)"
+        ]
+      },
+      "gold": {
+        "role": "tertiary",
+        "displayName": "Signal Gold",
+        "canonical": "#ffce00",
+        "tonalRamp": [
+          "oklch(15% 0.031 91.3)",
+          "oklch(25% 0.051 91.3)",
+          "oklch(35% 0.072 91.3)",
+          "oklch(45% 0.092 91.3)",
+          "oklch(55% 0.112 91.3)",
+          "oklch(65% 0.133 91.3)",
+          "oklch(80% 0.164 91.3)",
+          "oklch(95% 0.067 91.3)"
+        ]
+      },
+      "error": {
+        "role": "tertiary",
+        "displayName": "Clear Error Red",
+        "canonical": "#dd0000",
+        "tonalRamp": [
+          "oklch(15% 0.062 29.2)",
+          "oklch(25% 0.103 29.2)",
+          "oklch(35% 0.144 29.2)",
+          "oklch(45% 0.185 29.2)",
+          "oklch(55% 0.226 29.2)",
+          "oklch(65% 0.231 29.2)",
+          "oklch(80% 0.115 29.2)",
+          "oklch(95% 0.025 29.2)"
+        ]
+      },
+      "error-subtle": {
+        "role": "tertiary",
+        "displayName": "Pale Error Surface",
+        "canonical": "#fdecec",
+        "tonalRamp": [
+          "oklch(15% 0.018 17.5)",
+          "oklch(25% 0.018 17.5)",
+          "oklch(35% 0.018 17.5)",
+          "oklch(45% 0.018 17.5)",
+          "oklch(55% 0.018 17.5)",
+          "oklch(65% 0.018 17.5)",
+          "oklch(80% 0.018 17.5)",
+          "oklch(95% 0.018 17.5)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Soft Paper",
+        "canonical": "#fbfbfb",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(45% 0.000 89.9)",
+          "oklch(55% 0.000 89.9)",
+          "oklch(65% 0.000 89.9)",
+          "oklch(80% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Clean Surface",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(45% 0.000 89.9)",
+          "oklch(55% 0.000 89.9)",
+          "oklch(65% 0.000 89.9)",
+          "oklch(80% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "surface-raised": {
+        "role": "neutral",
+        "displayName": "Raised Paper",
+        "canonical": "#f4f4f3",
+        "tonalRamp": [
+          "oklch(15% 0.001 106.4)",
+          "oklch(25% 0.001 106.4)",
+          "oklch(35% 0.001 106.4)",
+          "oklch(45% 0.001 106.4)",
+          "oklch(55% 0.001 106.4)",
+          "oklch(65% 0.001 106.4)",
+          "oklch(80% 0.001 106.4)",
+          "oklch(95% 0.001 106.4)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Quiet Border",
+        "canonical": "#d9d9d6",
+        "tonalRamp": [
+          "oklch(15% 0.004 106.5)",
+          "oklch(25% 0.004 106.5)",
+          "oklch(35% 0.004 106.5)",
+          "oklch(45% 0.004 106.5)",
+          "oklch(55% 0.004 106.5)",
+          "oklch(65% 0.004 106.5)",
+          "oklch(80% 0.004 106.5)",
+          "oklch(95% 0.004 106.5)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "canonical": "#0f0a01",
+        "tonalRamp": [
+          "oklch(15% 0.026 89.6)",
+          "oklch(25% 0.026 89.6)",
+          "oklch(35% 0.026 89.6)",
+          "oklch(45% 0.026 89.6)",
+          "oklch(55% 0.026 89.6)",
+          "oklch(65% 0.026 89.6)",
+          "oklch(80% 0.026 89.6)",
+          "oklch(95% 0.026 89.6)"
+        ]
+      },
+      "muted-text": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#6b6763",
+        "tonalRamp": [
+          "oklch(15% 0.008 67.6)",
+          "oklch(25% 0.008 67.6)",
+          "oklch(35% 0.008 67.6)",
+          "oklch(45% 0.008 67.6)",
+          "oklch(55% 0.008 67.6)",
+          "oklch(65% 0.008 67.6)",
+          "oklch(80% 0.008 67.6)",
+          "oklch(95% 0.008 67.6)"
+        ]
+      },
+      "focus-ring": {
+        "role": "primary",
+        "displayName": "Focus Blue",
+        "canonical": "#08327d",
+        "tonalRamp": [
+          "oklch(15% 0.066 261.2)",
+          "oklch(25% 0.110 261.2)",
+          "oklch(35% 0.135 261.2)",
+          "oklch(45% 0.135 261.2)",
+          "oklch(55% 0.135 261.2)",
+          "oklch(65% 0.135 261.2)",
+          "oklch(80% 0.101 261.2)",
+          "oklch(95% 0.024 261.2)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Product name and primary landing heading."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Mode and section headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Instructions, exercise text, and supporting content."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Small category labels and metadata headings."
+      }
+    },
+    "shadows": [
+      {
+        "name": "interactive-lift",
+        "value": "0 14px 28px color-mix(in srgb, var(--text) 16%, transparent)",
+        "purpose": "Hover feedback on video thumbnails."
+      },
+      {
+        "name": "soft-answer-panel",
+        "value": "0 6px 20px color-mix(in srgb, var(--text) 7%, transparent)",
+        "purpose": "Subtle separation for dictation answer and feedback areas."
+      }
+    ],
+    "motion": [
+      {
+        "name": "quick-control-state",
+        "value": "120ms ease",
+        "purpose": "Button and row hover/focus transitions."
+      },
+      {
+        "name": "media-hover",
+        "value": "160ms ease",
+        "purpose": "Video item hover and play affordance transitions."
+      },
+      {
+        "name": "progress-fill",
+        "value": "220ms ease",
+        "purpose": "Dictation progress changes."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "shell",
+        "value": "820px"
+      },
+      {
+        "name": "dictation-tablet",
+        "value": "760px"
+      },
+      {
+        "name": "dictation-mobile",
+        "value": "620px"
+      },
+      {
+        "name": "dictation-narrow",
+        "value": "380px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main action, used once per focused task where possible.",
+      "html": "<button class=\"ds-button-primary\">Check answer</button>",
+      "css": ".ds-button-primary { min-height: 58px; padding: 0 20px; border: 1px solid var(--primary); border-radius: 0; background: var(--primary); color: var(--primary-fg); font: inherit; cursor: pointer; transition: background-color 120ms ease, border-color 120ms ease; } .ds-button-primary:hover { border-color: var(--primary-hover); background: var(--primary-hover); } .ds-button-primary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .ds-button-primary:disabled { background: var(--surface-raised); color: var(--muted-text); opacity: .48; cursor: not-allowed; }"
+    },
+    {
+      "name": "Answer Option",
+      "kind": "button",
+      "description": "An unselected choice that stays visually quiet until hover or focus.",
+      "html": "<button class=\"ds-answer-option\">Ich gehe heute nach Hause.</button>",
+      "css": ".ds-answer-option { min-height: 58px; padding: 12px 20px; border: 1px solid var(--border-strong, var(--text)); border-radius: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background-color 120ms ease, border-color 120ms ease; } .ds-answer-option:hover { border-color: var(--text); background: var(--surface-raised); } .ds-answer-option:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A simple writing surface with a clear keyboard focus state.",
+      "html": "<input class=\"ds-text-field\" aria-label=\"Your answer\" placeholder=\"Type your answer…\">",
+      "css": ".ds-text-field { box-sizing: border-box; width: 100%; min-height: 46px; padding: 8px; border: 1px solid var(--border); border-radius: 0; background: var(--surface); color: var(--text); font: inherit; } .ds-text-field:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .ds-text-field[aria-invalid=\"true\"] { border-color: var(--error); }"
+    },
+    {
+      "name": "Mode Row",
+      "kind": "custom",
+      "description": "An open row for selecting a learning activity, with color appearing at the point of interaction.",
+      "html": "<button class=\"ds-mode-row\"><span class=\"ds-mode-number\">01</span><span><strong>Grammar practice</strong><small>Review a topic and try a short exercise.</small></span><span aria-hidden=\"true\">→</span></button>",
+      "css": ".ds-mode-row { --row-accent: var(--primary); box-sizing: border-box; display: grid; grid-template-columns: 64px minmax(0, 1fr) 24px; gap: 16px; align-items: start; width: 100%; min-height: 96px; padding: 16px 12px; border: 0; border-top: 1px solid var(--border); border-left: 4px solid transparent; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background-color 120ms ease, border-color 120ms ease; } .ds-mode-row:hover, .ds-mode-row:focus-visible { border-top-color: var(--row-accent); border-left-color: var(--row-accent); background: color-mix(in srgb, var(--row-accent) 8%, var(--surface)); } .ds-mode-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .ds-mode-number { color: var(--row-accent); font-size: 32px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; } .ds-mode-row strong, .ds-mode-row small { display: block; } .ds-mode-row small { margin-top: 6px; color: var(--muted-text); font-size: 13px; line-height: 1.4; }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "custom",
+      "description": "A compact choice control with a dark, high-contrast selected state.",
+      "html": "<div class=\"ds-segmented\" role=\"tablist\"><button role=\"tab\" aria-selected=\"true\">A1</button><button role=\"tab\" aria-selected=\"false\">A2</button></div>",
+      "css": ".ds-segmented { display: inline-grid; grid-auto-columns: 1fr; grid-auto-flow: column; height: 44px; border: 1px solid var(--border); background: var(--surface); } .ds-segmented button { min-width: 56px; padding: 0 14px; border: 0; background: transparent; color: var(--muted-text); font: inherit; font-size: 13px; cursor: pointer; } .ds-segmented button:hover { background: var(--surface-raised); color: var(--text); } .ds-segmented button[aria-selected=\"true\"] { background: var(--text); color: var(--background); } .ds-segmented button:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--focus-ring); outline-offset: 2px; }"
+    },
+    {
+      "name": "App Header",
+      "kind": "nav",
+      "description": "A compact header with understated back navigation and a narrow brand rule.",
+      "html": "<nav class=\"ds-app-header\" aria-label=\"Main navigation\"><a href=\"#\">DeutscheLearn</a><a href=\"#\">Back</a></nav>",
+      "css": ".ds-app-header { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 0 0 20px; color: var(--text); font: inherit; } .ds-app-header::after { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; background: linear-gradient(to right, var(--text) 0 40%, var(--error) 40% 70%, var(--gold) 70% 100%); content: \"\"; } .ds-app-header a { color: inherit; text-decoration: none; } .ds-app-header a:last-child { color: var(--muted-text); } .ds-app-header a:last-child:hover { color: var(--text); text-decoration: underline; text-underline-offset: 4px; } .ds-app-header a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }"
+    },
+    {
+      "name": "Video Library Item",
+      "kind": "card",
+      "description": "A media-specific card for choosing a captioned video; keep this exception limited to video browsing.",
+      "html": "<button class=\"ds-video-card\"><span class=\"ds-video-image\"><span class=\"ds-video-play\" aria-hidden=\"true\">▶</span></span><span class=\"ds-video-copy\"><strong>Deutsch lernen im Alltag</strong><small>Die Maus · 4 min</small></span></button>",
+      "css": ".ds-video-card { display: grid; align-content: start; overflow: hidden; padding: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease; } .ds-video-card:hover { border-color: var(--text); transform: translateY(-3px); box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 14%, transparent); } .ds-video-card:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; } .ds-video-image { display: grid; min-height: 120px; place-items: center; background: var(--surface-raised); } .ds-video-play { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); } .ds-video-copy { display: grid; gap: 6px; padding: 12px; } .ds-video-copy small { color: var(--muted-text); font-size: 13px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Language Workshop",
+    "overview": "DeutscheLearn feels like a calm place to work through German: focused, minimal, and friendly. The interface favors clear type, open space, and direct controls over decorative framing. Learning modes read as steps in a working process, with restrained color used to orient learners and mark important states. The light theme uses a soft near-white canvas and dark ink; the dark theme moves to charcoal surfaces and warm off-white text. Blue and teal provide the main signals, while gold and red are reserved for selected emphasis and errors. The user prefers avoiding card-heavy layouts and excess color. Keep content open and row-based wherever grouping does not need its own container.",
+    "keyCharacteristics": [
+      "Minimal and approachable, with clear hierarchy.",
+      "Open rows and flat surfaces are the default.",
+      "Color identifies action, mode, or state rather than decorating empty space."
+    ],
+    "rules": [
+      {
+        "name": "The One Accent at a Time Rule",
+        "body": "Use neutral surfaces as the base; let one strong accent lead a small control group or status at a time.",
+        "section": "colors"
+      },
+      {
+        "name": "The Working Text Rule",
+        "body": "Keep instructions and exercise content at the body size or larger; labels are for navigation and metadata, not long explanations.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Keep resting content flat; reserve shadows for clear interaction or a focused task surface.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use open rows, spacing, and thin borders before adding another card container.",
+      "Do keep primary actions blue and reserve gold and red for small, meaningful status or feedback cues.",
+      "Do preserve clear keyboard focus in both themes.",
+      "Do keep the 12-column desktop layout and single-column behavior below 820px when building within the existing shell.",
+      "Do keep media cards for thumbnail-based video selection, where the preview helps the learner choose."
+    ],
+    "donts": [
+      "Don't use several saturated colors in one small group when one accent and neutrals communicate the state.",
+      "Don't wrap every section, option, or paragraph in a card; prefer open space and row separators.",
+      "Don't add decorative shadows to resting panels.",
+      "Don't use uppercase tracked labels for long instructions or body copy."
+    ]
+  }
+}

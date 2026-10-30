@@ -9,30 +9,40 @@
 
 .home-intro {
   display: grid;
-  gap: 0;
+  gap: 8px;
 }
 
-.home-intro::before {
-  content: "01 — ÜBERSICHT";
-  color: var(--text);
-  font-size: var(--text-label-size);
-  line-height: var(--text-label-line);
-  font-weight: var(--text-label-weight);
-  letter-spacing: var(--text-label-tracking);
-  text-transform: uppercase;
+.home-heading {
+  margin: 0;
+  font-size: var(--text-title-size);
+  line-height: var(--text-title-line);
+  font-weight: var(--text-title-weight);
 }
 
 .mode-grid {
   display: grid;
-  grid-template-columns: 1fr;
   align-content: start;
-  gap: 0;
+  gap: 20px;
   min-height: 0;
   padding: 0 0 24px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+.mode-group {
+  display: grid;
+  gap: 0;
+}
+
+.mode-group-title {
+  margin: 0;
+  padding: 4px 0 8px;
+  color: var(--text-muted);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-line);
+  font-weight: var(--text-label-weight);
 }
 
 .mode-grid::-webkit-scrollbar {
@@ -52,7 +62,7 @@
   padding: 16px 0 24px 20px;
   border: 0;
   border-top: 1px solid var(--border);
-  border-left: 4px solid transparent;
+  border-left: 0;
   background: transparent;
   color: var(--text);
   text-align: left;
@@ -66,8 +76,7 @@
 .mode-card:hover,
 .mode-card:focus-visible {
   border-top-color: var(--row-colour);
-  border-left-color: var(--row-colour);
-  background: color-mix(in srgb, var(--row-colour) 8%, var(--surface));
+  background: color-mix(in srgb, var(--row-colour) 5%, var(--surface));
 }
 
 .mode-card:focus-visible {
@@ -153,44 +162,37 @@
   font-variant-numeric: tabular-nums;
 }
 
-.mode-card:nth-child(1) {
+.mode-group-quiz .mode-card {
   --row-colour: var(--primary);
 }
 
-.mode-card:nth-child(1) .mode-numeral {
+.mode-group-quiz .mode-numeral {
   color: var(--primary);
 }
 
-.mode-card:nth-child(2) {
+.mode-group-skills .mode-card {
   --row-colour: var(--accent);
 }
 
-.mode-card:nth-child(2) .mode-numeral {
+.mode-group-skills .mode-numeral {
   color: var(--accent);
 }
 
-.mode-card:nth-child(3) {
-  --row-colour: var(--gold);
+.home-more > summary {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
-.mode-card:nth-child(3) .mode-numeral {
-  color: var(--gold);
+.home-more > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
 }
 
-.mode-card:nth-child(4) {
-  --row-colour: var(--red);
-}
-
-.mode-card:nth-child(4) .mode-numeral {
-  color: var(--red);
-}
-
-.mode-card:nth-child(5) {
-  --row-colour: var(--text);
-}
-
-.mode-card:nth-child(5) .mode-numeral {
-  color: var(--text);
+.home-more[open] {
+  display: grid;
+  gap: 16px;
 }
 
 .mistake-tray {

@@ -59,34 +59,51 @@ const modes: Array<{
   },
 ];
 
+const modeGroups: Array<{ id: "quiz" | "skills"; title: string; modes: HomeMode[] }> = [
+  { id: "quiz", title: "Quiz practice", modes: ["practice", "endless", "timed"] },
+  { id: "skills", title: "Study and listening", modes: ["focus", "story", "dictation"] },
+];
+
 export function homeView(options: HomeViewOptions): HTMLElement {
   const section = el("section", "home");
   const intro = el("div", "home-intro");
+  intro.append(el("h2", "home-heading", "Choose a way to practice"));
 
   const grid = el("div", "mode-grid");
-  for (const [index, item] of modes.entries()) {
-    const card = document.createElement("a");
-    card.className = `mode-card mode-card-${item.mode}`;
-    card.href = `#${item.mode}`;
-    card.setAttribute("aria-label", item.action);
-    card.addEventListener("click", (event) => {
-      event.preventDefault();
-      options.onSelectMode(item.mode);
-    });
+  let index = 0;
+  for (const group of modeGroups) {
+    const groupNode = el("section", `mode-group mode-group-${group.id}`);
+    groupNode.setAttribute("aria-labelledby", `mode-group-${group.id}-title`);
+    const groupTitle = el("h3", "mode-group-title", group.title);
+    groupTitle.id = `mode-group-${group.id}-title`;
+    groupNode.append(groupTitle);
+    for (const mode of group.modes) {
+      const item = modes.find((candidate) => candidate.mode === mode);
+      if (!item) continue;
+      const card = document.createElement("a");
+      card.className = `mode-card mode-card-${item.mode}`;
+      card.href = `#${item.mode}`;
+      card.setAttribute("aria-label", `${item.title}: ${item.action}`);
+      card.addEventListener("click", (event) => {
+        event.preventDefault();
+        options.onSelectMode(item.mode);
+      });
 
-    const numeral = el("span", "mode-numeral", String(index + 1).padStart(2, "0"));
-    const content = el("span", "mode-content");
-    content.append(el("strong", "", item.title), el("span", "mode-description", item.description));
+      const numeral = el("span", "mode-numeral", String(++index).padStart(2, "0"));
+      const content = el("span", "mode-content");
+      content.append(el("strong", "", item.title), el("span", "mode-description", item.description));
 
-    const metric = options.metrics[item.mode];
-    const stat = el("span", "mode-stat");
-    stat.append(
-      el("span", "mode-stat-label", metric.label),
-      el("span", metric.value === "—" ? "mode-stat-value mode-stat-empty" : "mode-stat-value", metric.value),
-    );
+      const metric = options.metrics[item.mode];
+      const stat = el("span", "mode-stat");
+      stat.append(
+        el("span", "mode-stat-label", metric.label),
+        el("span", metric.value === "—" ? "mode-stat-value mode-stat-empty" : "mode-stat-value", metric.value),
+      );
 
-    card.append(numeral, content, stat, el("span", "mode-arrow", "→"));
-    grid.append(card);
+      card.append(numeral, content, stat, el("span", "mode-arrow", "→"));
+      groupNode.append(card);
+    }
+    grid.append(groupNode);
   }
 
   section.append(intro, grid);

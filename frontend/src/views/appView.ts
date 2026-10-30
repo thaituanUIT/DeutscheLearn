@@ -15,11 +15,12 @@ import {
 } from "../components/grammarWidget";
 import { setPlayer } from "../state/playerStore";
 import { homeMetricsForPlayer, recentMistakes } from "../state/progressStore";
+import { getQuizState } from "../state/quizStore";
 import { clear, el } from "../utils/dom";
 import { focusView } from "./focusView";
 import { homeView, type HomeMode } from "./homeView";
 import { leaderboardView, wordOfDayView } from "./leaderboardView";
-import { quizView } from "./quizView";
+import { abandonTimedRun, quizView } from "./quizView";
 import { storyView } from "./storyView";
 import { dictationView } from "./dictationView";
 
@@ -44,9 +45,12 @@ export async function renderApp(root: HTMLElement): Promise<void> {
   } catch (error) {
     clear(root);
     const shell = el("div", "shell");
+    const message = el("div", "error", error instanceof Error ? error.message : "Could not load app");
+    message.setAttribute("role", "alert");
+    message.setAttribute("aria-atomic", "true");
     shell.append(
       el("h1", "brand", "DeutscheLearn"),
-      el("div", "error", error instanceof Error ? error.message : "Could not load app"),
+      message,
     );
     root.append(shell);
   }
@@ -62,6 +66,9 @@ function draw(
   let bestScore = player.best_endless_score;
   let grammarWidget: ReturnType<typeof mountGrammarWidget> | null = null;
   let refreshedHomeMetrics = false;
+  let currentRoute: AppRoute = readRoute();
+  let routeInitialized = false;
+  let restoringTimedRoute = false;
 
   const shell = el("div", "shell");
   const playerNode = el("div", "player");
@@ -77,6 +84,9 @@ function draw(
   };
 
   const showHome = (syncRoute = true): void => {
+    if (syncRoute && !confirmLeavingTimedRun("home")) return;
+    if (currentRoute === "timed") abandonTimedRun();
+    currentRoute = "home";
     if (syncRoute) writeRoute("home");
     grammarWidget?.updateContext({ route: "home", passage: null, wrongAnswer: null });
     layout.className = "layout home-layout";
@@ -91,7 +101,9 @@ function draw(
         mistakes: recentMistakes(player.player_id),
       }),
     );
-    sidebar.replaceChildren(wordOfDayView(wordOfDay), leaderboardHost);
+    const more = el("details", "home-more");
+    more.append(el("summary", "", "Word of the day and leaderboard"), wordOfDayView(wordOfDay), leaderboardHost);
+    sidebar.replaceChildren(more);
     layout.replaceChildren(mainHost, sidebar);
     if (!refreshedHomeMetrics) {
       refreshedHomeMetrics = true;
@@ -108,6 +120,9 @@ function draw(
   };
 
   const showMode = (mode: HomeMode, syncRoute = true): void => {
+    if (syncRoute && !confirmLeavingTimedRun(mode)) return;
+    if (currentRoute === "timed" && mode !== "timed") abandonTimedRun();
+    currentRoute = mode;
     if (syncRoute) writeRoute(mode);
     grammarWidget?.updateContext({ route: mode, passage: null, wrongAnswer: null });
     layout.className = mode === "story" ? "layout mode-layout story-mode-layout" : "layout mode-layout";
@@ -118,7 +133,6 @@ function draw(
         focusView({
           onBack: showHome,
           onBackChange: renderHeaderBack,
-          onError: showError,
         }),
       );
       return;
@@ -170,13 +184,37 @@ function draw(
   };
 
   const showError = (message: string): void => {
-    const error = el("div", "error", message);
+    layout.querySelector(".app-error")?.remove();
+    const error = el("div", "error app-error", message);
+    error.setAttribute("role", "alert");
+    error.setAttribute("aria-atomic", "true");
     layout.prepend(error);
+  };
+
+  const confirmLeavingTimedRun = (destination: AppRoute): boolean => {
+    if (currentRoute !== "timed" || destination === "timed" || !getQuizState().running) return true;
+    const destinationLabel = destination === "home" ? "the home screen" : "another mode";
+    return window.confirm(`End this timed run and return to ${destinationLabel}? The timer will stop.`);
   };
 
   renderLeaderboard();
   const renderRoute = (): void => {
     const route = readRoute();
+    if (restoringTimedRoute) {
+      if (route === currentRoute) restoringTimedRoute = false;
+      return;
+    }
+    if (routeInitialized && route === currentRoute) return;
+    routeInitialized = true;
+    if (route !== currentRoute) {
+      if (!confirmLeavingTimedRun(route)) {
+        restoringTimedRoute = true;
+        window.history.forward();
+        return;
+      }
+      if (currentRoute === "timed") abandonTimedRun();
+      currentRoute = route;
+    }
     if (route === "home") {
       showHome(false);
       return;
