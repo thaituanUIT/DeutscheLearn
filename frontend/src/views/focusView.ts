@@ -16,7 +16,6 @@ import { formatCount } from "../utils/format";
 type FocusViewOptions = {
   onBack: () => void;
   onBackChange: (handler: () => void) => void;
-  onError: (message: string) => void;
 };
 
 type FocusRating = "again" | "hard" | "good" | "easy";
@@ -59,7 +58,9 @@ async function renderLevels(section: HTMLElement, options: FocusViewOptions): Pr
 
     section.replaceChildren(intro, grid);
   } catch (error) {
-    options.onError(error instanceof Error ? error.message : "Could not load focus levels");
+    renderRetryError(section, error instanceof Error ? error.message : "Could not load focus levels", () =>
+      renderLevels(section, options),
+    );
   }
 }
 
@@ -86,7 +87,12 @@ async function renderTopics(
 
     section.replaceChildren(intro, grid);
   } catch (error) {
-    options.onError(error instanceof Error ? error.message : "Could not load focus topics");
+    renderRetryError(
+      section,
+      error instanceof Error ? error.message : "Could not load focus topics",
+      () => renderTopics(section, level, options),
+      level,
+    );
   }
 }
 
@@ -102,7 +108,12 @@ async function renderFlashcards(
     const cards = shuffle(focusCardsFromWords(await getFocusWordsCorpus(), level, topic.topic));
     renderFlashcard(section, cards, 0, level, topic, options);
   } catch (error) {
-    options.onError(error instanceof Error ? error.message : "Could not load flashcards");
+    renderRetryError(
+      section,
+      error instanceof Error ? error.message : "Could not load flashcards",
+      () => renderFlashcards(section, level, topic, options),
+      `${level} · ${topic.label}`,
+    );
   }
 }
 
@@ -122,7 +133,12 @@ async function renderRevision(
       renderRevision(section, level, topic, options),
     );
   } catch (error) {
-    options.onError(error instanceof Error ? error.message : "Could not load revision quiz");
+    renderRetryError(
+      section,
+      error instanceof Error ? error.message : "Could not load revision quiz",
+      () => renderRevision(section, level, topic, options),
+      `${level} · ${topic.label}`,
+    );
   }
 }
 
@@ -284,6 +300,7 @@ function renderFlashcard(
     const player = getPlayer();
     if (player) recordFocusReview(player.player_id, card, rating);
     if (index < cards.length - 1) renderFlashcard(section, cards, index + 1, level, topic, options);
+    else renderDeckComplete(section, cards.length, level, topic, options);
   };
 
   const previous = button("Previous", "flashcard-nav-control flashcard-previous");
@@ -299,6 +316,48 @@ function renderFlashcard(
     onGrade: gradeCard,
     onPrevious: index > 0 ? showPrevious : null,
   });
+}
+
+function renderDeckComplete(
+  section: HTMLElement,
+  cardCount: number,
+  level: FocusLevel["level"],
+  topic: FocusTopic,
+  options: FocusViewOptions,
+): void {
+  clearFlashcardKeyboard(section);
+  const result = el("div", "result focus-deck-complete");
+  result.setAttribute("role", "status");
+  result.setAttribute("aria-live", "polite");
+  result.setAttribute("aria-atomic", "true");
+  result.append(
+    el("div", "question-type", `${level} · ${topic.label}`),
+    el("h2", "focus-title", "Deck complete"),
+    el("p", "prompt", `You reviewed all ${cardCount} cards in this deck.`),
+  );
+  const actions = el("div", "actions focus-deck-complete-actions");
+  const review = button("Review this deck again", "button primary");
+  review.addEventListener("click", () => void renderFlashcards(section, level, topic, options));
+  const chooseTopic = button("Choose another topic", "button");
+  chooseTopic.addEventListener("click", () => void renderTopics(section, level, options));
+  actions.append(review, chooseTopic);
+  section.replaceChildren(result, actions);
+}
+
+function renderRetryError(
+  section: HTMLElement,
+  message: string,
+  retryAction: () => void,
+  contextLabel?: string,
+): void {
+  const error = el("p", "error", message);
+  error.setAttribute("role", "alert");
+  const retry = button("Try again", "button compact-button");
+  retry.addEventListener("click", retryAction);
+  const state = el("div", "load-error");
+  if (contextLabel) state.append(el("div", "question-type", contextLabel));
+  state.append(error, retry);
+  section.replaceChildren(state);
 }
 
 function focusReviewActions(onGrade: (rating: FocusRating) => void): HTMLElement {

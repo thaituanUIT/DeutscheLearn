@@ -243,6 +243,7 @@ function renderExercise(
   const reveal = button("Reveal transcript", "button button-quiet dictation-reveal-button");
   const next = button("Next line →", "button button-secondary");
   let index = 0;
+  let skipAnswerShown = false;
   let youtubePlayer: YouTubePlayer | null = null;
   let disposed = false;
   let lineEndWatcher: number | null = null;
@@ -272,6 +273,8 @@ function renderExercise(
     progress.setAttribute("aria-valuetext", `Line ${index + 1} of ${transcript.segments.length}`);
     progressFill.style.width = `${((index + 1) / transcript.segments.length) * 100}%`;
     answer.value = "";
+    skipAnswerShown = false;
+    next.textContent = "Next line →";
     clear(feedback);
     reveal.textContent = "Reveal transcript";
     reveal.dataset.open = "false";
@@ -305,6 +308,21 @@ function renderExercise(
   });
 
   next.addEventListener("click", () => {
+    if (!answer.value.trim() && !skipAnswerShown) {
+      skipAnswerShown = true;
+      reveal.dataset.open = "true";
+      reveal.textContent = "Hide transcript";
+      feedback.replaceChildren(
+        el("p", "dictation-gold", transcript.segments[index].text),
+        el(
+          "p",
+          "dictation-skip-advice",
+          "Tip: replay the line and listen for the verb position and word endings. Those clues can make it easier to catch the whole sentence.",
+        ),
+      );
+      next.textContent = "Continue →";
+      return;
+    }
     index = (index + 1) % transcript.segments.length;
     showLine(true);
   });

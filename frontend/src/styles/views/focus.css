@@ -34,7 +34,7 @@
   padding: 16px 0 16px 12px;
   border: 0;
   border-top: 1px solid var(--border);
-  border-left: 4px solid transparent;
+  border-left: 0;
   background: transparent;
   color: var(--text);
   text-align: left;
@@ -44,31 +44,10 @@
     border-color 120ms ease-out;
 }
 
-.focus-grid .focus-option:nth-child(5n + 1) {
-  --option-colour: var(--primary);
-}
-
-.focus-grid .focus-option:nth-child(5n + 2) {
-  --option-colour: var(--accent);
-}
-
-.focus-grid .focus-option:nth-child(5n + 3) {
-  --option-colour: var(--gold);
-}
-
-.focus-grid .focus-option:nth-child(5n + 4) {
-  --option-colour: var(--red);
-}
-
-.focus-grid .focus-option:nth-child(5n + 5) {
-  --option-colour: var(--text);
-}
-
 .focus-option:not(:disabled):hover,
 .focus-option:focus-visible {
   border-top-color: var(--option-colour);
-  border-left-color: var(--option-colour);
-  background: color-mix(in srgb, var(--option-colour) 8%, var(--surface));
+  background: color-mix(in srgb, var(--option-colour) 5%, var(--surface));
 }
 
 .focus-option:focus-visible {
@@ -83,8 +62,27 @@
 
 .focus-option:disabled:hover {
   border-color: var(--border);
-  border-left-color: transparent;
   background: transparent;
+}
+
+.load-error {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+.load-error .error {
+  width: 100%;
+  margin: 0;
+}
+
+.focus-deck-complete {
+  display: grid;
+  gap: 12px;
+}
+
+.focus-deck-complete-actions {
+  flex-wrap: wrap;
 }
 
 .focus-option strong {
