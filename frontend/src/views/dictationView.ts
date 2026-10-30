@@ -1,9 +1,13 @@
 import {
   getDictationTranscript,
   getSavedDictationVideo,
-  listDictationVideos,
   reportDictationVideo,
 } from "../api/client";
+import {
+  getCachedDictationVideos,
+  getDictationVideosCatalog,
+  invalidateDictationVideos,
+} from "../api/queryClient";
 import type { DictationTranscript, DictationVideoSummary } from "../api/types";
 import { button } from "../components/button";
 import { clear, el } from "../utils/dom";
@@ -13,6 +17,8 @@ type DictationViewOptions = {
   onBack: () => void;
   onBackChange: (handler: () => void) => void;
 };
+
+const VIDEOS_PER_PAGE = 8;
 
 export function dictationView(options: DictationViewOptions): HTMLElement {
   const section = el("section", "dictation-view");
@@ -31,6 +37,9 @@ export function dictationView(options: DictationViewOptions): HTMLElement {
   const catalog = el("div", "dictation-video-grid");
   const libraryStatus = el("p", "dictation-library-empty muted", "Loading saved videos…");
   library.append(libraryHeader, libraryStatus, catalog);
+  const cachedVideos = getCachedDictationVideos();
+  let videos: DictationVideoSummary[] = cachedVideos ?? [];
+  let currentPage = 1;
 
   const addVideo = el("section", "dictation-add-video");
   const sourceHeading = el("div", "dictation-source-heading");
@@ -88,29 +97,43 @@ export function dictationView(options: DictationViewOptions): HTMLElement {
     status.textContent = message;
   };
 
+  const selectVideo = async (videoId: string): Promise<void> => {
+    const video = videos.find((item) => item.video_id === videoId);
+    showPracticePanel(video?.title ?? "Hörtippen");
+    updateStatus("");
+    clearExercise();
+    try {
+      const transcript = await getSavedDictationVideo(videoId);
+      practiceTitle.textContent = transcript.title;
+      disposeExercise = renderExercise(exercise, transcript, () => {
+        updateStatus("YouTube could not play this video. Try another video.", true);
+      });
+      updateStatus("");
+    } catch (error) {
+      updateStatus(readableError(error), true);
+    }
+  };
+
+  const renderCurrentCatalogPage = (): void => {
+    renderCatalog(catalog, libraryStatus, count, videos, currentPage, selectVideo, (page) => {
+      currentPage = page;
+      renderCurrentCatalogPage();
+    });
+  };
+
+  if (cachedVideos) renderCurrentCatalogPage();
+
   const refreshCatalog = async (): Promise<void> => {
     try {
-      const videos = await listDictationVideos();
-      renderCatalog(catalog, libraryStatus, count, videos, async (videoId) => {
-        const video = videos.find((item) => item.video_id === videoId);
-        showPracticePanel(video?.title ?? "Hörtippen");
-        updateStatus("");
-        clearExercise();
-        try {
-          const transcript = await getSavedDictationVideo(videoId);
-          practiceTitle.textContent = transcript.title;
-          disposeExercise = renderExercise(exercise, transcript, () => {
-            updateStatus("YouTube could not play this video. Try another video.", true);
-          });
-          updateStatus("");
-        } catch (error) {
-          updateStatus(readableError(error), true);
-        }
-      });
+      videos = await getDictationVideosCatalog();
+      currentPage = Math.min(currentPage, Math.max(1, Math.ceil(videos.length / VIDEOS_PER_PAGE)));
+      renderCurrentCatalogPage();
     } catch (error) {
-      count.textContent = "";
-      libraryStatus.textContent = readableError(error);
-      libraryStatus.className = "dictation-library-empty error";
+      if (!cachedVideos) {
+        count.textContent = "";
+        libraryStatus.textContent = readableError(error);
+        libraryStatus.className = "dictation-library-empty error";
+      }
     }
   };
 
@@ -129,6 +152,8 @@ export function dictationView(options: DictationViewOptions): HTMLElement {
           updateStatus("YouTube could not play this video. Try another video.", true);
         });
         updateStatus("");
+        currentPage = 1;
+        await invalidateDictationVideos();
         await refreshCatalog();
       })
       .catch((error: unknown) => {
@@ -150,7 +175,9 @@ function renderCatalog(
   emptyState: HTMLElement,
   count: HTMLElement,
   videos: DictationVideoSummary[],
+  page: number,
   onSelect: (videoId: string) => Promise<void>,
+  onPageChange: (page: number) => void,
 ): void {
   clear(catalog);
   count.textContent = `${videos.length} videos`;
@@ -162,7 +189,8 @@ function renderCatalog(
 
   emptyState.textContent = "Choose a video to start.";
   emptyState.className = "dictation-library-empty muted";
-  for (const video of videos) {
+  const totalPages = Math.ceil(videos.length / VIDEOS_PER_PAGE);
+  for (const video of videos.slice((page - 1) * VIDEOS_PER_PAGE, page * VIDEOS_PER_PAGE)) {
     const cardWrap = el("div", "dictation-video-card-wrap");
     const card = button("", "dictation-video-card");
     const imageWrap = el("span", "dictation-video-image");
@@ -205,6 +233,20 @@ function renderCatalog(
     });
     cardWrap.append(card, report);
     catalog.append(cardWrap);
+  }
+  if (totalPages > 1) {
+    const pagination = el("nav", "dictation-pagination");
+    pagination.setAttribute("aria-label", "Available video pages");
+    const previous = button("← Previous", "button button-quiet dictation-page-button");
+    previous.disabled = page <= 1;
+    previous.addEventListener("click", () => onPageChange(page - 1));
+    const pageLabel = el("span", "dictation-page-label", `Page ${page} of ${totalPages}`);
+    pageLabel.setAttribute("aria-live", "polite");
+    const next = button("Next →", "button button-quiet dictation-page-button");
+    next.disabled = page >= totalPages;
+    next.addEventListener("click", () => onPageChange(page + 1));
+    pagination.append(previous, pageLabel, next);
+    catalog.append(pagination);
   }
 }
 

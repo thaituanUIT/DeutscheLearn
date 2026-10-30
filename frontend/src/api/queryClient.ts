@@ -1,7 +1,8 @@
 import { QueryClient } from "@tanstack/query-core";
 
-import { fetchAllPassages, fetchAllWords } from "./client";
+import { fetchAllPassages, fetchAllWords, listDictationVideos } from "./client";
 import type {
+  DictationVideoSummary,
   FocusCard,
   FocusLevel,
   FocusRevisionQuestion,
@@ -15,8 +16,10 @@ import type {
 
 export const PASSAGES_QUERY_KEY = ["passages"] as const;
 export const WORDS_QUERY_KEY = ["words"] as const;
+export const DICTATION_VIDEOS_QUERY_KEY = ["dictation-videos"] as const;
 export const PASSAGES_STALE_TIME = 1000 * 60 * 60;
 export const WORDS_STALE_TIME = 1000 * 60 * 60;
+export const DICTATION_VIDEOS_STALE_TIME = 1000 * 60 * 2;
 
 export const queryClient = new QueryClient();
 
@@ -34,6 +37,30 @@ export function prefetchFocusWords(): Promise<void> {
     queryFn: fetchAllWords,
     staleTime: WORDS_STALE_TIME,
   });
+}
+
+export function prefetchDictationVideos(): Promise<void> {
+  return queryClient.prefetchQuery({
+    queryKey: DICTATION_VIDEOS_QUERY_KEY,
+    queryFn: listDictationVideos,
+    staleTime: DICTATION_VIDEOS_STALE_TIME,
+  });
+}
+
+export function getCachedDictationVideos(): DictationVideoSummary[] | undefined {
+  return queryClient.getQueryData<DictationVideoSummary[]>(DICTATION_VIDEOS_QUERY_KEY);
+}
+
+export function getDictationVideosCatalog(): Promise<DictationVideoSummary[]> {
+  return queryClient.fetchQuery({
+    queryKey: DICTATION_VIDEOS_QUERY_KEY,
+    queryFn: listDictationVideos,
+    staleTime: DICTATION_VIDEOS_STALE_TIME,
+  });
+}
+
+export function invalidateDictationVideos(): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: DICTATION_VIDEOS_QUERY_KEY });
 }
 
 export function getCachedFocusWords(): FocusCard[] | undefined {

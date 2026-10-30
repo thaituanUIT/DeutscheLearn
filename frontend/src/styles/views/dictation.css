@@ -18,6 +18,10 @@
 .dictation-video-count { flex: none; padding: 5px 10px; color: var(--text-muted); background: var(--surface-raised); border-radius: 999px; font-size: var(--text-meta-size); }
 .dictation-library-empty { margin: 0; padding: 16px; border: 1px dashed var(--border); }
 .dictation-video-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px 16px; }
+.dictation-pagination { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 16px; padding-top: 8px; }
+.dictation-page-button { min-height: 40px; padding: 0 12px; border: 1px solid var(--border); color: var(--text); background: transparent; }
+.dictation-page-button:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text); background: var(--surface-raised); }
+.dictation-page-label { color: var(--text-muted); font-size: var(--text-meta-size); font-variant-numeric: tabular-nums; }
 .dictation-video-card-wrap { display: grid; align-content: start; gap: 7px; min-width: 0; }
 .dictation-video-card { display: grid; align-content: start; overflow: hidden; padding: 0; color: var(--text); text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
 .dictation-video-card:hover { z-index: 1; border-color: var(--border-strong); transform: translateY(-4px) scale(1.015); box-shadow: 0 14px 28px color-mix(in srgb, var(--text) 16%, transparent); }
