@@ -2,6 +2,7 @@ import { getCurrentPlayer, getLeaderboard, getWordOfDay } from "../api/client";
 import {
   getCachedFocusWords,
   getCachedStoryPassages,
+  prefetchDictationVideos,
   prefetchFocusWords,
   prefetchStoryPassages,
 } from "../api/queryClient";
@@ -33,6 +34,7 @@ export async function renderApp(root: HTMLElement): Promise<void> {
   root.append(el("div", "shell", "Loading..."));
   void prefetchStoryPassages();
   void prefetchFocusWords();
+  void prefetchDictationVideos();
 
   try {
     const [player, leaderboard, wordOfDay] = await Promise.all([
