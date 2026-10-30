@@ -50,6 +50,7 @@ import {
 } from "../stimuli/templates";
 import { clear, el } from "../utils/dom";
 import { formatCount } from "../utils/format";
+import { renderDictationAdmin } from "./adminDictationView";
 
 const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
@@ -132,7 +133,7 @@ function adminMissingToken(): HTMLElement {
 function adminWorkspace(token: string): HTMLElement {
   const panel = el("section", "panel admin-panel");
   const host = el("div", "admin-host");
-  let activeTab: "words" | "reading" = "words";
+  let activeTab: "words" | "reading" | "dictation" = "words";
   let disposeActiveTab = (): void => undefined;
 
   const showWords = (): void => {
@@ -146,6 +147,12 @@ function adminWorkspace(token: string): HTMLElement {
     disposeActiveTab = renderReadingAdmin(host, token);
   };
 
+  const showDictation = (): void => {
+    activeTab = "dictation";
+    disposeActiveTab();
+    disposeActiveTab = renderDictationAdmin(host, token);
+  };
+
   const tabs = SegmentedControl({
     label: "Admin section",
     value: activeTab,
@@ -153,10 +160,12 @@ function adminWorkspace(token: string): HTMLElement {
     options: [
       { value: "words", label: "Vocabulary" },
       { value: "reading", label: "Reading" },
+      { value: "dictation", label: "Dictation" },
     ],
     onChange: (value) => {
       if (value === "words") showWords();
-      else showReading();
+      else if (value === "reading") showReading();
+      else showDictation();
     },
   });
   tabs.classList.add("admin-section-tabs");

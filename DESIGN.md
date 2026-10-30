@@ -136,11 +136,10 @@ Spacing repeats around 8, 12, 16, 24, and 32px. Leave enough room for learners t
 
 ## Elevation & Depth
 
-Depth is mostly flat. Thin borders and subtle surface shifts separate work areas; broad shadows are uncommon and belong to a small number of interactive media or answer panels. Avoid adding a card or shadow around every section. When a group needs stronger separation, prefer spacing and a quiet border before adding elevation.
+Depth is mostly flat. Thin borders and subtle surface shifts separate work areas; shadows are reserved for interactive video thumbnails. Avoid adding a card or shadow around every section. When a group needs stronger separation, prefer spacing and a quiet border before adding elevation.
 
 ### Shadow Vocabulary
 - **Interactive lift** (`0 14px 28px` with a 16% text-color mix): Hover feedback on video thumbnails, clarifying that the media item is actionable.
-- **Soft answer-panel shadow** (`0 6px 20px` with a 7% text-color mix): Used sparingly around dictation answer and feedback areas.
 
 **The Flat-By-Default Rule.** Keep resting content flat; reserve shadows for clear interaction or a focused task surface.
 

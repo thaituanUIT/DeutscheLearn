@@ -1,5 +1,6 @@
 import type {
   AdminImportResult,
+  AdminDictationVideo,
   AdminReadingPassage,
   AdminReadingPassageSummary,
   AdminWord,
@@ -36,8 +37,9 @@ export function getDictationTranscript(videoUrl: string): Promise<DictationTrans
   });
 }
 
-export function listDictationVideos(): Promise<DictationVideoSummary[]> {
-  return request<DictationVideoSummary[]>("/api/dictation/videos");
+export function listDictationVideos(limit = 100, offset = 0): Promise<DictationVideoSummary[]> {
+  const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return request<DictationVideoSummary[]>(`/api/dictation/videos?${query.toString()}`);
 }
 
 export function getSavedDictationVideo(videoId: string): Promise<DictationTranscript> {
@@ -49,6 +51,25 @@ export function reportDictationVideo(videoId: string): Promise<{ status: string 
     method: "POST",
     body: JSON.stringify({ reason: "other" }),
   });
+}
+
+export function getAdminDictationReports(token: string): Promise<AdminDictationVideo[]> {
+  return adminRequest<AdminDictationVideo[]>(token, "/api/admin/dictation/reports");
+}
+
+export function setAdminDictationVideoHidden(
+  token: string,
+  videoId: string,
+  isHidden: boolean,
+): Promise<AdminDictationVideo> {
+  return adminRequest<AdminDictationVideo>(
+    token,
+    `/api/admin/dictation/videos/${encodeURIComponent(videoId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ is_hidden: isHidden }),
+    },
+  );
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {

@@ -73,6 +73,103 @@
   justify-self: start;
 }
 
+.admin-dictation {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--admin-space-field);
+  overflow: hidden;
+}
+
+.admin-dictation-summary {
+  max-width: 72ch;
+  margin: 0;
+}
+
+.admin-dictation-list {
+  min-height: 0;
+  padding-bottom: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-dictation-list > .error {
+  margin-bottom: 12px;
+}
+
+.admin-dictation-empty-title {
+  margin: 16px 0 4px;
+  font-size: var(--text-body-size);
+  font-weight: 600;
+}
+
+.admin-dictation-row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+
+.admin-dictation-thumbnail {
+  display: block;
+  width: 112px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--surface-raised);
+}
+
+.admin-dictation-details {
+  min-width: 0;
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.admin-dictation-title {
+  max-width: 100%;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.admin-dictation-title:hover {
+  color: var(--primary);
+}
+
+.admin-dictation-title:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.admin-dictation-meta {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-dictation-state {
+  color: var(--accent);
+  font-size: var(--text-meta-size);
+  font-weight: 600;
+}
+
+.admin-dictation-state.is-hidden {
+  color: var(--text-muted);
+}
+
+.admin-dictation-hide {
+  color: var(--danger);
+}
+
+.admin-dictation-row .button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 .admin-reading-tabs {
   width: 100%;
   min-width: 0;
@@ -705,6 +802,8 @@
   .admin-editor,
   .admin-editor-form,
   .admin-host,
+  .admin-dictation,
+  .admin-dictation-list,
   .admin-items,
   .admin-form-fields,
   .form-scroll {
@@ -726,6 +825,21 @@
 
   .admin-items {
     max-height: none;
+  }
+
+  .admin-dictation-row {
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .admin-dictation-thumbnail {
+    width: 88px;
+    grid-row: span 2;
+  }
+
+  .admin-dictation-row > .button {
+    grid-column: 2;
+    justify-self: start;
   }
 }
 }

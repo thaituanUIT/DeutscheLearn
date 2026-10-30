@@ -55,7 +55,7 @@ library's default retry count for blocked proxies. Keep the credentials in the e
 never commit them. If only one value is set, dictation returns a configuration error instead of
 silently sending requests without the proxy.
 
-Dictation abuse controls apply only to new transcript fetches; cached videos remain available.
+Dictation abuse controls apply only to new transcript fetch attempts; cached videos remain available and do not consume fetch quotas.
 Defaults allow 3 new videos per client per hour, 10 per client per day, and 10 globally per day,
 with a 500-video library cap and transcript limits of 20,000 characters / 500 segments. Public
 reports are rate-limited and queued for admin review; they do not hide videos automatically. An admin can review reports at

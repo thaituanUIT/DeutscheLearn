@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.admin import router as admin_router
+from app.api.admin_reading import router as admin_reading_router
 from app.api.content import router as content_router
 from app.api.deps import get_or_create_player
 from app.api.dictation import router as dictation_router
@@ -25,6 +26,7 @@ router.include_router(dictation_router)
 router.include_router(grammar_router)
 router.include_router(content_router)
 router.include_router(admin_router)
+router.include_router(admin_reading_router)
 router.include_router(quiz_router)
 logger = logging.getLogger(__name__)
 

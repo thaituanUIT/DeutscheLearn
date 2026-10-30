@@ -38,6 +38,13 @@ Reading and Goethe exercises:
 - `GET /api/story/passages/{passage_id}`
 - `POST /api/story/answer`
 
+Dictation:
+
+- `GET /api/dictation/videos?limit=100&offset=0` lists visible videos in newest-first order; `limit` is capped at 500.
+- `GET /api/dictation/videos/{video_id}` fetches a saved transcript.
+- `POST /api/dictation/transcript` loads and caches captions for a YouTube video.
+- `POST /api/dictation/videos/{video_id}/report` queues a moderation report.
+
 Quiz:
 
 - `POST /api/quiz/endless/start`
@@ -80,6 +87,6 @@ Common API errors:
 - `404`: requested attempt, question, answer, word, or passage does not exist
 - `409`: attempt already finished, question already answered, duplicate word, or malformed content state
 - `422`: request validation failure
-- `429`: grammar assistant rate limit
+- `429`: grammar assistant or dictation per-client rate limit
 - `502`: upstream grammar provider failure
 - `503`: unavailable admin or grammar configuration
