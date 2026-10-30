@@ -20,7 +20,7 @@ The product combines practice modes with grammar help grounded in curated gramma
 
 ## Operating Context
 
-- Learners use the web app for flashcards, quiz and Goethe-style exercises, reading practice, grammar questions, and video dictation.
+- Learners use the web app for flashcards, word scrambles, quiz and Goethe-style exercises, reading practice, grammar questions, and video dictation.
 - Dictation uses YouTube videos with available captions. Learners can choose a cached library video or submit a video URL; fetched transcripts are stored for reuse.
 - The app currently identifies learners anonymously with a cookie-based player identity.
 
@@ -28,7 +28,7 @@ The product combines practice modes with grammar help grounded in curated gramma
 
 - The frontend is a TypeScript single-page app built with Vite. The backend is FastAPI with SQLAlchemy; the repository configures Postgres for hosted use.
 - Grammar assistance retrieves curated Markdown grammar notes and generates grounded answers with cited material. Wrong-answer context can be included to make help specific to the learner's mistake.
-- The app supports flashcards, quiz modes, reading passages, Goethe-style exercises, and caption-based dictation.
+- The app supports flashcards, word scrambles, quiz modes, reading passages, Goethe-style exercises, and caption-based dictation.
 - Anonymous access is a deliberate constraint for the current phase. Authentication is a future direction when the user base is large; no size threshold or transition date has been set.
 - Grammar generation and transcript fetching depend on external services and are subject to their availability, quotas, and operating cost.
 

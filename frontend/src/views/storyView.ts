@@ -1,3 +1,4 @@
+import "../styles/views/story.css";
 import {
   submitStoryAnswer,
 } from "../api/client";

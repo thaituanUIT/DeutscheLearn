@@ -1,0 +1,343 @@
+@layer views {
+.scramble-card {
+  min-height: 560px;
+  display: grid;
+  align-content: start;
+  gap: 32px;
+}
+
+.scramble-intro,
+.scramble-setup,
+.scramble-round,
+.scramble-result,
+.scramble-error {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+}
+
+.scramble-title,
+.scramble-result-score {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.scramble-setup {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  max-width: 680px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.scramble-level-field {
+  display: grid;
+  gap: 8px;
+}
+
+.scramble-field-label,
+.scramble-prompt-label,
+.scramble-bank-label {
+  color: var(--text-muted);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-line);
+  font-weight: var(--text-label-weight);
+  letter-spacing: var(--text-label-tracking);
+  text-transform: uppercase;
+}
+
+.scramble-level-select {
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 8px 36px 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.scramble-level-select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.scramble-start {
+  min-width: 170px;
+}
+
+.scramble-round {
+  gap: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.scramble-round-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.scramble-round-count,
+.scramble-score {
+  color: var(--text-muted);
+  font-size: var(--text-meta-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.scramble-score {
+  margin: 0;
+  text-align: right;
+}
+
+.scramble-prompt {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.scramble-meaning {
+  max-width: 700px;
+  margin: 0;
+  font-size: clamp(24px, 3.4vw, 36px);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.scramble-answer {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+}
+
+.scramble-answer-word {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.scramble-word-space {
+  width: 8px;
+}
+
+.scramble-answer-slot {
+  box-sizing: border-box;
+  display: grid;
+  width: 44px;
+  height: 54px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-bottom: 2px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 24px;
+  font-weight: 650;
+}
+
+button.scramble-answer-slot {
+  cursor: pointer;
+}
+
+button.scramble-answer-slot:hover {
+  border-color: var(--primary);
+  background: var(--accent-subtle);
+}
+
+.scramble-answer-slot.is-empty {
+  color: var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.scramble-letter-bank {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  min-height: 56px;
+}
+
+.scramble-letter-tile {
+  display: grid;
+  min-width: 48px;
+  min-height: 54px;
+  padding: 0 12px;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 23px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.scramble-letter-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  background: var(--accent-subtle);
+}
+
+.scramble-letter-tile:disabled {
+  opacity: 0.52;
+  cursor: default;
+}
+
+.scramble-letter-tile:focus-visible,
+.scramble-answer-slot:focus-visible,
+.scramble-actions button:focus-visible,
+.scramble-result button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.scramble-bank-empty {
+  align-self: center;
+  color: var(--text-muted);
+  font-size: var(--text-meta-size);
+}
+
+.scramble-feedback {
+  min-height: 24px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line);
+}
+
+.scramble-feedback.is-correct {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.scramble-feedback.is-incorrect {
+  color: var(--red);
+}
+
+.scramble-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.scramble-actions .scramble-check,
+.scramble-actions .scramble-next {
+  min-width: 150px;
+  justify-content: center;
+}
+
+.scramble-secondary {
+  min-height: 48px;
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.scramble-secondary:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.scramble-secondary:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.scramble-result {
+  justify-items: start;
+  max-width: 680px;
+  margin: auto;
+  padding: 48px 0;
+}
+
+.scramble-result-score {
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.scramble-error .button {
+  justify-self: start;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scramble-letter-tile {
+    transition: none;
+  }
+
+  .scramble-letter-tile:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .scramble-card {
+    min-height: 480px;
+    padding: 24px 16px;
+  }
+
+  .scramble-setup {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .scramble-start {
+    width: 100%;
+  }
+
+  .scramble-round-header {
+    align-items: start;
+  }
+
+  .scramble-answer-word {
+    gap: 4px;
+  }
+
+  .scramble-answer-slot {
+    width: 36px;
+    height: 46px;
+    font-size: 20px;
+  }
+
+  .scramble-letter-tile {
+    min-width: 42px;
+    min-height: 48px;
+    padding: 0 10px;
+    font-size: 20px;
+  }
+
+  .scramble-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .scramble-actions .scramble-check,
+  .scramble-actions .scramble-next {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+}

@@ -1,3 +1,4 @@
+import "../styles/views/quiz.css";
 import {
   startEndlessQuiz,
   startPracticeQuiz,

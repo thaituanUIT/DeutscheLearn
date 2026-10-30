@@ -1,8 +1,9 @@
+import "../styles/views/home.css";
 import { el } from "../utils/dom";
 import type { Mistake } from "../state/progressStore";
 import type { QuizMode } from "./quizView";
 
-export type HomeMode = QuizMode | "focus" | "story" | "dictation";
+export type HomeMode = QuizMode | "focus" | "scramble" | "story" | "dictation";
 
 export type HomeModeMetric = {
   label: string;
@@ -46,6 +47,12 @@ const modes: Array<{
     action: "Study words",
   },
   {
+    mode: "scramble",
+    title: "Scramble",
+    description: "Rebuild German words from shuffled letters.",
+    action: "Play scramble",
+  },
+  {
     mode: "story",
     title: "Story",
     description: "Short passages with comprehension questions.",
@@ -61,7 +68,7 @@ const modes: Array<{
 
 const modeGroups: Array<{ id: "quiz" | "skills"; title: string; modes: HomeMode[] }> = [
   { id: "quiz", title: "Quiz practice", modes: ["practice", "endless", "timed"] },
-  { id: "skills", title: "Study and listening", modes: ["focus", "story", "dictation"] },
+  { id: "skills", title: "Study and listening", modes: ["focus", "scramble", "story", "dictation"] },
 ];
 
 export function homeView(options: HomeViewOptions): HTMLElement {

@@ -1,3 +1,4 @@
+import "../styles/views/dictation.css";
 import {
   getDictationTranscript,
   getSavedDictationVideo,

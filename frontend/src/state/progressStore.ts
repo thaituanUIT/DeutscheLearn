@@ -7,6 +7,8 @@ type FocusReview = {
   reviewedAt: string;
 };
 
+export type FocusReviewUndo = () => boolean;
+
 export type Mistake = {
   mode: QuizMode | "focus" | "story";
   prompt: string;
@@ -66,6 +68,10 @@ export function homeMetricsForPlayer(
       label: "GELESEN",
       value: storyTotal > 0 ? `${Math.min(storyReadCount, storyTotal)} / ${storyTotal}` : empty,
     },
+    scramble: {
+      label: "WÖRTER",
+      value: options.focusCards ? String(options.focusCards.length) : empty,
+    },
     dictation: { label: "HÖREN & SCHREIBEN", value: "YouTube" },
   };
 }
@@ -111,14 +117,30 @@ export function recordQuizComplete(
   return { mode, score, total, missed, isRecord };
 }
 
-export function recordFocusReview(playerId: string, card: FocusCard, rating: "again" | "hard" | "good" | "easy"): void {
+export function recordFocusReview(
+  playerId: string,
+  card: FocusCard,
+  rating: "again" | "hard" | "good" | "easy",
+): FocusReviewUndo {
   const progress = loadProgress(playerId);
   const now = new Date();
-  progress.focusReviews[focusKey(card)] = {
+  const key = focusKey(card);
+  const previous = progress.focusReviews[key];
+  const recorded: FocusReview = {
     reviewedAt: now.toISOString(),
     dueAt: addDays(now, ratingDays(rating)).toISOString(),
   };
+  progress.focusReviews[key] = recorded;
   saveProgress(playerId, progress);
+
+  return () => {
+    const latest = loadProgress(playerId);
+    if (latest.focusReviews[key]?.reviewedAt !== recorded.reviewedAt) return false;
+    if (previous) latest.focusReviews[key] = previous;
+    else delete latest.focusReviews[key];
+    saveProgress(playerId, latest);
+    return true;
+  };
 }
 
 export function recordStoryRead(playerId: string, passage: StoryPassage): void {

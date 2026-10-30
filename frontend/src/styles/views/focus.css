@@ -9,12 +9,8 @@
 
 .focus-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 24px;
-}
-
-.topics-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 860px;
+  gap: 0;
 }
 
 .story-group-grid {
@@ -27,11 +23,14 @@
 
 .focus-option {
   --option-colour: var(--primary);
-  min-height: 164px;
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  padding: 16px 0 16px 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 12px;
   border: 0;
   border-top: 1px solid var(--border);
   border-left: 0;
@@ -86,6 +85,8 @@
 }
 
 .focus-option strong {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--text-title-size);
   line-height: var(--text-title-line);
   font-weight: var(--text-title-weight);
@@ -93,15 +94,23 @@
   hyphens: auto;
 }
 
-.focus-option span {
-  display: grid;
-  gap: 2px;
-  color: var(--text-muted);
-  font-size: var(--text-meta-size);
-  line-height: var(--text-meta-line);
+.focus-option-metrics {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 28px;
 }
 
-.focus-option > span::before {
+.focus-option-metric {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  min-width: 72px;
+}
+
+.focus-option-metric-label {
   color: var(--text);
   font-size: var(--text-label-size);
   line-height: var(--text-label-line);
@@ -110,12 +119,10 @@
   text-transform: uppercase;
 }
 
-.focus-option > span:first-of-type::before {
-  content: "Umfang";
-}
-
-.focus-option > span:nth-of-type(2)::before {
-  content: "Status";
+.focus-option-metric-value {
+  color: var(--text-muted);
+  font-size: var(--text-meta-size);
+  line-height: var(--text-meta-line);
 }
 
 .flashcard {
@@ -132,6 +139,7 @@
 
 .flashcard-deck-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -232,6 +240,28 @@
   overflow-wrap: anywhere;
 }
 
+.focus-recall-instruction {
+  color: var(--text-muted);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line);
+}
+
+.focus-recall-meaning {
+  max-width: 760px;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.focus-reveal {
+  justify-self: start;
+  min-height: 52px;
+  margin-top: 24px;
+}
+
 .flashcard-actions {
   display: flex;
   align-items: center;
@@ -274,48 +304,73 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 48px;
+  margin-top: 12px;
 }
 
 .focus-grade {
   position: relative;
   min-width: 0;
-  padding: 0 12px;
+  min-height: 68px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  padding: 10px 22px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
   justify-content: center;
-  border-color: transparent;
   font-weight: 600;
 }
 
-.focus-grade-again,
-.focus-grade-again:hover {
-  border-color: var(--red);
-  background: var(--red);
-  color: #ffffff;
-}
-
-.focus-grade-hard,
-.focus-grade-hard:hover {
-  border-color: var(--gold);
-  background: var(--gold);
-  color: var(--gold-fg);
-}
-
-.focus-grade-good,
-.focus-grade-good:hover {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-
-.focus-grade-easy,
-.focus-grade-easy:hover {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: var(--primary-fg);
-}
-
 .focus-grade:hover {
-  filter: brightness(0.94);
+  border-color: var(--primary);
+  background: var(--accent-subtle);
+}
+
+.focus-grade:focus-visible,
+.focus-undo:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.focus-grade-interval {
+  color: var(--text-muted);
+  font-size: var(--text-meta-size);
+  line-height: var(--text-meta-line);
+  font-weight: 400;
+}
+
+.focus-review-guidance {
+  margin: 28px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line);
+}
+
+.focus-review-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 8px 0 20px;
+  padding: 12px 16px;
+  border-block: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.focus-review-undo-message {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line);
+}
+
+.focus-undo {
+  min-height: 44px;
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .focus-grade-shortcut {
@@ -324,7 +379,7 @@
   right: 7px;
   border: 0;
   background: transparent;
-  color: currentColor;
+  color: var(--text-muted);
   font-family: inherit;
   font-size: 10px;
   font-weight: 400;
@@ -344,10 +399,38 @@
     min-height: 0;
   }
 
+  .focus-option-metrics {
+    gap: 16px;
+  }
+
   .focus-grade {
     min-height: 54px;
-    padding-inline: 5px;
+    padding: 10px 18px;
     font-size: var(--text-meta-size);
+  }
+}
+
+@media (max-width: 620px) {
+  .focus-review-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .focus-option {
+    gap: 12px;
+    padding-inline: 8px;
+  }
+
+  .focus-option-metrics {
+    gap: 10px;
+  }
+
+  .focus-option-metric {
+    min-width: 58px;
+  }
+
+  .focus-review-undo {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 }

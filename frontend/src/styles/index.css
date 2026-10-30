@@ -16,11 +16,3 @@
 @import "./components/preview.css";
 @import "./components/stimulus.css";
 @import "./components/modal.css";
-
-@import "./views/home.css";
-@import "./views/focus.css";
-@import "./views/story.css";
-@import "./views/quiz.css";
-@import "./views/leaderboard.css";
-@import "./views/admin.css";
-@import "./views/dictation.css";

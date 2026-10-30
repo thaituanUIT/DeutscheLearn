@@ -14,7 +14,6 @@ from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.services.grammar import answer_grammar_question
 
-
 DEFAULT_CASES = Path("evals/learner_questions.jsonl")
 DEFAULT_OUTPUT = Path("evals/answer_review.jsonl")
 

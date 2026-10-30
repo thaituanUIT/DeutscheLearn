@@ -68,6 +68,10 @@ GET /api/focus/revision?level=A1&topic=food_drink
 
 Revision questions sample up to five words from the selected level/topic. Each question asks for the word meaning and includes distractors sampled from the global meaning pool.
 
+## Word Scramble
+
+The Scramble mode uses the same focus vocabulary cards. Learners choose a CEFR level, see a card's meaning, and arrange shuffled letter tiles to spell its German word. When a card has an article, the article is included in the answer. Word boundaries remain visible, and cards too short or with only one distinct letter are skipped. Each round contains up to ten cards.
+
 ## Maintenance
 
 After editing `data/focus_words.csv`, restart the app with seeding enabled or run the import path from a script/session. The importer adds missing words, topics, and focus entries. It does not delete rows that were removed from the CSV.

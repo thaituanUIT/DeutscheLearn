@@ -1,3 +1,4 @@
+import "../styles/views/leaderboard.css";
 import type { LeaderboardEntry, WordOfDay } from "../api/types";
 import { el } from "../utils/dom";
 import { formatSeconds } from "../utils/format";
