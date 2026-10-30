@@ -289,8 +289,11 @@
 
 .story-answer-option {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   gap: 12px;
+  padding-block: 12px;
   cursor: pointer;
 }
 

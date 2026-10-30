@@ -182,6 +182,9 @@ async function renderStoryPassages(
     section.classList.remove("story-list-updating");
 
     const grid = el("div", "focus-grid topics-grid");
+    grid.tabIndex = 0;
+    grid.setAttribute("role", "region");
+    grid.setAttribute("aria-label", group === "goethe" ? "Reading exercises" : "Stories");
     for (const passage of passages) {
       grid.append(
         passageCard(passage, () => renderStoryReader(section, passage.id, group, level, part, options)),

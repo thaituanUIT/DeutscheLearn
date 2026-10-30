@@ -41,4 +41,55 @@
   align-content: start;
   overflow: visible;
 }
+
+/* Keep list headings visible while the choices scroll within the panel. */
+.shell:has(.panel > .topics-grid) {
+  height: 100svh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.shell:has(.panel > .topics-grid) > .layout,
+.shell:has(.panel > .topics-grid) > .layout > :first-child {
+  height: 100%;
+  min-height: 0;
+}
+
+.panel:has(> .topics-grid) {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.panel > .topics-grid {
+  min-height: 0;
+  width: 100%;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) var(--surface);
+  padding: 4px;
+}
+
+.panel > .topics-grid:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media print {
+  .shell:has(.panel > .topics-grid),
+  .panel:has(> .topics-grid) {
+    height: auto;
+    display: block;
+    overflow: visible;
+  }
+
+  .panel > .topics-grid {
+    overflow: visible;
+  }
+}
 }
