@@ -19,7 +19,7 @@ from app.services.grammar import (
     retrieve_grammar_chunks,
 )
 
-GOLDEN_PATH = Path("evals/golden.jsonl")
+DEFAULT_CASES_PATH = Path("evals/learner_questions.jsonl")
 RESULTS_PATH = Path("evals/results.json")
 DEFAULT_ABSOLUTE_FLOORS = [round(value / 100, 2) for value in range(30, 71, 5)]
 
@@ -34,7 +34,7 @@ class CaseResult:
 
 def main() -> None:
     args = parse_args()
-    cases = load_cases()
+    cases = load_cases(args.cases)
     settings = get_settings()
     absolute_floors = parse_floors(args.absolute_floors)
     relative_floor = args.relative_floor
@@ -62,6 +62,12 @@ def main() -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Sweep grammar retrieval thresholds.")
     parser.add_argument(
+        "--cases",
+        type=Path,
+        default=DEFAULT_CASES_PATH,
+        help="JSONL file with retrieval labels and answerability annotations.",
+    )
+    parser.add_argument(
         "--absolute-floors",
         default=",".join(f"{value:.2f}" for value in DEFAULT_ABSOLUTE_FLOORS),
         help="Comma-separated absolute similarity floors to sweep.",
@@ -75,10 +81,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_cases() -> list[dict[str, Any]]:
-    if not GOLDEN_PATH.exists():
-        raise SystemExit(f"Missing {GOLDEN_PATH}")
-    cases = [json.loads(line) for line in GOLDEN_PATH.read_text(encoding="utf-8").splitlines() if line]
+def load_cases(path: Path = DEFAULT_CASES_PATH) -> list[dict[str, Any]]:
+    if not path.exists():
+        raise SystemExit(f"Missing {path}")
+    cases = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    if not cases:
+        raise SystemExit(f"No cases found in {path}")
     for index, case in enumerate(cases, start=1):
         target_key, targets = required_targets(case)
         if not isinstance(targets, list) or any(not isinstance(target, str) for target in targets):
