@@ -49,9 +49,8 @@ async function renderSetup(section: HTMLElement, options: ScrambleViewOptions): 
 
     const intro = el("div", "scramble-intro");
     intro.append(
-      el("div", "question-type", "Word scramble"),
-      el("h2", "scramble-title", "Put the word back together"),
-      el("p", "prompt", "Read the meaning, then select the letter tiles to rebuild the German word."),
+      el("h2", "scramble-title", "Word scramble"),
+      el("p", "prompt", "Use the meaning to rebuild the German word."),
     );
 
     const setup = el("div", "scramble-setup");
@@ -207,7 +206,6 @@ function renderScrambleQuestion(
   const score = el("p", "scramble-score", `${args.score} correct`);
   const prompt = el("div", "scramble-prompt");
   prompt.append(
-    el("span", "scramble-prompt-label", "German meaning"),
     el("h2", "scramble-meaning", card.meaning_overview),
   );
 
@@ -266,7 +264,6 @@ function renderScrambleQuestion(
     answer.append(word);
   });
 
-  const bankLabel = el("div", "scramble-bank-label", "Shuffled letters");
   const bank = el("div", "scramble-letter-bank");
   bank.setAttribute("role", "group");
   bank.setAttribute("aria-label", `Shuffled letter tiles; ${emptyCount} remaining, ${placedCount} placed.`);
@@ -296,7 +293,7 @@ function renderScrambleQuestion(
     });
     bank.append(tileButton);
   }
-  if (bank.childElementCount === 0) bank.append(el("span", "scramble-bank-empty", "All letters placed"));
+  if (bank.childElementCount === 0) bank.append(el("span", "sr-only", "All letters placed"));
 
   const actions = el("div", "scramble-actions");
   const clear = button("Clear", "button scramble-secondary");
@@ -314,7 +311,7 @@ function renderScrambleQuestion(
     if (solved || puzzle.revealed) return;
     puzzle.revealed = true;
     fillAnswer(puzzle, words);
-    puzzle.feedback = { tone: "reveal", text: `Skipped. The correct answer is ${words.join(" ")}.` };
+    puzzle.feedback = { tone: "reveal", text: `Skipped. Answer: ${words.join(" ")}.` };
     rerender("next", puzzle.feedback.text);
   });
 
@@ -338,7 +335,7 @@ function renderScrambleQuestion(
       puzzle.feedback = null;
       score.textContent = `${onCorrect()} correct`;
       status.className = "scramble-feedback is-correct";
-      status.textContent = "Richtig! The letters are in the right order.";
+      status.textContent = "Correct!";
       for (const tileButton of Array.from(bank.querySelectorAll<HTMLButtonElement>("button"))) {
         tileButton.disabled = true;
       }
@@ -358,13 +355,13 @@ function renderScrambleQuestion(
       fillAnswer(puzzle, words);
       puzzle.feedback = {
         tone: "reveal",
-        text: `The correct answer is ${words.join(" ")}. Select Next word when you’re ready.`,
+        text: `Answer: ${words.join(" ")}.`,
       };
       rerender("next", puzzle.feedback.text);
       return;
     }
 
-    puzzle.feedback = { tone: "incorrect", text: "Not quite. Move a few letters and try again." };
+    puzzle.feedback = { tone: "incorrect", text: "Not quite. Try again." };
     status.className = "scramble-feedback is-incorrect";
     status.textContent = puzzle.feedback.text;
   });
@@ -376,7 +373,7 @@ function renderScrambleQuestion(
   } else {
     actions.append(clear, skip, check);
   }
-  shell.append(header, score, prompt, answer, bankLabel, bank, status, actions);
+  shell.append(header, score, prompt, answer, bank, status, actions);
   section.replaceChildren(shell, args.announcement);
   if (announcementText) args.announcement.textContent = announcementText;
 
@@ -423,9 +420,8 @@ function renderRoundComplete(
   options.onBackChange(() => void renderSetup(section, options));
   const result = el("div", "scramble-result");
   result.append(
-    el("div", "question-type", "Round complete"),
-    el("h2", "scramble-result-score", `${score} / ${total}`),
-    el("p", "prompt", "Keep practicing a few letters at a time. Your word bank is ready for another round."),
+    el("h2", "scramble-title", "Round complete"),
+    el("p", "scramble-result-score", `${score} / ${total} correct`),
   );
   const playAgain = button("Play another round", "button primary");
   playAgain.addEventListener("click", () => void renderSetup(section, options));

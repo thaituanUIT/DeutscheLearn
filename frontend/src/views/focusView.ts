@@ -88,6 +88,9 @@ async function renderTopics(
     );
 
     const grid = el("div", "focus-grid topics-grid");
+    grid.tabIndex = 0;
+    grid.setAttribute("role", "region");
+    grid.setAttribute("aria-label", "Vocabulary topics");
     for (const topic of topics) {
       grid.append(topicCard(topic, () => renderFlashcards(section, level, topic, options)));
     }
