@@ -9,6 +9,10 @@ type FocusReview = {
 
 export type FocusReviewUndo = () => boolean;
 
+export type StoryDraft = {
+  selections: Record<string, string>;
+};
+
 export type Mistake = {
   mode: QuizMode | "focus" | "story";
   prompt: string;
@@ -23,6 +27,8 @@ type LearnerProgress = {
   lastPracticeAt: string | null;
   focusReviews: Record<string, FocusReview>;
   storyReadIds: string[];
+  storyCompletedIds: string[];
+  storyDrafts: Record<string, StoryDraft>;
   mistakes: Mistake[];
 };
 
@@ -43,7 +49,7 @@ export function homeMetricsForPlayer(
   options: { storyTotal?: number; focusCards?: FocusCard[] } = {},
 ): Record<HomeMode, HomeModeMetric> {
   const progress = loadProgress(player.player_id);
-  const storyReadCount = progress.storyReadIds.length;
+  const storyCompletedCount = progress.storyCompletedIds.length;
   const storyTotal = options.storyTotal ?? 0;
   const focusDue = dueFocusCount(progress, options.focusCards ?? []);
 
@@ -65,8 +71,8 @@ export function homeMetricsForPlayer(
       value: focusDue > 0 ? String(focusDue) : empty,
     },
     story: {
-      label: "GELESEN",
-      value: storyTotal > 0 ? `${Math.min(storyReadCount, storyTotal)} / ${storyTotal}` : empty,
+      label: "COMPLETED",
+      value: storyTotal > 0 ? `${Math.min(storyCompletedCount, storyTotal)} / ${storyTotal}` : empty,
     },
     scramble: {
       label: "WÖRTER",
@@ -143,12 +149,59 @@ export function recordFocusReview(
   };
 }
 
-export function recordStoryRead(playerId: string, passage: StoryPassage): void {
+export function recordStoryComplete(
+  playerId: string,
+  passage: StoryPassage,
+  submittedSelections?: Record<string, string>,
+): boolean {
   const progress = loadProgress(playerId);
-  if (!progress.storyReadIds.includes(passage.id)) {
-    progress.storyReadIds.push(passage.id);
-    saveProgress(playerId, progress);
+  if (!progress.storyCompletedIds.includes(passage.id)) {
+    progress.storyCompletedIds.push(passage.id);
   }
+  const currentDraft = progress.storyDrafts[passage.id];
+  const matchesSubmission = !currentDraft || !submittedSelections || passage.questions.every(
+    (question) => currentDraft.selections[question.id] === submittedSelections[question.id],
+  );
+  if (matchesSubmission) delete progress.storyDrafts[passage.id];
+  return saveProgress(playerId, progress);
+}
+
+export function isStoryCompleted(playerId: string, passageId: string): boolean {
+  return loadProgress(playerId).storyCompletedIds.includes(passageId);
+}
+
+export function loadStoryDraft(playerId: string, passage: StoryPassage): StoryDraft | null {
+  const draft = loadProgress(playerId).storyDrafts[passage.id];
+  if (!draft || typeof draft !== "object" || !draft.selections) return null;
+  const selections = validStorySelections(passage, draft.selections);
+  return Object.keys(selections).length ? { selections } : null;
+}
+
+export function saveStoryDraft(
+  playerId: string,
+  passage: StoryPassage,
+  selections: Record<string, string>,
+): boolean {
+  const progress = loadProgress(playerId);
+  const valid = validStorySelections(passage, selections);
+  delete progress.storyDrafts[passage.id];
+  if (Object.keys(valid).length) progress.storyDrafts[passage.id] = { selections: valid };
+  const oldest = Object.keys(progress.storyDrafts).slice(0, -20);
+  for (const id of oldest) delete progress.storyDrafts[id];
+  return saveProgress(playerId, progress);
+}
+
+export function clearStoryDraft(playerId: string, passageId: string): boolean {
+  const progress = loadProgress(playerId);
+  delete progress.storyDrafts[passageId];
+  return saveProgress(playerId, progress);
+}
+
+function validStorySelections(passage: StoryPassage, selections: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(passage.questions.flatMap((question) => {
+    const selected = selections[question.id];
+    return question.answers.some((answer) => answer.id === selected) ? [[question.id, selected]] : [];
+  }));
 }
 
 export function addStoryMistakes(
@@ -183,14 +236,26 @@ function loadProgress(playerId: string): LearnerProgress {
   try {
     const raw = localStorage.getItem(storageKey(playerId));
     if (!raw) return emptyProgress();
-    return { ...emptyProgress(), ...JSON.parse(raw) } as LearnerProgress;
+    const progress = { ...emptyProgress(), ...JSON.parse(raw) } as LearnerProgress;
+    progress.storyCompletedIds = Array.isArray(progress.storyCompletedIds)
+      ? progress.storyCompletedIds.filter((id) => typeof id === "string")
+      : [];
+    if (!progress.storyDrafts || typeof progress.storyDrafts !== "object" || Array.isArray(progress.storyDrafts)) {
+      progress.storyDrafts = {};
+    }
+    return progress;
   } catch {
     return emptyProgress();
   }
 }
 
-function saveProgress(playerId: string, progress: LearnerProgress): void {
-  localStorage.setItem(storageKey(playerId), JSON.stringify(progress));
+function saveProgress(playerId: string, progress: LearnerProgress): boolean {
+  try {
+    localStorage.setItem(storageKey(playerId), JSON.stringify(progress));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function emptyProgress(): LearnerProgress {
@@ -199,6 +264,8 @@ function emptyProgress(): LearnerProgress {
     lastPracticeAt: null,
     focusReviews: {},
     storyReadIds: [],
+    storyCompletedIds: [],
+    storyDrafts: {},
     mistakes: [],
   };
 }
