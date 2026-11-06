@@ -100,6 +100,27 @@ Routes:
 
 Reported videos remain in the queue after moderation so admins can restore them later.
 
+### Normalize Saved Captions
+
+New dictation imports remove recognized bracketed audio cues such as `[Musik]`,
+`[Applaus]`, and `[laughter]` before sentence grouping. Unicode and whitespace are
+normalized; other bracketed text is preserved. Cue-only segments are discarded.
+
+To clean existing videos whose language is exactly `German (auto-generated)`, preview
+the changes and then apply them using the configured database:
+
+```bash
+uv run python -m scripts.normalize_dictation
+uv run python -m scripts.normalize_dictation --apply
+```
+
+Use `--language` to explicitly select another stored language label. The command
+preserves segment timestamps and metadata, updates segment counts, and hides videos
+left with no segments. Before committing, it saves the original changed records to
+a private JSON file in the system temporary directory and prints its path. Copy that
+file to durable storage if it is needed for recovery. Repeating the command on
+normalized captions makes no changes.
+
 ## Stimulus Image Uploads
 
 Route:
