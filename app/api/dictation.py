@@ -28,6 +28,7 @@ from app.schemas import (
     DictationVideoReportIn,
     DictationVideoSummaryOut,
 )
+from app.services.dictation import normalize_dictation_text
 
 router = APIRouter(tags=["dictation"])
 logger = logging.getLogger(__name__)
@@ -151,7 +152,7 @@ def dictation_transcript(
 
     snippets = list(transcript)
     transcript_chars = sum(len(" ".join(snippet.text.split())) for snippet in snippets)
-    if transcript_chars < 40:
+    if sum(len(normalize_dictation_text(snippet.text)) for snippet in snippets) < 40:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The German captions did not contain enough speech for dictation. Try another video.",
@@ -508,7 +509,7 @@ def group_transcript_snippets(transcript: Any) -> list[DictationSegmentOut]:
             )
 
     for snippet in transcript:
-        text = " ".join(snippet.text.split())
+        text = normalize_dictation_text(snippet.text)
         if not text:
             continue
         start = float(snippet.start)
