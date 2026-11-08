@@ -29,12 +29,20 @@
   align-items: center;
   justify-content: flex-end;
   gap: 14px;
+  min-width: 0;
 }
 
 .header-start {
+  min-width: 0;
   min-height: 48px;
   display: flex;
   align-items: center;
+  gap: 16px;
+}
+
+.current-mode {
+  color: var(--text-muted);
+  font-size: var(--text-body-size);
 }
 
 .player {
@@ -44,12 +52,38 @@
   font-size: var(--text-meta-size);
   line-height: var(--text-meta-line);
   font-variant-numeric: tabular-nums;
+  min-width: 0;
+  max-width: 32ch;
+  overflow-wrap: anywhere;
+}
+
+.player strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 820px) {
   .topbar {
+    flex-wrap: wrap;
+    gap: 12px;
     align-items: flex-start;
     margin-bottom: 32px;
+  }
+
+  .header-start,
+  .header-end {
+    flex: 1 1 auto;
+  }
+
+  .header-start .brand {
+    max-width: 100%;
+    font-size: clamp(28px, 7vw, 36px);
+    overflow-wrap: anywhere;
+  }
+
+  .header-end .player {
+    flex: 0 1 auto;
   }
 }
 }

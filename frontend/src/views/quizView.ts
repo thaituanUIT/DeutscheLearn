@@ -35,7 +35,16 @@ type QuizViewOptions = {
   onBack: () => void;
   onRender: () => void;
   onError: (message: string) => void;
+  onExplainAnswer: (answer: GrammarWrongAnswerContext) => void;
+  onBeginnerPractice: () => void;
   onGrammarContextChange: (context: { wrongAnswer?: GrammarWrongAnswerContext | null }) => void;
+};
+
+type AnswerReceipt = {
+  question: QuizQuestion;
+  selected: string;
+  correct: string;
+  meaning?: string;
 };
 
 let timedTimerId: number | null = null;
@@ -62,42 +71,61 @@ function renderStart(section: HTMLElement, options: QuizViewOptions): void {
   const config = modeConfig(options.mode);
   const intro = el("div");
   intro.append(
-    el("div", "question-type", config.eyebrow),
-    el("h2", "question-word", config.title),
+    el("h2", "focus-title", config.title),
     el("p", "prompt", config.prompt),
   );
   const actions = el("div", "actions");
   const start = button(config.startLabel, "button primary");
+  let starting = false;
+  const startStatus = el("p", "prompt");
+  startStatus.setAttribute("role", "status");
   start.addEventListener("click", async () => {
+    if (starting) return;
+    starting = true;
+    start.disabled = true;
+    section.setAttribute("aria-busy", "true");
+    startStatus.textContent = "Starting your quiz…";
     try {
       const payload = await startMode(options.mode);
       const secondsRemaining = "duration_seconds" in payload ? payload.duration_seconds : null;
       const totalQuestions = "total_questions" in payload ? payload.total_questions : 0;
+      if (!section.isConnected) return;
       startAttempt(payload.attempt_id, payload.question, payload.score, totalQuestions, secondsRemaining);
       renderQuestion(section, payload.question, options);
     } catch (error) {
-      options.onError(error instanceof Error ? error.message : "Could not start quiz");
+      startStatus.textContent = "Could not start the quiz. Check your connection and try again.";
+    } finally {
+      starting = false;
+      start.disabled = false;
+      section.setAttribute("aria-busy", "false");
     }
   });
+  const guidance = el("div", "quiz-level-guidance");
+  guidance.append(el("p", "prompt", "Mixed-level vocabulary. For a guided beginner start, practice A1 flashcards first."));
+  const beginner = button("Start with A1 flashcards", "button quiz-secondary");
+  beginner.onclick = options.onBeginnerPractice;
+  guidance.append(beginner);
   actions.append(start);
-  section.append(stats(options), intro, actions);
+  section.append(intro, guidance, actions, startStatus);
 }
 
 function renderQuestion(
   section: HTMLElement,
   question: QuizQuestion,
   options: QuizViewOptions,
+  receipt?: AnswerReceipt,
 ): void {
-  const state = getQuizState();
   pendingAnswerKey = null;
   options.onGrammarContextChange({ wrongAnswer: null });
   section.replaceChildren();
   if (options.mode === "timed") startTimedTimer(section, options);
 
   const questionBlock = el("div");
+  const word = el("h2", "question-word", question.word);
+  word.lang = "de";
   questionBlock.append(
     el("div", "question-type", question.type === "article" ? "Article" : "Word type"),
-    el("h2", "question-word", question.word),
+    word,
     el("p", "prompt", question.prompt),
   );
 
@@ -107,10 +135,22 @@ function renderQuestion(
     option.addEventListener("click", async () => {
       await handleAnswer(choice, section, options);
     });
+    if (question.type === "article") option.lang = "de";
     answers.append(option);
   }
 
-  section.append(stats(options), questionBlock, answers);
+  section.append(stats(options));
+  if (receipt) {
+    const last = el("p", "quiz-answer-receipt");
+    announceResult(last);
+    last.append(document.createTextNode(receipt.selected === receipt.correct ? "Last answer: correct — " : "Last answer: not quite — "));
+    const correction = el("span", "", correctedWord(receipt));
+    correction.lang = "de";
+    last.append(correction, document.createTextNode(receipt.question.type === "word_type" ? ` (${receipt.correct})` : ""));
+    section.append(last);
+  }
+  section.append(questionBlock, answers);
+  focusQuizElement(word);
 }
 
 async function handleAnswer(
@@ -121,7 +161,10 @@ async function handleAnswer(
   const state = getQuizState();
   if (!state.attemptId || !state.currentQuestion) return;
 
-  const questionId = state.currentQuestion.question_id;
+  const attemptId = state.attemptId;
+  const active = (): boolean => section.isConnected && getQuizState().attemptId === attemptId;
+  const answeredQuestion = state.currentQuestion;
+  const questionId = answeredQuestion.question_id;
   const answerKey = `${state.attemptId}:${questionId}`;
   if (pendingAnswerKey === answerKey) return;
 
@@ -135,6 +178,7 @@ async function handleAnswer(
         questionId,
         choice,
       );
+      if (!active()) return;
       recordCurrentQuizAnswer(options.mode, choice, answer.correct_answer);
       recordCurrentQuizComplete(options.mode, answer.score, answer.total_questions);
       if (!answer.correct && state.currentQuestion) {
@@ -149,13 +193,15 @@ async function handleAnswer(
         });
       }
       advanceQuestion(answer.next_question, answer.score, answer.total_questions);
-      renderPracticeFeedback(section, answer.correct, answer.correct_answer, answer.next_question, options);
+      renderPracticeFeedback(section, answer.correct, {
+        question: { ...answeredQuestion, word: answer.answered_word }, selected: choice, correct: answer.correct_answer, meaning: answer.meaning_overview,
+      }, answer.next_question, options);
       return;
     }
 
     if (options.mode === "timed") {
       const answer = await submitTimedAnswer(state.attemptId, questionId, choice);
-      if (!getQuizState().running) return;
+      if (!active() || !getQuizState().running) return;
       recordCurrentQuizAnswer(options.mode, choice, answer.correct_answer);
       if (!answer.attempt_finished && answer.next_question) {
         advanceQuestion(
@@ -164,7 +210,9 @@ async function handleAnswer(
           answer.total_questions,
           answer.seconds_remaining,
         );
-        renderQuestion(section, answer.next_question, options);
+        renderQuestion(section, answer.next_question, options, {
+          question: answeredQuestion, selected: choice, correct: answer.correct_answer,
+        });
         return;
       }
 
@@ -179,7 +227,8 @@ async function handleAnswer(
       return;
     }
 
-    const answer = await submitEndlessAnswer(state.attemptId, questionId, choice);
+    const answer = await submitEndlessAnswer(attemptId, questionId, choice);
+    if (!active()) return;
     recordCurrentQuizAnswer(options.mode, choice, answer.correct_answer);
     if (answer.correct && answer.next_question) {
       advanceQuestion(answer.next_question, answer.score);
@@ -205,18 +254,18 @@ async function handleAnswer(
         },
       });
     }
-    await options.onLeaderboardRefresh();
+    await options.onLeaderboardRefresh().catch(() => undefined);
+    if (!active()) return;
     const summary = recordCurrentQuizComplete(options.mode, answer.score, answer.score + 1);
     renderResult(
       section,
       answer.score,
-      answer.correct_answer,
-      answer.answered_word,
-      answer.meaning_overview,
       options,
       summary,
+      { question: { ...answeredQuestion, word: answer.answered_word }, selected: choice, correct: answer.correct_answer, meaning: answer.meaning_overview },
     );
   } catch (error) {
+    if (!active()) return;
     pendingAnswerKey = null;
     setAnswerOptionsDisabled(section, false);
     options.onError(error instanceof Error ? error.message : "Could not submit answer");
@@ -241,55 +290,83 @@ function renderEndlessFeedback(
   announceResult(content);
   content.append(
     el("h2", "", "Correct"),
-    el("p", "answered-word", answeredWord),
+    Object.assign(el("p", "answered-word", answeredWord), { lang: "de" }),
     el("p", "meaning-overview", meaningOverview),
   );
   const next = button("Next question", "button primary");
   next.addEventListener("click", () => renderQuestion(section, nextQuestion, options));
   section.append(stats(options), content, next);
+  focusQuizElement(content.querySelector<HTMLElement>("h2")!);
 }
 
 function renderPracticeFeedback(
   section: HTMLElement,
   correct: boolean,
-  correctAnswer: string,
+  receipt: AnswerReceipt,
   nextQuestion: QuizQuestion,
   options: QuizViewOptions,
 ): void {
   section.replaceChildren();
-  const content = el("div", "result");
-  announceResult(content);
-  content.append(
-    el("h2", "", correct ? "Correct" : "Not quite"),
-    el("p", "prompt", correct ? "Keep going." : `Correct answer: ${correctAnswer}.`),
-  );
+  const content = answerReview(correct ? "Correct" : "Not quite", receipt, options);
   const next = button("Next question", "button primary");
-  next.addEventListener("click", () => renderQuestion(section, nextQuestion, options));
+  next.onclick = () => renderQuestion(section, nextQuestion, options);
   section.append(stats(options), content, next);
+  focusQuizElement(content.querySelector<HTMLElement>("h2")!);
+}
+
+function correctedWord(receipt: AnswerReceipt): string {
+  const word = receipt.question.word;
+  return receipt.question.type === "article" ? `${receipt.correct} ${word.charAt(0).toLocaleUpperCase("de")}${word.slice(1)}` : word;
+}
+
+function answerReview(title: string, receipt: AnswerReceipt, options: QuizViewOptions): HTMLElement {
+  const content = el("div", "result quiz-answer-review");
+  announceResult(content);
+  const heading = el("h2", "", title);
+  const word = el("p", "answered-word", correctedWord(receipt));
+  word.lang = "de";
+  content.append(heading, word);
+  if (receipt.meaning) content.append(el("p", "meaning-overview", receipt.meaning));
+  const comparison = el("dl", "quiz-answer-comparison");
+  for (const [label, value] of [["Your answer", receipt.selected], ["Correct answer", receipt.correct]]) {
+    const row = el("div", "");
+    const answer = el("dd", "", value);
+    if (receipt.question.type === "article") answer.lang = "de";
+    row.append(el("dt", "", label), answer);
+    comparison.append(row);
+  }
+  content.append(comparison);
+  if (receipt.selected !== receipt.correct) {
+    const explain = button("Explain this answer", "button quiz-secondary");
+    explain.onclick = () => options.onExplainAnswer({
+      question: receipt.question.prompt, learnerAnswer: receipt.selected,
+      correctAnswer: receipt.correct, word: receipt.question.word, mode: options.mode,
+    });
+    content.append(explain);
+  }
+  return content;
+}
+
+function focusQuizElement(node: HTMLElement): void {
+  node.tabIndex = -1;
+  queueMicrotask(() => { if (node.isConnected) node.focus(); });
 }
 
 function renderResult(
   section: HTMLElement,
   score: number,
-  correctAnswer: string,
-  answeredWord: string,
-  meaningOverview: string,
   options: QuizViewOptions,
   summary: SessionSummary | null,
+  receipt: AnswerReceipt,
 ): void {
   section.replaceChildren();
-  const content = el("div", "result");
-  announceResult(content);
-  content.append(
-    el("h2", "", "Run finished"),
-    el("p", "prompt", `Final streak: ${score}. Correct answer: ${correctAnswer}.`),
-    el("p", "answered-word", answeredWord),
-    el("p", "meaning-overview", meaningOverview),
-  );
+  const content = answerReview("Run finished", receipt, options);
+  content.prepend(el("p", "prompt", `Final streak: ${score}.`));
   if (summary) content.append(sessionSummary(summary));
   const retry = button("Try again", "button primary");
   retry.addEventListener("click", () => renderStart(section, options));
   section.append(stats({ ...options, bestScore: Math.max(options.bestScore, score) }), content, retry);
+  focusQuizElement(content.querySelector<HTMLElement>("h2")!);
   options.onRender();
 }
 
@@ -312,6 +389,7 @@ function renderTimedResult(
   const retry = button("Try timed again", "button primary");
   retry.addEventListener("click", () => renderStart(section, options));
   section.append(stats(options), content, retry);
+  focusQuizElement(content.querySelector<HTMLElement>("h2")!);
 }
 
 function announceResult(node: HTMLElement): void {
@@ -323,12 +401,12 @@ function announceResult(node: HTMLElement): void {
 function sessionSummary(summary: SessionSummary): HTMLElement {
   const wrap = el("div", "session-summary");
   wrap.append(
-    summaryItem("RICHTIG", String(summary.score)),
-    summaryItem("GESAMT", String(summary.total)),
-    summaryItem("FEHLER", String(summary.missed)),
+    summaryItem("Correct", String(summary.score)),
+    summaryItem("Answered", String(summary.total)),
+    summaryItem("Mistakes", String(summary.missed)),
   );
   if (summary.isRecord) {
-    wrap.append(summaryItem("REKORD", "neu"));
+    wrap.append(summaryItem("Record", "New"));
   }
   return wrap;
 }
@@ -358,30 +436,26 @@ function stats(options: QuizViewOptions): HTMLElement {
 }
 
 function modeConfig(mode: QuizMode): {
-  eyebrow: string;
   title: string;
   prompt: string;
   startLabel: string;
 } {
   if (mode === "practice") {
     return {
-      eyebrow: "Practice mode",
-      title: "Train",
+      title: "Practice",
       prompt: "Answer freely, see the correct answer, and keep practicing without a leaderboard.",
       startLabel: "Start practice",
     };
   }
   if (mode === "timed") {
     return {
-      eyebrow: "Timed mode",
-      title: "60s",
+      title: "Timed quiz",
       prompt: "Answer as many questions as you can before the timer runs out.",
       startLabel: "Start timed run",
     };
   }
   return {
-    eyebrow: "Endless mode",
-    title: "Wort?",
+    title: "Endless quiz",
     prompt: "Answer until your first miss. Your longest streak goes on the board.",
     startLabel: "Start endless run",
   };

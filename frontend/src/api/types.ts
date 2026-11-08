@@ -91,6 +91,8 @@ export type PracticeAnswer = {
   score: number;
   total_questions: number;
   correct_answer: string;
+  answered_word: string;
+  meaning_overview: string;
   next_question: QuizQuestion;
 };
 

@@ -107,8 +107,8 @@ export function dictationView(options: DictationViewOptions): HTMLElement {
       const transcript = await getSavedDictationVideo(videoId);
       practiceTitle.textContent = transcript.title;
       disposeExercise = renderExercise(exercise, transcript, () => {
-        updateStatus("YouTube could not play this video. Try another video.", true);
-      });
+        updateStatus("YouTube could not play this video. Choose another video or reveal the transcript to review it.", true);
+      }, showBrowsePanel);
       updateStatus("");
     } catch (error) {
       updateStatus(readableError(error), true);
@@ -150,8 +150,8 @@ export function dictationView(options: DictationViewOptions): HTMLElement {
       .then(async (transcript) => {
         practiceTitle.textContent = transcript.title;
         disposeExercise = renderExercise(exercise, transcript, () => {
-          updateStatus("YouTube could not play this video. Try another video.", true);
-        });
+          updateStatus("YouTube could not play this video. Choose another video or reveal the transcript to review it.", true);
+        }, showBrowsePanel);
         updateStatus("");
         currentPage = 1;
         await invalidateDictationVideos();
@@ -255,7 +255,16 @@ function renderExercise(
   host: HTMLElement,
   transcript: DictationTranscript,
   onPlayerError: () => void,
+  onChooseAnother: () => void,
 ): () => void {
+  if (!transcript.segments.length) {
+    const empty = el("p", "error", "This video has no caption lines. Choose another video.");
+    empty.setAttribute("role", "alert");
+    const back = button("Choose another video", "button button-secondary");
+    back.onclick = onChooseAnother;
+    host.replaceChildren(empty, back);
+    return () => undefined;
+  }
   const exercise = el("div", "dictation-workspace");
   const player = el("div", "dictation-player");
   const playerMount = el("div", "dictation-player-mount");
@@ -270,7 +279,8 @@ function renderExercise(
   const progressTrack = el("span", "dictation-progress-track");
   const progressFill = el("span", "dictation-progress-fill");
   progressTrack.append(progressFill);
-  progress.append(progressTrack);
+  const progressLabel = el("p", "dictation-line-label");
+  progress.append(progressLabel, progressTrack);
   const answerPanel = el("div", "dictation-answer-panel");
   const answerLabel = el("label", "dictation-answer-label", "Your answer");
   const answer = el("textarea", "dictation-answer") as HTMLTextAreaElement;
@@ -281,12 +291,15 @@ function renderExercise(
   answer.id = "dictation-answer-input";
   answerPanel.append(answerLabel, answer);
   const feedback = el("div", "dictation-feedback");
-  const play = button("▶ Replay line", "button button-secondary");
+  const play = button("Replay line", "button button-secondary");
   const check = button("Check answer", "button button-primary");
   const reveal = button("Reveal transcript", "button button-quiet dictation-reveal-button");
-  const next = button("Next line →", "button button-secondary");
+  const next = button("Next line", "button button-secondary");
   let index = 0;
   let skipAnswerShown = false;
+  let completed = false;
+  const scores = new Map<number, number>();
+  const revealedLines = new Set<number>();
   let youtubePlayer: YouTubePlayer | null = null;
   let disposed = false;
   let lineEndWatcher: number | null = null;
@@ -312,12 +325,13 @@ function renderExercise(
 
   const showLine = (autoplay = false): void => {
     const segment = transcript.segments[index];
+    progressLabel.textContent = `Line ${index + 1} of ${transcript.segments.length}`;
     progress.setAttribute("aria-valuenow", String(index + 1));
     progress.setAttribute("aria-valuetext", `Line ${index + 1} of ${transcript.segments.length}`);
     progressFill.style.width = `${((index + 1) / transcript.segments.length) * 100}%`;
     answer.value = "";
     skipAnswerShown = false;
-    next.textContent = "Next line →";
+    next.textContent = index === transcript.segments.length - 1 ? "Finish dictation" : "Next line";
     clear(feedback);
     reveal.textContent = "Reveal transcript";
     reveal.dataset.open = "false";
@@ -340,19 +354,25 @@ function renderExercise(
       answer.focus();
       return;
     }
-    renderDiff(feedback, answer.value, transcript.segments[index].text);
+    scores.set(index, renderDiff(feedback, answer.value, transcript.segments[index].text));
   });
   reveal.addEventListener("click", () => {
     const open = reveal.dataset.open !== "true";
     reveal.dataset.open = String(open);
     reveal.textContent = open ? "Hide transcript" : "Reveal transcript";
-    if (open) feedback.replaceChildren(el("p", "dictation-gold", transcript.segments[index].text));
+    if (open) {
+      revealedLines.add(index);
+      const text = el("p", "dictation-gold", transcript.segments[index].text);
+      text.lang = "de";
+      feedback.replaceChildren(el("h3", "dictation-result-heading", "Transcript"), text);
+    }
     else clear(feedback);
   });
 
   next.addEventListener("click", () => {
     if (!answer.value.trim() && !skipAnswerShown) {
       skipAnswerShown = true;
+      revealedLines.add(index);
       reveal.dataset.open = "true";
       reveal.textContent = "Hide transcript";
       feedback.replaceChildren(
@@ -363,12 +383,38 @@ function renderExercise(
           "Tip: replay the line and listen for the verb position and word endings. Those clues can make it easier to catch the whole sentence.",
         ),
       );
-      next.textContent = "Continue →";
+      next.textContent = index === transcript.segments.length - 1 ? "Finish dictation" : "Continue to next line";
       return;
     }
-    index = (index + 1) % transcript.segments.length;
+    if (index === transcript.segments.length - 1) { showCompletion(); return; }
+    index += 1;
     showLine(true);
+    answer.focus();
   });
+  const showCompletion = (): void => {
+    completed = true;
+    clearLineEndWatcher();
+    youtubePlayer?.pauseVideo();
+    exercise.hidden = true;
+    const summary = el("section", "dictation-completion");
+    const title = el("h2", "", "Dictation complete");
+    title.tabIndex = -1;
+    summary.append(title, el("p", "prompt", `You reached the end of all ${transcript.segments.length} caption lines.`),
+      el("p", "", `${scores.size} lines checked · ${revealedLines.size} transcripts revealed`));
+    if (scores.size) {
+      const average = Math.round([...scores.values()].reduce((total, score) => total + score, 0) / scores.size);
+      summary.append(el("p", "", `Average checked-line score: ${average}%`));
+    }
+    const actions = el("div", "actions");
+    const again = button("Practice again", "button button-primary");
+    again.onclick = () => {
+      completed = false; index = 0; scores.clear(); revealedLines.clear();
+      summary.remove(); exercise.hidden = false; showLine(); answer.focus();
+    };
+    const choose = button("Choose another video", "button button-secondary");
+    choose.onclick = onChooseAnother;
+    actions.append(again, choose); summary.append(actions); host.append(summary); title.focus();
+  };
   const controls = el("div", "dictation-controls");
   play.classList.add("dictation-replay-button");
   check.classList.add("dictation-check-button");
@@ -406,7 +452,7 @@ function renderExercise(
               startSeconds: transcript.segments[index].start,
             });
             play.disabled = false;
-            next.disabled = false;
+            if (completed) youtubePlayer.pauseVideo();
           },
           onStateChange: (event) => {
             if (event.data === 1) watchLineEnd();
@@ -419,7 +465,7 @@ function renderExercise(
     .catch(onPlayerError);
 
   play.disabled = true;
-  next.disabled = true;
+  next.disabled = false;
   return () => {
     disposed = true;
     clearLineEndWatcher();
@@ -428,7 +474,7 @@ function renderExercise(
   };
 }
 
-function renderDiff(host: HTMLElement, typed: string, target: string): void {
+function renderDiff(host: HTMLElement, typed: string, target: string): number {
   const left = words(typed);
   const right = words(target);
   const rows: number[][] = Array.from({ length: left.length + 1 }, () => Array(right.length + 1).fill(0));
@@ -451,6 +497,7 @@ function renderDiff(host: HTMLElement, typed: string, target: string): void {
     el("span", "dictation-score-copy", score === 100 ? "All words correct" : `${matched} of ${right.length} words matched`),
   );
   const diff = el("p", "dictation-diff");
+  diff.lang = "de";
   let i = left.length;
   let j = right.length;
   const tokens: Array<{ text: string; kind: string }> = [];
@@ -464,10 +511,19 @@ function renderDiff(host: HTMLElement, typed: string, target: string): void {
     }
   }
   for (const token of tokens.reverse()) {
-    const node = el("span", `dictation-word is-${token.kind}`, token.text);
+    const node = el(token.kind === "extra" ? "del" : token.kind === "missing" ? "ins" : "span", `dictation-word is-${token.kind}`, token.text);
     diff.append(node, document.createTextNode(" "));
   }
-  host.replaceChildren(...(score === 100 ? [heading, summary] : [heading, summary, diff]));
+  const typedText = el("p", "dictation-typed", typed);
+  typedText.lang = "de";
+  const transcriptText = el("p", "dictation-gold", target);
+  transcriptText.lang = "de";
+  summary.setAttribute("role", "status");
+  host.replaceChildren(heading, summary, el("h4", "dictation-diff-label", "Your answer"), typedText,
+    el("h4", "dictation-diff-label", "Transcript"), transcriptText);
+  if (score !== 100) host.append(el("h4", "dictation-diff-label", "Word comparison"),
+    el("p", "prompt", "Underlined words: add or correct these. Struck-through words: remove these."), diff);
+  return score;
 }
 
 function words(text: string): Array<{ text: string; normalized: string }> {

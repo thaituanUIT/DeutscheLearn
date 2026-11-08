@@ -140,6 +140,8 @@ class PracticeAnswerOut(BaseModel):
     score: int
     total_questions: int
     correct_answer: str
+    answered_word: str
+    meaning_overview: str
     next_question: QuestionOut
 
 

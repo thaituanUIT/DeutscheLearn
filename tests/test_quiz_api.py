@@ -1268,6 +1268,8 @@ def test_practice_mode_continues_after_wrong_answer() -> None:
         try:
             stored_question = db.get(QuizAttemptQuestion, question["question_id"])
             assert stored_question is not None
+            expected_meaning = get_meaning_overview(db, stored_question.word)
+            expected_word = stored_question.word
             wrong_answer = next(
                 choice for choice in question["choices"] if choice != stored_question.correct_answer
             )
@@ -1288,6 +1290,8 @@ def test_practice_mode_continues_after_wrong_answer() -> None:
         assert body["correct"] is False
         assert body["score"] == 0
         assert body["total_questions"] == 1
+        assert body["answered_word"] == expected_word
+        assert body["meaning_overview"] == expected_meaning
         assert body["next_question"] is not None
 
 

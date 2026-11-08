@@ -34,6 +34,22 @@ Run the frontend dev server:
 npm run dev --prefix frontend
 ```
 
+API failures show recovery actions in development as well as production. To explicitly
+use the offline preview fixtures, start Vite with `VITE_DEMO_MODE=true`.
+
+### Learner interface
+
+Home uses document scrolling so all seven modes remain discoverable on phones. Quizzes
+are labeled as mixed-level, with a direct route to A1 flashcards. Corrections retain the
+word, meaning, and selected/correct answers; **Explain this answer** prepares a contextual
+grammar question for the learner to send. Dictation ends with a summary of checked and
+revealed lines rather than repeating the first line.
+
+Run the learner browser regressions with `npm run test:client --prefix frontend`, or
+all browser regressions with `npm test --prefix frontend`. Install Playwright Chromium
+first with `npx playwright install chromium` from `frontend/`. These tests use isolated
+API fixtures and a YouTube player stub; they do not call external media or grammar services.
+
 ### Admin panel
 
 Set `ADMIN_TOKEN` on the backend, open `/admin`, and enter that token. The Vocabulary,

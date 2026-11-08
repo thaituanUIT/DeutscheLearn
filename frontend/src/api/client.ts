@@ -275,7 +275,7 @@ async function withPreviewFallback<T>(promise: Promise<T>, fallback: T): Promise
 }
 
 function previewFallbackEnabled(): boolean {
-  return import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === "true";
+  return import.meta.env.VITE_DEMO_MODE === "true";
 }
 
 const previewPlayer: Player = {

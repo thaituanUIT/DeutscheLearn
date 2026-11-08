@@ -656,7 +656,7 @@ function formatStoryItemCount(
   options: { zeroLabel?: string } = {},
 ): string {
   if (group === "goethe") return formatCount(count, "exercise", { plural: "exercises", ...options });
-  return formatCount(count, "story", options);
+  return formatCount(count, "story", { plural: "stories", ...options });
 }
 
 function learnerPartLabel(label: string): string {

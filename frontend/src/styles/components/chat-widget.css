@@ -8,15 +8,14 @@
 }
 
 .grammar-launcher {
-  width: 56px;
-  height: 56px;
+  min-height: 48px;
+  padding: 0 16px;
   display: grid;
   place-items: center;
   border: 1px solid var(--border-strong);
-  border-radius: 50%;
   background: var(--primary);
   color: var(--primary-fg);
-  font-size: 24px;
+  font-size: var(--text-body-size);
   font-weight: 600;
   cursor: pointer;
 }
@@ -76,12 +75,12 @@
 }
 
 .grammar-close {
-  width: 36px;
-  height: 36px;
+  min-width: 56px;
+  min-height: 44px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
-  font-size: 18px;
+  font-size: var(--text-meta-size);
   cursor: pointer;
 }
 
@@ -291,6 +290,13 @@
   background: var(--surface);
 }
 
+.grammar-input-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: var(--text-meta-size);
+  color: var(--text-muted);
+}
+
 .grammar-input-wrap {
   position: relative;
   display: flex;
@@ -304,7 +310,7 @@
   resize: none;
   overflow: hidden;
   border: 1px solid var(--border);
-  padding: 8px 48px 8px 8px;
+  padding: 12px 72px 12px 8px;
   font: inherit;
   line-height: var(--text-body-line);
   background: var(--surface);
@@ -319,7 +325,7 @@
 
 .grammar-counter {
   position: absolute;
-  right: 48px;
+  right: 72px;
   bottom: 8px;
   color: var(--text-muted);
   font-size: var(--text-label-size);
@@ -332,16 +338,16 @@
   position: absolute;
   right: 6px;
   top: 50%;
-  width: 30px;
-  height: 30px;
+  width: 56px;
+  height: 44px;
   display: grid;
   align-items: center;
-  justify-items: start;
+  justify-items: center;
   border: 1px solid var(--primary);
-  padding: 0 0 0 8px;
+  padding: 0;
   background: var(--primary);
   color: var(--primary-fg);
-  font-size: 16px;
+  font-size: var(--text-meta-size);
   font-weight: 600;
   line-height: 1;
   cursor: pointer;

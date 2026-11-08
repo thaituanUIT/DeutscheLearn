@@ -172,6 +172,8 @@ def answer_practice(
         score=attempt.score,
         total_questions=attempt.total_questions,
         correct_answer=question.correct_answer,
+        answered_word=question.word,
+        meaning_overview=get_meaning_overview(db, question.word),
         next_question=next_question,
     )
 

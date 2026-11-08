@@ -55,19 +55,19 @@ export function homeMetricsForPlayer(
 
   return {
     endless: {
-      label: "BESTE SERIE",
+      label: "Best streak",
       value: player.best_endless_score > 0 ? String(player.best_endless_score) : empty,
     },
     practice: {
-      label: "ZULETZT",
+      label: "Last practiced",
       value: progress.lastPracticeAt ? relativeDay(progress.lastPracticeAt) : empty,
     },
     timed: {
-      label: "BESTE PUNKTZAHL",
+      label: "Best score",
       value: progress.bestTimedScore && progress.bestTimedScore > 0 ? String(progress.bestTimedScore) : empty,
     },
     focus: {
-      label: "FÄLLIG",
+      label: "Due for review",
       value: focusDue > 0 ? String(focusDue) : empty,
     },
     story: {
@@ -75,10 +75,10 @@ export function homeMetricsForPlayer(
       value: storyTotal > 0 ? `${Math.min(storyCompletedCount, storyTotal)} / ${storyTotal}` : empty,
     },
     scramble: {
-      label: "WÖRTER",
+      label: "Words",
       value: options.focusCards ? String(options.focusCards.length) : empty,
     },
-    dictation: { label: "HÖREN & SCHREIBEN", value: "YouTube" },
+    dictation: { label: "Listen and write", value: "YouTube" },
   };
 }
 
@@ -295,7 +295,7 @@ function relativeDay(isoDate: string): string {
   const then = new Date(isoDate);
   then.setHours(0, 0, 0, 0);
   const days = Math.round((startOfToday.getTime() - then.getTime()) / (24 * 60 * 60 * 1000));
-  if (days === 0) return "heute";
-  if (days === 1) return "gestern";
-  return `vor ${days} Tagen`;
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return `${days} days ago`;
 }

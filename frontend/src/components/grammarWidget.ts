@@ -42,6 +42,7 @@ type GrammarWidgetContext = {
 
 export type GrammarWidgetHandle = {
   updateContext: (context: Partial<GrammarWidgetContext>) => void;
+  explainAnswer: (answer: GrammarWrongAnswerContext) => void;
 };
 
 const MAX_MESSAGES = 20;
@@ -72,6 +73,7 @@ const SUGGESTIONS = [
 export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWidgetHandle {
   let context = { ...DEFAULT_CONTEXT };
   let status: WidgetStatus = "closed";
+  let isOpen = readInitialOpen(player.player_id);
   let messages = loadMessages(player.player_id);
   let inFlight = false;
   let lastQuestion = "";
@@ -80,43 +82,53 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
 
   const storageKey = `grammar_widget_${player.player_id}`;
   const host = el("div", "grammar-widget");
-  const launcher = button("?", "grammar-launcher");
+  const launcher = button("Grammar help", "grammar-launcher");
   launcher.setAttribute("aria-label", "Open grammar assistant");
   launcher.title = "Open grammar assistant";
 
   const panel = el("section", "grammar-panel");
+  panel.id = `grammar-panel-${crypto.randomUUID()}`;
+  launcher.setAttribute("aria-controls", panel.id);
+  launcher.setAttribute("aria-expanded", String(isOpen));
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-modal", "false");
   panel.setAttribute("aria-label", "Grammar assistant");
 
   const header = el("div", "grammar-panel-header");
   const title = el("div", "grammar-panel-title");
-  const close = button("×", "grammar-close");
+  const close = button("Close", "grammar-close");
   close.setAttribute("aria-label", "Close grammar assistant");
   title.append(el("strong", "", "Grammar assistant"));
   header.append(title, close);
 
   const list = el("div", "grammar-message-list");
+  list.setAttribute("role", "log");
+  list.setAttribute("aria-live", "polite");
   const composer = el("div", "grammar-composer");
   const inputWrap = el("div", "grammar-input-wrap");
   const textarea = document.createElement("textarea");
   textarea.className = "grammar-input";
   textarea.placeholder = "Ask a grammar question";
+  textarea.id = `grammar-question-${crypto.randomUUID()}`;
+  const inputLabel = el("label", "grammar-input-label", "Your grammar question");
+  inputLabel.htmlFor = textarea.id;
   textarea.rows = 1;
   textarea.maxLength = MAX_QUESTION_LENGTH;
   const counter = el("span", "grammar-counter");
-  const send = button("↑", "grammar-send");
+  const send = button("Send", "grammar-send");
   send.setAttribute("aria-label", "Send");
   send.title = "Send";
   inputWrap.append(textarea, counter, send);
-  composer.append(inputWrap);
+  composer.append(inputLabel, inputWrap);
   panel.append(header, list, composer);
   host.append(launcher, panel);
   root.append(host);
 
   const setOpen = (open: boolean): void => {
-    status = open ? "open" : "closed";
-    host.dataset.state = status;
+    isOpen = open;
+    status = open ? inFlight ? "sending" : "open" : "closed";
+    host.dataset.state = isOpen ? status : "closed";
+    launcher.setAttribute("aria-expanded", String(open));
     persistState();
     if (open) {
       renderMessages();
@@ -131,12 +143,12 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
     if (!question || inFlight) return;
     lastQuestion = question;
     textarea.value = "";
+    inFlight = true;
     updateComposer();
     const learnerMessage: ChatMessage = { role: "learner", text: question };
     messages = [...messages, learnerMessage].slice(-MAX_MESSAGES);
     status = "sending";
-    inFlight = true;
-    host.dataset.state = status;
+    host.dataset.state = isOpen ? status : "closed";
     renderMessages();
     startLoadingTimers();
     try {
@@ -164,7 +176,7 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
       status = "error";
     } finally {
       inFlight = false;
-      host.dataset.state = status;
+      host.dataset.state = isOpen ? status : "closed";
       persistState();
       renderMessages();
       updateComposer();
@@ -208,7 +220,7 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
     clearLoadingTimers();
     loadingTimer = window.setTimeout(() => {
       status = "waking";
-      host.dataset.state = status;
+      host.dataset.state = isOpen ? status : "closed";
       renderMessages();
     }, 10000);
     timeoutTimer = window.setTimeout(() => {
@@ -216,7 +228,7 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
       const timeoutMessage: ChatMessage = {
         role: "assistant",
         status: "error",
-        text: "The server is taking too long to wake up.",
+        text: "This answer is taking longer than expected. Try again.",
         canRetry: true,
       };
       messages = [
@@ -225,7 +237,7 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
       ].slice(-MAX_MESSAGES);
       inFlight = false;
       status = "error";
-      host.dataset.state = status;
+      host.dataset.state = isOpen ? status : "closed";
       renderMessages();
       updateComposer();
     }, 60000);
@@ -239,7 +251,7 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
   };
 
   const persistState = (): void => {
-    localStorage.setItem(storageKey, JSON.stringify({ open: status !== "closed", messages }));
+    localStorage.setItem(storageKey, JSON.stringify({ open: isOpen, messages }));
   };
 
   const applyKeyboardOffset = (): void => {
@@ -249,7 +261,7 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
     host.style.setProperty("--grammar-keyboard-offset", `${offset}px`);
   };
 
-  launcher.addEventListener("click", () => setOpen(status === "closed"));
+  launcher.addEventListener("click", () => setOpen(!isOpen));
   close.addEventListener("click", () => setOpen(false));
   send.addEventListener("click", () => void sendQuestion());
   textarea.addEventListener("input", updateComposer);
@@ -260,18 +272,25 @@ export function mountGrammarWidget(root: HTMLElement, player: Player): GrammarWi
     }
   });
   window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && status !== "closed") setOpen(false);
+    if (event.key === "Escape" && isOpen) setOpen(false);
   });
   window.visualViewport?.addEventListener("resize", applyKeyboardOffset);
   window.visualViewport?.addEventListener("scroll", applyKeyboardOffset);
 
-  host.dataset.state = readInitialOpen(player.player_id) ? "open" : "closed";
+  host.dataset.state = isOpen ? "open" : "closed";
   status = host.dataset.state as WidgetStatus;
   updateComposer();
   renderMessages();
   applyKeyboardOffset();
 
   return {
+    explainAnswer(answer) {
+      context = { ...context, wrongAnswer: answer };
+      setOpen(true);
+      textarea.value = wrongAnswerQuestion(answer, interfaceLanguage());
+      updateComposer();
+      textarea.focus();
+    },
     updateContext(next) {
       context = { ...context, ...next };
       renderMessages();
@@ -558,7 +577,7 @@ function renderLoading(): HTMLElement {
   }, 3000);
   window.setTimeout(() => {
     if (node.isConnected) {
-      node.textContent = "The server was asleep and is waking up. This takes about a minute the first time.";
+      node.textContent = "Still working on your question. You can keep practicing while you wait.";
     }
   }, 10000);
   return node;

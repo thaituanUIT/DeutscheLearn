@@ -7,7 +7,9 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test:admin": "playwright test"
+    "test": "playwright test",
+    "test:admin": "playwright test admin.spec.mjs",
+    "test:client": "playwright test client.spec.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

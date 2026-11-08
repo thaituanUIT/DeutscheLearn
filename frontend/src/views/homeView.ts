@@ -77,7 +77,6 @@ export function homeView(options: HomeViewOptions): HTMLElement {
   intro.append(el("h2", "home-heading", "Choose a way to practice"));
 
   const grid = el("div", "mode-grid");
-  let index = 0;
   for (const group of modeGroups) {
     const groupNode = el("section", `mode-group mode-group-${group.id}`);
     groupNode.setAttribute("aria-labelledby", `mode-group-${group.id}-title`);
@@ -96,7 +95,6 @@ export function homeView(options: HomeViewOptions): HTMLElement {
         options.onSelectMode(item.mode);
       });
 
-      const numeral = el("span", "mode-numeral", String(++index).padStart(2, "0"));
       const content = el("span", "mode-content");
       content.append(el("strong", "", item.title), el("span", "mode-description", item.description));
 
@@ -107,7 +105,9 @@ export function homeView(options: HomeViewOptions): HTMLElement {
         el("span", metric.value === "—" ? "mode-stat-value mode-stat-empty" : "mode-stat-value", metric.value),
       );
 
-      card.append(numeral, content, stat, el("span", "mode-arrow", "→"));
+      const arrow = el("span", "mode-arrow", "");
+      arrow.setAttribute("aria-hidden", "true");
+      card.append(content, stat, arrow);
       groupNode.append(card);
     }
     grid.append(groupNode);
@@ -125,13 +125,16 @@ function mistakeTray(mistakes: Mistake[]): HTMLElement {
   const list = el("div", "mistake-list");
   for (const mistake of mistakes.slice(0, 3)) {
     const item = el("div", "mistake-item");
+    const modeLabels = { practice: "Practice", endless: "Endless", timed: "Timed", focus: "Flashcards", story: "Reading" };
+    const word = el("strong", "", mistake.word ?? mistake.prompt);
+    word.lang = "de";
     item.append(
-      el("span", "mistake-mode", mistake.mode),
-      el("strong", "", mistake.word ?? mistake.prompt),
-      el("span", "mistake-answer", `${mistake.selected} / ${mistake.correct}`),
+      el("span", "mistake-mode", modeLabels[mistake.mode]),
+      word,
+      el("span", "mistake-answer", `You chose ${mistake.selected} · Correct: ${mistake.correct}`),
     );
     list.append(item);
   }
-  tray.append(el("div", "question-type", "Review"), list);
+  tray.append(el("h3", "mode-group-title", "Review recent mistakes"), list);
   return tray;
 }
