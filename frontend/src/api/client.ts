@@ -391,7 +391,7 @@ export function askGrammar(payload: {
   });
 }
 
-export function getAdminWords(
+export async function getAdminWords(
   token: string,
   filters: { search?: string; level?: string; topic?: string } = {},
 ): Promise<AdminWord[]> {
@@ -399,8 +399,14 @@ export function getAdminWords(
   if (filters.search) params.set("search", filters.search);
   if (filters.level) params.set("level", filters.level);
   if (filters.topic) params.set("topic", filters.topic);
-  const suffix = params.toString() ? `?${params.toString()}` : "";
-  return adminRequest<AdminWord[]>(token, `/api/admin/words${suffix}`);
+  const words: AdminWord[] = [];
+  params.set("limit", "200");
+  for (let offset = 0; ; offset += 200) {
+    params.set("offset", String(offset));
+    const page = await adminRequest<AdminWord[]>(token, `/api/admin/words?${params}`);
+    words.push(...page);
+    if (page.length < 200) return words;
+  }
 }
 
 export function createAdminWord(token: string, word: AdminWord): Promise<AdminWord> {

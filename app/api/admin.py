@@ -51,6 +51,8 @@ def admin_words(
     search: str = Query(default="", max_length=120),
     level: str | None = Query(default=None, pattern="^(A1|A2|B1|B2)$"),
     topic: str | None = Query(default=None, max_length=80),
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> list[AdminWordOut]:
     query = select(CachedWord).options(
@@ -64,7 +66,7 @@ def admin_words(
             query = query.where(FocusWordEntry.level == level)
         if topic:
             query = query.join(Topic).where(Topic.slug == topic)
-    query = query.order_by(CachedWord.lemma).limit(200)
+    query = query.distinct().order_by(CachedWord.lemma).limit(limit).offset(offset)
     words = db.scalars(query).unique().all()
     return [_admin_word_out(word) for word in words]
 

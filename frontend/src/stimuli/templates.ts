@@ -317,6 +317,7 @@ export function createStimulusEditor(
   const updateWarningAndNotify = (): void => {
     updateWarning();
     onInput();
+    node.dispatchEvent(new Event("input", { bubbles: true }));
   };
 
   renderKind.addEventListener("change", () => {

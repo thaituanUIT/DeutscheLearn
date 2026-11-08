@@ -14,7 +14,12 @@ from app.api.dictation import (
     youtube_video_id,
 )
 from app.core.config import Settings
-from app.db.models import DictationFetchCounter, DictationVideo
+from app.db.models import (
+    DictationFetchCounter,
+    DictationModerationEvent,
+    DictationVideo,
+    DictationVideoReport,
+)
 from app.db.session import SessionLocal
 from app.main import app
 
@@ -213,3 +218,49 @@ def test_admin_can_hide_and_restore_reported_video(monkeypatch: pytest.MonkeyPat
     assert all(item["video_id"] != video_id for item in visible_catalog.json())
     assert restored.status_code == 200
     assert restored.json()["is_hidden"] is False
+
+
+def test_moderation_reasons_and_history_survive_reload_without_reporter_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    video = new_video(report_count=3)
+    video_id = video.video_id
+    with SessionLocal() as db:
+        db.add(video)
+        db.flush()
+        db.add_all(
+            [
+                DictationVideoReport(
+                    video_id=video_id, reporter_key="private-one", reason="not_german"
+                ),
+                DictationVideoReport(
+                    video_id=video_id, reporter_key="private-two", reason="not_german"
+                ),
+                DictationVideoReport(
+                    video_id=video_id, reporter_key="private-three", reason="broken"
+                ),
+            ]
+        )
+        db.commit()
+    monkeypatch.setattr("app.api.security.get_settings", lambda: Settings(admin_token="test-admin"))
+    headers = {"Authorization": "Bearer test-admin"}
+    with TestClient(app) as client:
+        assert client.get("/api/admin/dictation/reports").status_code == 401
+        for hidden in (True, True, False):
+            response = client.patch(
+                f"/api/admin/dictation/videos/{video_id}",
+                headers=headers,
+                json={"is_hidden": hidden},
+            )
+            assert response.status_code == 200
+        response = client.get("/api/admin/dictation/reports", headers=headers)
+    item = next(item for item in response.json() if item["video_id"] == video_id)
+    assert item["report_reasons"] == {"not_german": 2, "broken": 1}
+    assert [event["is_hidden"] for event in item["review_history"]] == [False, True]
+    assert all(event["created_at"].endswith("Z") for event in item["review_history"])
+    assert "private-one" not in response.text
+    with SessionLocal() as db:
+        events = db.scalars(
+            select(DictationModerationEvent).where(DictationModerationEvent.video_id == video_id)
+        ).all()
+    assert len(events) == 2

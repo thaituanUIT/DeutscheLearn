@@ -34,6 +34,38 @@ Run the frontend dev server:
 npm run dev --prefix frontend
 ```
 
+### Admin panel
+
+Set `ADMIN_TOKEN` on the backend, open `/admin`, and enter that token. The Vocabulary,
+Reading, and Dictation sections keep their working state when switching tabs. Unsaved
+word and passage drafts are recovered from this browser tab after refresh; signing out
+clears those local drafts. Save with Ctrl/Cmd+Enter or the visible save action.
+
+New reading passages start as drafts. Publishing is a separate action, and saving changes
+to an already published passage updates learner content. Imports provide downloadable
+templates and a validation preview before any changes are written. Reading imports that
+omit `status` also default to drafts.
+
+Dictation moderation shows report reasons and the latest 20 hide/restore decisions per
+video. Older reports may lack reason details; review history begins when this version is
+installed. Apply the database migration before deploying the updated backend:
+
+```bash
+uv run alembic upgrade head
+```
+
+Run the admin browser regressions with isolated API fixtures:
+
+```bash
+cd frontend
+npx playwright install chromium
+npm run test:admin
+```
+
+The suite starts and stops its own local server. `PLAYWRIGHT_CHROMIUM_EXECUTABLE` can
+select an existing Chromium binary. Browser screenshots and failure traces are written
+to `frontend/test-results/`.
+
 For a production-style local run:
 
 ```bash

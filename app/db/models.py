@@ -116,6 +116,17 @@ class DictationVideoReport(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False, index=True)
 
 
+class DictationModerationEvent(Base):
+    __tablename__ = "dictation_moderation_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    video_id: Mapped[str] = mapped_column(
+        ForeignKey("dictation_videos.video_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    is_hidden: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+
 class WordFocus(Base):
     __tablename__ = "word_focus"
     __table_args__ = (
