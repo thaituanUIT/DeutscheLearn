@@ -17,6 +17,7 @@ import { formatCount } from "../utils/format";
 type FocusViewOptions = {
   onBack: () => void;
   onBackChange: (handler: () => void) => void;
+  initialLevel?: FocusLevel["level"];
 };
 
 type FocusRating = "again" | "hard" | "good" | "easy";
@@ -42,7 +43,8 @@ const flashcardKeyHandlers = new WeakMap<HTMLElement, (event: KeyboardEvent) => 
 
 export function focusView(options: FocusViewOptions): HTMLElement {
   const section = el("section", "panel focus-card");
-  renderLevels(section, options);
+  if (options.initialLevel) void renderTopics(section, options.initialLevel, options);
+  else void renderLevels(section, options);
   return section;
 }
 
@@ -64,6 +66,7 @@ async function renderLevels(section: HTMLElement, options: FocusViewOptions): Pr
     }
 
     section.replaceChildren(intro, grid);
+    focusHeading(section);
   } catch (error) {
     renderRetryError(section, error instanceof Error ? error.message : "Could not load focus levels", () =>
       renderLevels(section, options),
@@ -96,6 +99,7 @@ async function renderTopics(
     }
 
     section.replaceChildren(intro, grid);
+    focusHeading(section);
   } catch (error) {
     renderRetryError(
       section,
@@ -104,6 +108,17 @@ async function renderTopics(
       level,
     );
   }
+}
+
+function focusHeading(section: HTMLElement): void {
+  requestAnimationFrame(() => {
+    if (!section.isConnected) return;
+    const heading = section.querySelector("h2");
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus();
+    }
+  });
 }
 
 async function renderFlashcards(

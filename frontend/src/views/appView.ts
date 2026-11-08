@@ -44,15 +44,19 @@ export async function renderApp(root: HTMLElement): Promise<void> {
     draw(root, player, Promise.allSettled([getLeaderboard(), getWordOfDay()]));
   } catch (error) {
     clear(root);
-    const shell = el("div", "shell");
-    const message = el("div", "error", error instanceof Error ? error.message : "Could not load app");
+    const shell = el("div", "shell app-load-error");
+    const message = el("div", "error", "Could not load your learning session. Check your connection and try again.");
     message.setAttribute("role", "alert");
     message.setAttribute("aria-atomic", "true");
+    const retry = button("Try again", "button primary");
+    retry.onclick = () => void renderApp(root);
     shell.append(
       el("h1", "brand", "DeutscheLearn"),
       message,
+      retry,
     );
     root.append(shell);
+    retry.focus();
   }
 }
 
@@ -73,10 +77,13 @@ function draw(
   let routeInitialized = false;
   let restoringTimedRoute = false;
   let modeRequestId = 0;
+  let beginnerFocus = false;
 
   const shell = el("div", "shell");
   const playerNode = el("div", "player");
-  playerNode.append(el("span", "muted", "Anonymous learner"), el("strong", "", player.display_name));
+  const playerName = el("strong", "", player.display_name);
+  playerName.title = player.display_name;
+  playerNode.append(el("span", "muted", "Anonymous learner"), playerName);
   const { header, headerStart } = appHeader("DeutscheLearn", playerNode);
 
   const layout = el("div", "layout");
@@ -129,9 +136,10 @@ function draw(
   };
 
   const renderHeaderBack = (onClick: () => void): void => {
-    const back = button("← Back", "button header-back");
+    const back = button("Back", "button header-back");
     back.addEventListener("click", onClick);
-    headerStart.replaceChildren(back);
+    const modeNames: Record<AppRoute, string> = { home: "Home", practice: "Practice", endless: "Endless", timed: "Timed", focus: "Flashcards", scramble: "Scramble", story: "Reading", dictation: "Hörtippen" };
+    headerStart.replaceChildren(back, el("span", "current-mode", modeNames[currentRoute]));
   };
 
   const showMode = (mode: HomeMode, syncRoute = true): void => {
@@ -148,7 +156,11 @@ function draw(
     renderHeaderBack(showHome);
     mainHost.replaceChildren(el("p", "prompt", "Loading practice…"));
     void loadModeView(mode, requestId).then((view) => {
-      if (view && requestId === modeRequestId && currentRoute === mode) mainHost.replaceChildren(view);
+      if (view && requestId === modeRequestId && currentRoute === mode) {
+        mainHost.replaceChildren(view);
+        const title = view.querySelector<HTMLElement>("h2");
+        if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
+      }
     }).catch((error) => {
       if (requestId === modeRequestId && currentRoute === mode) {
         showError(error instanceof Error ? error.message : "Could not load this practice mode.");
@@ -160,7 +172,9 @@ function draw(
     if (mode === "focus") {
       const { focusView } = await import("./focusView");
       if (requestId !== modeRequestId || currentRoute !== mode) return null;
-      return focusView({ onBack: showHome, onBackChange: renderHeaderBack });
+      const initialLevel = beginnerFocus ? "A1" : undefined;
+      beginnerFocus = false;
+      return focusView({ onBack: showHome, onBackChange: renderHeaderBack, initialLevel });
     }
     if (mode === "scramble") {
       const { scrambleView } = await import("./scrambleView");
@@ -202,6 +216,8 @@ function draw(
       onRender: () => undefined,
       onGrammarContextChange: (context: { wrongAnswer?: GrammarWrongAnswerContext | null }) =>
         grammarWidget?.updateContext(context),
+      onExplainAnswer: (answer) => grammarWidget?.explainAnswer(answer),
+      onBeginnerPractice: () => { beginnerFocus = true; showMode("focus"); },
       onError: showError,
     });
   };

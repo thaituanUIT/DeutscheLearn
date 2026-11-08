@@ -17,9 +17,15 @@ from sqlalchemy.orm import Session
 
 from app.api.security import has_admin_bearer
 from app.core.config import get_settings
-from app.db.models import DictationFetchCounter, DictationVideo, DictationVideoReport
+from app.db.models import (
+    DictationFetchCounter,
+    DictationModerationEvent,
+    DictationVideo,
+    DictationVideoReport,
+)
 from app.db.session import get_db
 from app.schemas import (
+    DictationModerationEventOut,
     DictationSegmentOut,
     DictationTranscriptIn,
     DictationTranscriptOut,
@@ -265,9 +271,7 @@ def list_reported_dictation_videos(
         .order_by(DictationVideo.report_count.desc(), DictationVideo.created_at.desc())
         .limit(100)
     ).all()
-    return [
-        DictationVideoModerationOut.model_validate(video, from_attributes=True) for video in videos
-    ]
+    return moderation_outputs(db, list(videos))
 
 
 @router.patch("/admin/dictation/videos/{video_id}", response_model=DictationVideoModerationOut)
@@ -284,10 +288,62 @@ def moderate_dictation_video(
     video = db.get(DictationVideo, video_id)
     if video is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Saved video not found.")
-    video.is_hidden = payload.is_hidden
+    if video.is_hidden != payload.is_hidden:
+        video.is_hidden = payload.is_hidden
+        db.add(DictationModerationEvent(video_id=video_id, is_hidden=payload.is_hidden))
     db.commit()
     db.refresh(video)
-    return DictationVideoModerationOut.model_validate(video, from_attributes=True)
+    return moderation_outputs(db, [video])[0]
+
+
+def moderation_outputs(
+    db: Session, videos: list[DictationVideo]
+) -> list[DictationVideoModerationOut]:
+    if not videos:
+        return []
+    video_ids = [video.video_id for video in videos]
+    reasons: dict[str, dict[str, int]] = {}
+    for video_id, reason, count in db.execute(
+        select(DictationVideoReport.video_id, DictationVideoReport.reason, func.count())
+        .where(DictationVideoReport.video_id.in_(video_ids))
+        .group_by(DictationVideoReport.video_id, DictationVideoReport.reason)
+    ):
+        reasons.setdefault(video_id, {})[reason] = count
+    ranked_events = (
+        select(
+            DictationModerationEvent.video_id,
+            DictationModerationEvent.is_hidden,
+            DictationModerationEvent.created_at,
+            func.row_number()
+            .over(
+                partition_by=DictationModerationEvent.video_id,
+                order_by=(DictationModerationEvent.created_at.desc(), DictationModerationEvent.id),
+            )
+            .label("position"),
+        )
+        .where(DictationModerationEvent.video_id.in_(video_ids))
+        .subquery()
+    )
+    history: dict[str, list[DictationModerationEventOut]] = {}
+    for event in db.execute(
+        select(ranked_events)
+        .where(ranked_events.c.position <= 20)
+        .order_by(ranked_events.c.created_at.desc(), ranked_events.c.position)
+    ):
+        history.setdefault(event.video_id, []).append(
+            DictationModerationEventOut(
+                is_hidden=event.is_hidden, created_at=event.created_at.replace(tzinfo=UTC)
+            )
+        )
+    return [
+        DictationVideoModerationOut.model_validate(video, from_attributes=True).model_copy(
+            update={
+                "report_reasons": reasons.get(video.video_id, {}),
+                "review_history": history.get(video.video_id, []),
+            }
+        )
+        for video in videos
+    ]
 
 
 def dictation_client_key(client_ip: str) -> str:

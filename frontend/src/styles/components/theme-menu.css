@@ -5,14 +5,14 @@
 
 .theme-menu__trigger {
   display: inline-flex;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 0;
   background: transparent;
   color: var(--text);
   cursor: pointer;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   transition:
     background-color 120ms ease,
     border-color 120ms ease;
@@ -48,7 +48,7 @@
 .theme-menu__item {
   display: grid;
   grid-template-columns: 18px 1fr;
-  min-height: 34px;
+  min-height: 44px;
   padding: 0 10px;
   border: 0;
   background: transparent;

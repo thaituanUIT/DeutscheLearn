@@ -40,6 +40,11 @@ class DictationVideoReportIn(BaseModel):
     reason: str = Field(pattern="^(not_german|inappropriate|broken|other)$")
 
 
+class DictationModerationEventOut(BaseModel):
+    is_hidden: bool
+    created_at: datetime
+
+
 class DictationVideoModerationOut(BaseModel):
     video_id: str
     title: str
@@ -47,6 +52,8 @@ class DictationVideoModerationOut(BaseModel):
     report_count: int
     is_hidden: bool
     created_at: datetime
+    report_reasons: dict[str, int] = Field(default_factory=dict)
+    review_history: list[DictationModerationEventOut] = Field(default_factory=list)
 
 
 class DictationVideoModerationIn(BaseModel):
@@ -133,6 +140,8 @@ class PracticeAnswerOut(BaseModel):
     score: int
     total_questions: int
     correct_answer: str
+    answered_word: str
+    meaning_overview: str
     next_question: QuestionOut
 
 
@@ -395,7 +404,7 @@ class AdminReadingPassageIn(BaseModel):
     transcript: str | None = None
     context_label: str | None = Field(default=None, max_length=160)
     order_index: int = Field(default=0, ge=0)
-    status: Literal["draft", "published"] = "published"
+    status: Literal["draft", "published"] = "draft"
     questions: list[AdminReadingQuestionIn] = Field(default_factory=list)
     ad_stimuli: list[AdminReadingAdIn] = Field(default_factory=list)
 

@@ -50,7 +50,8 @@
   color: var(--text);
 }
 
-.segmented-control__item[aria-selected="true"] {
+.segmented-control__item[aria-selected="true"],
+.segmented-control__item[aria-checked="true"] {
   background: var(--text);
   color: var(--bg);
 }

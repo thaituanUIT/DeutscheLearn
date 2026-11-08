@@ -43,6 +43,8 @@ export type AdminDictationVideo = {
   report_count: number;
   is_hidden: boolean;
   created_at: string;
+  report_reasons: Record<string, number>;
+  review_history: { is_hidden: boolean; created_at: string }[];
 };
 
 export type QuizQuestion = {
@@ -89,6 +91,8 @@ export type PracticeAnswer = {
   score: number;
   total_questions: number;
   correct_answer: string;
+  answered_word: string;
+  meaning_overview: string;
   next_question: QuizQuestion;
 };
 

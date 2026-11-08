@@ -23,12 +23,16 @@
   color: var(--accent-fg);
 }
 
+.list-card[data-selected="true"] :is(.list-card-title, .list-card-meta, .list-card-untitled) {
+  color: inherit;
+}
+
 .list-card:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
-.list-card:hover {
+.list-card:not([data-selected="true"]):hover {
   border-color: var(--border-strong);
   background: var(--surface-raised);
 }

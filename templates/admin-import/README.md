@@ -32,3 +32,5 @@ Reading imports should use JSON because passages contain nested questions, answe
 - Any row error blocks the commit for that file.
 - Word imports match existing records by `word`.
 - Reading imports match existing records by `id` when provided.
+- Reading records without a `status` start as drafts. An explicit `"status": "published"`
+  makes the passage available to learners after import.

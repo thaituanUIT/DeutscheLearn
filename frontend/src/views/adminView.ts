@@ -22,7 +22,6 @@ import type {
   AdminReadingAdStimulus,
   AdminReadingPassage,
   AdminReadingQuestion,
-  AdminReadingPassageSummary,
   AdminWord,
   FocusTopicAlias,
 } from "../api/types";
@@ -52,6 +51,15 @@ import {
 import { clear, el } from "../utils/dom";
 import { formatCount } from "../utils/format";
 import { renderDictationAdmin } from "./adminDictationView";
+import wordsCsvTemplate from "../../../templates/admin-import/words.csv?raw";
+import wordsJsonTemplate from "../../../templates/admin-import/words.json?raw";
+import readingJsonTemplate from "../../../templates/admin-import/reading-passages.json?raw";
+import { adminContentList } from "./adminContentList";
+import {
+  adminDialog, clearAdminDrafts, confirmAdminAction, editorChanged, editorIsBusy,
+  editorSaved, leaveAllEditors, leaveEditor, protectAdminDrafts, readDraft,
+  registerEditor, removeDraft, setEditorBusy, storeDraft, type DraftState,
+} from "./adminSupport";
 
 const ADMIN_TOKEN_KEY = "recognition_admin_token";
 const LEVELS = ["A1", "A2", "B1", "B2"] as const;
@@ -85,20 +93,13 @@ type ServerValidationIssue = {
   loc?: Array<string | number>;
   msg?: string;
 };
-type ListCardProps = {
-  title: string;
-  meta: string;
-  selected: boolean;
-  onSelect: () => void;
-};
-type AdminListStatus = "idle" | "loading" | "error";
-
 export function renderAdminApp(root: HTMLElement): void {
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get("token")?.trim();
   if (urlToken) {
     localStorage.setItem(ADMIN_TOKEN_KEY, urlToken);
-    window.history.replaceState({}, "", "/admin");
+    params.delete("token");
+    window.history.replaceState({}, "", `/admin${params.size ? `?${params}` : ""}${location.hash}`);
   }
 
   const token = localStorage.getItem(ADMIN_TOKEN_KEY) ?? "";
@@ -106,13 +107,16 @@ export function renderAdminApp(root: HTMLElement): void {
   const shell = el("div", "shell admin-shell");
   shell.append(adminHeader(token), token ? adminWorkspace(token) : adminMissingToken());
   root.append(shell);
+  protectAdminDrafts();
 }
 
 function adminHeader(token: string): HTMLElement {
   const actions = el("div", "admin-header-actions");
   if (token) {
-    const clearToken = button("Clear token", "button");
-    clearToken.addEventListener("click", () => {
+    const clearToken = button("Sign out", "button");
+    clearToken.addEventListener("click", async () => {
+      if (!await leaveAllEditors()) return;
+      clearAdminDrafts();
       localStorage.removeItem(ADMIN_TOKEN_KEY);
       window.location.reload();
     });
@@ -123,35 +127,44 @@ function adminHeader(token: string): HTMLElement {
 }
 
 function adminMissingToken(): HTMLElement {
-  const panel = el("section", "panel admin-panel");
-  panel.append(
-    el("h2", "focus-title", "Admin token required"),
-    el("p", "prompt", "Open this page with /admin?token=your-secret-token."),
-  );
+  const panel = el("section", "admin-access");
+  const form = document.createElement("form");
+  const token = input("Admin token", "", "password");
+  token.autocomplete = "current-password";
+  token.required = true;
+  const submit = button("Open admin panel", "button primary");
+  submit.type = "submit";
+  form.append(wordField(token, undefined, true), submit);
+  form.onsubmit = (event) => {
+    event.preventDefault();
+    if (!token.value.trim()) return;
+    localStorage.setItem(ADMIN_TOKEN_KEY, token.value.trim());
+    window.location.reload();
+  };
+  panel.append(el("h2", "focus-title", "Admin access"), el("p", "prompt", "Enter the admin token provided by your administrator."), form);
   return panel;
 }
 
 function adminWorkspace(token: string): HTMLElement {
   const panel = el("section", "panel admin-panel");
   const host = el("div", "admin-host");
-  let activeTab: "words" | "reading" | "dictation" = "words";
-  let disposeActiveTab = (): void => undefined;
-
-  const showWords = (): void => {
-    activeTab = "words";
-    disposeActiveTab();
-    disposeActiveTab = renderWordsAdmin(host, token);
-  };
-  const showReading = (): void => {
-    activeTab = "reading";
-    disposeActiveTab();
-    disposeActiveTab = renderReadingAdmin(host, token);
-  };
-
-  const showDictation = (): void => {
-    activeTab = "dictation";
-    disposeActiveTab();
-    disposeActiveTab = renderDictationAdmin(host, token);
+  type Section = "words" | "reading" | "dictation";
+  const sections = new Map<Section, HTMLElement>();
+  const initialized = new Set<Section>();
+  const fromHash = (): Section => location.hash === "#reading" ? "reading" : location.hash === "#dictation" ? "dictation" : "words";
+  let activeTab = fromHash();
+  const show = (value: Section): void => {
+    activeTab = value;
+    let section = sections.get(value);
+    if (!initialized.has(value)) {
+      section = sections.get(value)!;
+      initialized.add(value);
+      if (value === "words") renderWordsAdmin(section, token);
+      else if (value === "reading") renderReadingAdmin(section, token);
+      else renderDictationAdmin(section, token);
+    }
+    sections.forEach((section, key) => { section.hidden = key !== value; });
+    if (location.hash !== `#${value}`) location.hash = value;
   };
 
   const tabs = SegmentedControl({
@@ -164,413 +177,336 @@ function adminWorkspace(token: string): HTMLElement {
       { value: "dictation", label: "Dictation" },
     ],
     onChange: (value) => {
-      if (value === "words") showWords();
-      else if (value === "reading") showReading();
-      else showDictation();
+      show(value);
     },
   });
   tabs.classList.add("admin-section-tabs");
+  for (const value of ["words", "reading", "dictation"] as const) {
+    const section = el("div", "admin-section-host");
+    section.id = `admin-section-${value}`;
+    section.setAttribute("role", "tabpanel");
+    section.setAttribute("aria-labelledby", `admin-tab-${value}`);
+    section.hidden = true;
+    sections.set(value, section);
+    host.append(section);
+  }
+  tabs.querySelectorAll<HTMLButtonElement>("[role=tab]").forEach((tab) => {
+    tab.id = `admin-tab-${tab.dataset.value}`;
+    tab.setAttribute("aria-controls", `admin-section-${tab.dataset.value}`);
+  });
+  window.addEventListener("hashchange", () => {
+    const value = fromHash();
+    if (value !== activeTab) { show(value); tabs.setValue(value); }
+  });
   panel.append(tabs, host);
-  showWords();
+  show(activeTab);
   return panel;
 }
 
-function renderWordsAdmin(host: HTMLElement, token: string): () => void {
-  const state = {
-    words: [] as AdminWord[],
-    selected: emptyWord(),
-    isNew: true,
-    search: "",
-  };
-  let disposed = false;
-  let requestId = 0;
+type WordEditorState = DraftState<AdminWord>;
 
+function renderWordsAdmin(host: HTMLElement, token: string): void {
+  const state = readDraft<AdminWord>("words", { selected: emptyWord(), isNew: true });
+  let words: AdminWord[] = [];
   const { wrap, listPanel, editor } = adminMasterDetailLayout();
   host.replaceChildren(wrap);
-
   const renderEditor = (): void => {
     renderWordEditor(editor, token, state, loadWords);
+    list.updateSelection();
   };
-
-  const renderList = (status: AdminListStatus = "idle", error?: unknown, isFetching = false): void => {
-    renderWordList(listPanel, token, state, renderEditor, loadWords, status, error, isFetching);
-  };
-
-  async function loadWords(): Promise<void> {
-    const currentRequest = ++requestId;
-    renderList(state.words.length === 0 ? "loading" : "idle", undefined, state.words.length > 0);
-    try {
-      const words = await getAdminWords(token);
-      if (disposed || currentRequest !== requestId) return;
-      state.words = words;
-      renderList();
-    } catch (error) {
-      if (disposed || currentRequest !== requestId) return;
-      renderList("error", error);
-    }
-  }
-
-  renderEditor();
-  renderList("loading");
-  void loadWords();
-  return () => {
-    disposed = true;
-  };
-}
-
-function renderWordList(
-  host: HTMLElement,
-  token: string,
-  state: { words: AdminWord[]; selected: AdminWord; isNew: boolean; search: string },
-  onSelect: () => void,
-  onSearch: () => void,
-  status: AdminListStatus = "idle",
-  error?: unknown,
-  isFetching = false,
-): void {
-  const newButton = button("New word", "button primary");
-  newButton.textContent = "+ New";
-  newButton.ariaLabel = "New word";
-  newButton.title = "New word";
-  newButton.addEventListener("click", () => {
-    state.selected = emptyWord();
-    state.isNew = true;
-    onSelect();
-  });
-  const importButton = button("Import", "button");
-  importButton.addEventListener("click", () => {
-    openAdminImportDialog({
-      title: "Import",
-      accept: ".csv,.json,application/json,text/csv",
-      parse: parseWordImportFile,
-      preview: (items) => previewAdminWordImport(token, items),
-      commit: (items) => importAdminWords(token, items),
-      onImported: onSearch,
-    });
-  });
-
-  const search = input("Search words", state.search);
-  search.autocomplete = "off";
-  search.addEventListener("input", () => {
-    state.search = search.value;
-    onSearch();
-  });
-
-  const clearSearch = button("Clear", "button compact-button");
-  clearSearch.disabled = !state.search.trim();
-  clearSearch.addEventListener("click", () => {
-    state.search = "";
-    onSearch();
-  });
-
-  const controls = el("div", "admin-list-controls");
-  controls.append(search, clearSearch);
-
-  const list = el("div", "admin-items");
-  list.dataset.fetching = isFetching ? "true" : "false";
-  const filteredWords = state.words.filter((word) => matchesWordSearch(word, state.search));
-  if (status === "loading") {
-    list.append(el("p", "prompt admin-list-placeholder", "Loading words..."));
-  } else if (status === "error") {
-    list.append(adminError(error));
-  }
-  for (const word of status === "idle" ? filteredWords : []) {
-    const focusCount = word.focus_entries.length;
-    list.append(
-      ListCard({
-        title: word.article ? `${word.article} ${word.word}` : word.word,
-        meta: `${word.part_of_speech} · ${pluralize(focusCount, "focus entry", "focus entries")}`,
-        selected: !state.isNew && state.selected.word === word.word,
-        onSelect: () => {
-          state.selected = cloneWord(word);
-          state.isNew = false;
-          onSelect();
+  const list = adminContentList({
+    title: "Words", noun: "word", topics: true,
+    selectedId: () => state.isNew ? undefined : state.selected.word,
+    errorMessage: adminErrorMessage,
+    onNew: async () => {
+      if (!await leaveEditor(editor)) return;
+      state.selected = emptyWord(); state.draft = undefined; state.isNew = true; state.notice = undefined;
+      renderEditor(); showAdminEditor(wrap);
+    },
+    onSelect: async (id) => {
+      if (!await leaveEditor(editor)) return;
+      state.selected = cloneWord(words.find((word) => word.word === id)!);
+      state.draft = undefined; state.isNew = false; state.notice = undefined;
+      renderEditor(); showAdminEditor(wrap);
+    },
+    onImport: async () => {
+      if (!await leaveEditor(editor)) return;
+      openAdminImportDialog({
+        title: "Import words", accept: ".csv,.json,application/json,text/csv", kind: "words",
+        parse: parseWordImportFile, preview: (items) => previewAdminWordImport(token, items),
+        commit: (items) => importAdminWords(token, items), onImported: async () => {
+          await loadWords();
+          const updated = words.find((word) => word.word === state.selected.word);
+          if (!state.isNew && updated) { state.selected = cloneWord(updated); renderEditor(); }
         },
-      }),
-    );
+      });
+    },
+    onRefresh: loadWords,
+    bulk: [{ label: "Delete selected", run: async (ids) => {
+      if (!await leaveEditor(editor)) return false;
+      if (!await confirmAdminAction(`Delete ${ids.length} words?`, "These words and their practice-topic assignments will be removed. This cannot be undone.", "Delete words")) return false;
+      await runContentBatch(ids, (id) => deleteAdminWord(token, id), loadWords, (successful) => {
+        if (successful.includes(state.selected.word)) {
+          state.selected = emptyWord(); state.draft = undefined; state.isNew = true; renderEditor();
+        }
+      });
+    } }],
+  });
+  listPanel.replaceWith(list.node);
+  async function loadWords(): Promise<void> {
+    list.setStatus(true);
+    try {
+      words = await getAdminWords(token);
+      list.setItems(words.map((word) => ({
+        id: word.word, title: word.article ? `${word.article} ${word.word}` : word.word,
+        meta: `${word.part_of_speech} · ${word.focus_entries.map((entry) => `${entry.level} ${entry.topic}`).join(", ") || "No practice topics"}`,
+        level: word.focus_entries.map((entry) => entry.level), topic: word.focus_entries.map((entry) => entry.topic),
+        searchText: word.meaning, assignments: word.focus_entries,
+      })));
+      list.setStatus(false);
+    } catch (error) { list.setStatus(false, error); }
   }
-
-  if (status === "idle" && filteredWords.length === 0) {
-    list.append(el("p", "prompt", state.search.trim() ? "No matching words." : "No words yet."));
-  }
-
-  const header = el("div", "admin-list-header");
-  const actions = el("div", "admin-list-actions");
-  actions.append(importButton, newButton);
-  header.append(el("h2", "focus-title", "Words"), actions);
-  const children = [header, controls, list];
-  if (isFetching) children.push(el("p", "prompt admin-list-status", "Refreshing..."));
-  host.replaceChildren(...children);
+  renderEditor();
+  if (state.draft) showAdminEditor(wrap);
+  void loadWords();
 }
 
-function renderWordEditor(
-  host: HTMLElement,
-  token: string,
-  state: { selected: AdminWord; isNew: boolean },
-  onSaved: () => Promise<void>,
-): void {
+function renderWordEditor(host: HTMLElement, token: string, state: WordEditorState, onSaved: () => Promise<void>): void {
+  const initial = state.draft ?? state.selected;
   const editorForm = adminEditorForm();
-  const word = input("Word", state.selected.word);
+  const word = input("Word", initial.word);
   word.disabled = !state.isNew;
-  const partOfSpeech = selectPartOfSpeech(state.selected.part_of_speech);
-  const article = articleSegmentedControl(state.selected.article, partOfSpeech.value === "noun");
-  const meaning = textarea("Meaning", state.selected.meaning, 5);
-  const focusEntries = focusEntriesRepeater(state.selected.focus_entries);
-  const status = el("p", "prompt admin-dirty-state");
-
-  const syncArticleState = (): void => {
-    article.setEnabled(partOfSpeech.value === "noun");
-  };
-
-  const saveWord = async (): Promise<void> => {
+  const partOfSpeech = selectPartOfSpeech(initial.part_of_speech);
+  const article = articleSegmentedControl(initial.article, partOfSpeech.value === "noun");
+  const meaning = textarea("Meaning", initial.meaning, 5);
+  const focusEntries = focusEntriesRepeater(initial.focus_entries);
+  const status = editorStatus(state.notice ?? (state.draft ? "Recovered unsaved changes. Review and save when ready." : ""));
+  const validation = createFormValidation(status);
+  validation.register("word", word); validation.register("meaning", meaning); validation.register("part_of_speech", partOfSpeech);
+  const value = (): AdminWord => ({
+    word: word.value.trim(), article: partOfSpeech.value === "noun" ? article.value() : null,
+    part_of_speech: partOfSpeech.value, meaning: meaning.value.trim(), focus_entries: focusEntries.value(),
+  });
+  const discard = (): void => { state.draft = undefined; state.notice = undefined; removeDraft("words"); };
+  const saveWord = async (): Promise<boolean> => {
+    if (editorIsBusy(host)) return false;
+    validation.clear();
+    const issues: FieldValidationIssue[] = [];
+    if (!word.value.trim()) issues.push({ field: "word", message: "Enter the German word.", control: word });
+    if (!meaning.value.trim()) issues.push({ field: "meaning", message: "Enter a meaning.", control: meaning });
+    if (validation.show(issues)) return false;
+    setEditorBusy(host, true);
+    status.textContent = "Saving word…";
+    let saved = false;
     try {
-      const wasNew = state.isNew;
-      const payload = {
-        word: word.value.trim(),
-        article: partOfSpeech.value === "noun" ? article.value() : null,
-        part_of_speech: partOfSpeech.value.trim(),
-        meaning: meaning.value.trim(),
-        focus_entries: focusEntries.value(),
-      };
-      state.selected = state.isNew
-        ? await createAdminWord(token, payload)
-        : await updateAdminWord(token, payload);
-      state.isNew = false;
-      setSavedStatus(status);
+      state.selected = state.isNew ? await createAdminWord(token, value()) : await updateAdminWord(token, value());
+      state.isNew = false; discard(); editorSaved(host);
+      state.notice = `Saved ${state.selected.word}.`;
       await onSaved();
-      if (wasNew) renderWordEditor(host, token, state, onSaved);
+      saved = true;
     } catch (error) {
-      setErrorStatus(status, error);
-    }
+      if (!validation.show(fieldErrorsFromUnknown(error))) setErrorStatus(status, error);
+    } finally { setEditorBusy(host, false); }
+    if (saved) { renderWordEditor(host, token, state, onSaved); host.querySelector<HTMLButtonElement>("[data-save]")?.focus({ preventScroll: true }); }
+    return saved;
   };
-
-  editorForm.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" || (!event.metaKey && !event.ctrlKey)) return;
-    event.preventDefault();
-    void saveWord();
-  });
-  editorForm.addEventListener("input", () => {
-    setDirtyStatus(status);
-  });
-  editorForm.addEventListener("change", () => {
-    setDirtyStatus(status);
-  });
-  partOfSpeech.addEventListener("change", syncArticleState);
-
+  partOfSpeech.addEventListener("change", () => article.setEnabled(partOfSpeech.value === "noun"));
   const save = button(state.isNew ? "Create word" : "Save word", "button primary");
-  save.addEventListener("click", () => {
-    void saveWord();
-  });
-
-  const cancel = button("Cancel", "button");
-  cancel.addEventListener("click", () => {
-    state.selected = state.isNew ? emptyWord() : state.selected;
+  save.dataset.save = "true";
+  save.setAttribute("aria-keyshortcuts", "Control+Enter Meta+Enter");
+  save.onclick = () => void saveWord();
+  const cancel = button("Discard changes", "button");
+  cancel.onclick = async () => {
+    if (state.draft && !await confirmAdminAction("Discard changes?", "Your unsaved changes to this word will be removed.", "Discard changes")) return;
+    discard(); editorSaved(host);
+    if (state.isNew) state.selected = emptyWord();
     renderWordEditor(host, token, state, onSaved);
-  });
-
+  };
   const metaGrid = el("div", "admin-vocab-meta-grid");
-  metaGrid.append(wordField(word), wordField(article.node, "Article"), wordField(partOfSpeech, "Part of speech"));
+  metaGrid.append(wordField(word, undefined, true), wordField(article.node, "Article"), wordField(partOfSpeech, "Part of speech"));
   const formFields = el("div", "admin-form-fields");
-  formFields.append(metaGrid, wordField(meaning), focusEntries.node);
-
-  const actions = editorActionBar(status, cancel, save);
-  editorForm.append(formFields, actions);
-
+  formFields.append(metaGrid, wordField(meaning, undefined, true), focusEntries.node);
+  editorForm.append(formFields, editorActionBar(status, cancel, save));
   const header = el("div", "admin-editor-header");
-  header.append(el("h2", "focus-title", state.isNew ? "New word" : state.selected.word));
+  const heading = el("h2", "focus-title", state.isNew ? "New word" : state.selected.word);
+  heading.tabIndex = -1;
+  header.append(heading);
   if (!state.isNew) {
-    const remove = button("Delete", "admin-text-button danger-text-button");
-    remove.addEventListener("click", async () => {
-      if (!window.confirm(`Delete ${state.selected.word}?`)) return;
+    const remove = button("Delete word", "admin-text-button danger-text-button");
+    remove.onclick = async () => {
+      if (editorIsBusy(host) || !await confirmAdminAction(`Delete ${state.selected.word}?`, "This word and its practice-topic assignments will be permanently removed.", "Delete word")) return;
+      setEditorBusy(host, true);
+      let deleted = false;
       try {
         await deleteAdminWord(token, state.selected.word);
-        state.selected = emptyWord();
-        state.isNew = true;
-        await onSaved();
-        renderWordEditor(host, token, state, onSaved);
-      } catch (error) {
-        setErrorStatus(status, error);
-      }
-    });
+        discard(); editorSaved(host); state.selected = emptyWord(); state.isNew = true;
+        state.notice = "Word deleted."; await onSaved(); deleted = true;
+      } catch (error) { setErrorStatus(status, error); }
+      finally { setEditorBusy(host, false); }
+      if (deleted) renderWordEditor(host, token, state, onSaved);
+    };
     header.append(remove);
   }
   host.replaceChildren(header, editorForm);
+  registerEditor(host, editorForm, {
+    dirty: Boolean(state.draft), save: saveWord,
+    discard: () => { discard(); renderWordEditor(host, token, state, onSaved); },
+    capture: () => { state.draft = value(); storeDraft("words", state); },
+    changed: () => setDirtyStatus(status),
+  });
+  editorForm.onkeydown = (event) => {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void saveWord(); }
+  };
 }
 
-function renderReadingAdmin(host: HTMLElement, token: string): () => void {
-  const state = {
-    activeGroup: "general" as AdminReadingGroup,
-    passages: [] as AdminReadingPassageSummary[],
-    selected: emptyPassage("general"),
-    isNew: true,
-    search: "",
-  };
-  let disposed = false;
-  let requestId = 0;
+type ReadingEditorState = DraftState<AdminReadingPassage> & { activeGroup: AdminReadingGroup };
 
+function renderReadingAdmin(host: HTMLElement, token: string): void {
+  let rememberedGroup: AdminReadingGroup = "general";
+  try { rememberedGroup = sessionStorage.getItem("admin-reading-group") === "goethe" ? "goethe" : "general"; } catch { /* Optional preference. */ }
+  const state: ReadingEditorState = { ...readDraft<AdminReadingPassage>(`reading-${rememberedGroup}`, { selected: emptyPassage(rememberedGroup), isNew: true }), activeGroup: rememberedGroup };
   const { wrap, listPanel, editor } = adminMasterDetailLayout();
   host.replaceChildren(wrap);
-
   const renderEditor = (): void => {
-    state.selected.group = state.activeGroup;
     renderPassageEditor(editor, token, state, loadPassages);
+    list.updateSelection();
   };
-
-  const renderList = (status: AdminListStatus = "idle", error?: unknown, isFetching = false): void => {
-    renderPassageList(listPanel, token, state, renderEditor, loadPassages, status, error, isFetching);
+  const collection = SegmentedControl<AdminReadingGroup>({
+    label: "Reading collection", value: state.activeGroup, fill: true,
+    role: "radiogroup",
+    options: [{ value: "general", label: "General" }, { value: "goethe", label: "Goethe" }],
+    onChange: (group) => {
+      void (async () => {
+        if (!await leaveEditor(editor)) return;
+        state.activeGroup = group;
+        Object.assign(state, readDraft<AdminReadingPassage>(`reading-${group}`, { selected: emptyPassage(group), isNew: true, draft: undefined, notice: undefined }));
+        try { sessionStorage.setItem("admin-reading-group", group); } catch { /* Optional preference. */ }
+        collection.setValue(group); renderEditor(); await loadPassages();
+      })();
+      return false;
+    },
+  });
+  collection.classList.add("admin-reading-tabs");
+  const changePublication = async (ids: string[], publication: "draft" | "published"): Promise<void | boolean> => {
+    if (!await leaveEditor(editor)) return false;
+    if (!await confirmAdminAction(`${publication === "published" ? "Publish" : "Unpublish"} ${ids.length} passages?`, publication === "published" ? "These passages will appear in learner practice. Review their content before publishing." : "These passages will become drafts and disappear from learner practice.", publication === "published" ? "Publish passages" : "Move to drafts")) return false;
+    await runContentBatch(ids, async (id) => {
+      const passage = await getAdminReadingPassage(token, id);
+      const updated = await updateAdminReadingPassage(token, { ...passage, status: publication });
+      if (!state.isNew && state.selected.id === id) state.selected = updated;
+    }, loadPassages, () => renderEditor());
   };
-
+  const list = adminContentList({
+    title: "Passages", noun: "passage", publication: true, collection,
+    selectedId: () => state.isNew ? undefined : state.selected.id,
+    errorMessage: adminErrorMessage,
+    onNew: async () => {
+      if (!await leaveEditor(editor)) return;
+      state.selected = emptyPassage(state.activeGroup); state.draft = undefined; state.isNew = true; state.notice = undefined;
+      renderEditor(); showAdminEditor(wrap);
+    },
+    onSelect: async (id) => {
+      if (!await leaveEditor(editor)) return;
+      const passage = await getAdminReadingPassage(token, id);
+      state.selected = passage; state.draft = undefined; state.isNew = false; state.notice = undefined;
+      renderEditor(); showAdminEditor(wrap);
+    },
+    onImport: async () => {
+      if (!await leaveEditor(editor)) return;
+      openAdminImportDialog({
+        title: "Import passages", accept: ".json,application/json", kind: "reading",
+        parse: parseJsonImportFile, preview: (items) => previewAdminReadingImport(token, items),
+        commit: (items) => importAdminReading(token, items), onImported: async () => {
+          await loadPassages();
+          if (!state.isNew && state.selected.id) {
+            try { state.selected = await getAdminReadingPassage(token, state.selected.id); }
+            catch { state.notice = "Import complete. Reselect this passage to load its updated content."; }
+            renderEditor();
+          }
+        },
+      });
+    },
+    onRefresh: loadPassages,
+    bulk: [
+      { label: "Publish", run: (ids) => changePublication(ids, "published") },
+      { label: "Move to drafts", run: (ids) => changePublication(ids, "draft") },
+      { label: "Delete", run: async (ids) => {
+        if (!await leaveEditor(editor)) return false;
+        if (!await confirmAdminAction(`Delete ${ids.length} passages?`, "The passages and their questions will be permanently removed.", "Delete passages")) return false;
+        await runContentBatch(ids, (id) => deleteAdminReadingPassage(token, id), loadPassages, (successful) => {
+          if (state.selected.id && successful.includes(state.selected.id)) {
+            state.selected = emptyPassage(state.activeGroup); state.draft = undefined; state.isNew = true; renderEditor();
+          }
+        });
+      } },
+    ],
+  });
+  listPanel.replaceWith(list.node);
   async function loadPassages(): Promise<void> {
-    const currentRequest = ++requestId;
-    renderList(state.passages.length === 0 ? "loading" : "idle", undefined, state.passages.length > 0);
+    list.setStatus(true);
     try {
       const passages = await getAdminReadingPassages(token, { group: state.activeGroup });
-      if (disposed || currentRequest !== requestId) return;
-      state.passages = passages;
-      renderList();
-    } catch (error) {
-      if (disposed || currentRequest !== requestId) return;
-      renderList("error", error);
-    }
+      list.setItems(passages.map((passage) => ({
+        id: passage.id, title: passage.title,
+        meta: `${passage.level}${passage.part ? ` · ${partLabel(passage.part)}` : ""} · ${formatCount(passage.question_count, "question", { zeroLabel: "No" })} · ${passage.status === "published" ? "Published" : "Draft"}`,
+        level: [passage.level], status: passage.status,
+      })));
+      list.setStatus(false);
+    } catch (error) { list.setStatus(false, error); }
   }
-
   renderEditor();
-  renderList("loading");
+  if (state.draft) showAdminEditor(wrap);
   void loadPassages();
-  return () => {
-    disposed = true;
-  };
 }
 
-function renderPassageList(
-  host: HTMLElement,
-  token: string,
-  state: {
-    activeGroup: AdminReadingGroup;
-    passages: AdminReadingPassageSummary[];
-    selected: AdminReadingPassage;
-    isNew: boolean;
-    search: string;
-  },
-  onSelect: () => void,
-  onGroupChange: () => void,
-  status: AdminListStatus = "idle",
-  error?: unknown,
-  isFetching = false,
-): void {
-  const newButton = button("New passage", "button primary");
-  newButton.textContent = "+ New";
-  newButton.ariaLabel = "New passage";
-  newButton.title = "New passage";
-  newButton.addEventListener("click", () => {
-    state.selected = emptyPassage(state.activeGroup);
-    state.isNew = true;
-    onSelect();
-  });
-  const importButton = button("Import", "button");
-  importButton.ariaLabel = "Import passages";
-  importButton.title = "Import passages";
-  importButton.addEventListener("click", () => {
-    openAdminImportDialog({
-      title: "Import passages",
-      accept: ".json,application/json",
-      parse: parseJsonImportFile,
-      preview: (items) => previewAdminReadingImport(token, items),
-      commit: (items) => importAdminReading(token, items),
-      onImported: onGroupChange,
-    });
-  });
-  const tabs = readingGroupTabs(state.activeGroup, (group) => {
-    if (!confirmDiscardingShapeData(state.selected, state.activeGroup, group)) return false;
-    state.activeGroup = group;
-    state.passages = [];
-    state.selected = emptyPassage(group);
-    state.isNew = true;
-    onSelect();
-    onGroupChange();
-    return true;
-  });
-  const search = input("Search passages", state.search);
-  search.autocomplete = "off";
-  search.addEventListener("input", () => {
-    state.search = search.value;
-    renderPassageList(host, token, state, onSelect, onGroupChange, status, error, isFetching);
-  });
-  const clearSearch = button("Clear", "button compact-button");
-  clearSearch.disabled = !state.search.trim();
-  clearSearch.addEventListener("click", () => {
-    state.search = "";
-    renderPassageList(host, token, state, onSelect, onGroupChange, status, error, isFetching);
-  });
-  const controls = el("div", "admin-list-controls");
-  controls.append(search, clearSearch);
+async function runContentBatch(ids: string[], action: (id: string) => Promise<void>, refresh: () => Promise<void>, completed: (ids: string[]) => void): Promise<void> {
+  const succeeded: string[] = [];
+  const failed: string[] = [];
+  for (const id of ids) {
+    try { await action(id); succeeded.push(id); } catch { failed.push(id); }
+  }
+  completed(succeeded);
+  await refresh();
+  if (failed.length) throw Object.assign(new Error(`${succeeded.length} completed; ${failed.length} could not be updated: ${failed.join(", ")}. The remaining items are still selected. Try again.`), { completedIds: succeeded });
+}
 
-  const list = el("div", "admin-items");
-  list.dataset.fetching = isFetching ? "true" : "false";
-  const filteredPassages = state.passages.filter((passage) => matchesPassageSearch(passage, state.search));
-  if (status === "loading") {
-    list.append(el("p", "prompt admin-list-placeholder", "Loading passages..."));
-  } else if (status === "error") {
-    list.append(adminError(error));
+function showAdminEditor(wrap: HTMLElement): void {
+  wrap.dataset.view = "editor";
+  wrap.querySelector<HTMLElement>(".admin-editor h2")?.focus({ preventScroll: true });
+  if (matchMedia("(max-width: 820px)").matches) {
+    window.scrollTo({ top: 0 });
   }
-  for (const passage of status === "idle" ? filteredPassages : []) {
-    const questionCount = formatCount(passage.question_count, "question", { zeroLabel: "No" });
-    list.append(
-      ListCard({
-        title: passage.title,
-        meta: `${readingGroupLabel(passage.group)} · ${passage.level}${
-          passage.part ? ` · ${partLabel(passage.part)}` : ""
-        } · ${questionCount}`,
-        selected: !state.isNew && state.selected.id === passage.id,
-        onSelect: async () => {
-          state.selected = await getAdminReadingPassage(token, passage.id);
-          state.isNew = false;
-          onSelect();
-        },
-      }),
-    );
-  }
-  if (status === "idle" && filteredPassages.length === 0) {
-    list.append(el("p", "prompt", state.search.trim() ? "No matching passages." : "No passages yet."));
-  }
-
-  const header = el("div", "admin-list-header");
-  const actions = el("div", "admin-list-actions");
-  actions.append(importButton, newButton);
-  header.append(el("h2", "focus-title", "Passages"), actions);
-  const children = [header, tabs, controls, list];
-  if (isFetching) children.push(el("p", "prompt admin-list-status", "Refreshing..."));
-  host.replaceChildren(...children);
 }
 
 function renderPassageEditor(
   host: HTMLElement,
   token: string,
-  state: { activeGroup: AdminReadingGroup; selected: AdminReadingPassage; isNew: boolean },
+  state: ReadingEditorState,
   onSaved: () => Promise<void>,
 ): void {
-  const level = selectLevel(state.selected.level);
-  const part = selectGoethePart(state.selected.part ?? "teil_1");
-  const topic = input("Topic", state.selected.topic ?? "");
-  const contextLabel = input("Context label", state.selected.context_label ?? "");
-  const title = input("Title", state.selected.title);
-  const passage = textarea("Passage text", state.selected.passage_text, 10);
+  const initial = state.draft ?? state.selected;
+  const level = selectLevel(initial.level);
+  const part = selectGoethePart(initial.part ?? "teil_1");
+  const topic = input("Topic", initial.topic ?? "");
+  const contextLabel = input("Context label", initial.context_label ?? "");
+  const title = input("Title", initial.title);
+  const passage = textarea("Passage text", initial.passage_text, 10);
   const questions = el("div", "admin-question-list");
-  const firstQuestion = state.selected.questions[0] ?? emptyQuestion(0);
+  const firstQuestion = initial.questions[0] ?? emptyQuestion(0);
   const sourceSituation = textarea("Situation", firstQuestion.prompt, 3);
   const sourceExplanation = textarea("Explanation after answer", firstQuestion.explanation ?? "", 3);
   const correctSource = selectSourceAnswer(firstQuestion);
   const noticeEditor = createStimulusEditor(
     {
-      id: state.selected.id,
-      title: state.selected.title,
-      body: state.selected.passage_text,
-      context_label: state.selected.context_label,
-      render_kind: state.selected.render_kind,
-      content: state.selected.content,
-      image_url: state.selected.image_url,
-      image_path: state.selected.image_path,
-      transcript: state.selected.transcript,
+      id: initial.id,
+      title: initial.title,
+      body: initial.passage_text,
+      context_label: initial.context_label,
+      render_kind: initial.render_kind,
+      content: initial.content,
+      image_url: initial.image_url,
+      image_path: initial.image_path,
+      transcript: initial.transcript,
     },
     "teil_3",
     () => {
@@ -583,7 +519,7 @@ function renderPassageEditor(
   );
   const adControls = (["a", "b"] as const).map((key, index) =>
     adStimulusBlock(
-      state.selected.ad_stimuli?.[index] ?? emptyAdStimulus(key, index),
+      initial.ad_stimuli?.[index] ?? emptyAdStimulus(key, index),
       key,
       (stimulusId, file) => createStimulusImageUploadUrl(token, stimulusId, file),
     ),
@@ -595,7 +531,7 @@ function renderPassageEditor(
     resolveReadingShape(state.activeGroup, level.value as AdminLevel, part.value as AdminGoethePart);
   const activeSpec = (): GoethePartSpec | null =>
     state.activeGroup === "goethe" ? goethePartSpec(level.value as AdminLevel, part.value as AdminGoethePart) : null;
-  let questionControls = state.selected.questions.map((question) => questionBlockForShape(question, shape(), activeSpec()));
+  let questionControls = initial.questions.map((question) => questionBlockForShape(question, shape(), activeSpec()));
   if (questionControls.length === 0) {
     questionControls = [questionBlockForShape(emptyQuestion(0, activeSpec()?.defaultOptions), shape(), activeSpec())];
   }
@@ -604,11 +540,16 @@ function renderPassageEditor(
     questions.replaceChildren(
       ...questionControls.map((control, index) => {
         control.title.textContent = `Question ${index + 1}`;
+        if (!control.node.dataset.initialized) {
+          (control.node as HTMLDetailsElement).open = index === 0;
+          control.node.dataset.initialized = "true";
+        }
         control.remove.disabled = questionControls.length === 1;
         control.remove.onclick = () => {
           questionControls.splice(index, 1);
           renderQuestions();
           renderForm();
+          editorChanged(editorForm);
         };
         return control.node;
       }),
@@ -617,7 +558,7 @@ function renderPassageEditor(
   };
   renderQuestions();
   const editorForm = adminEditorForm();
-  const status = el("p", "prompt admin-dirty-state");
+  const status = editorStatus(state.notice ?? (state.draft ? "Recovered unsaved changes. Review and save when ready." : ""));
   const metaGrid = el("div", "admin-reading-meta-grid");
   const formScroll = el("div", "form-scroll");
   const questionSectionNode = questionSection(questions);
@@ -641,27 +582,30 @@ function renderPassageEditor(
     }
   };
 
-  const renderPreviewState = (): void => {
+  const currentValue = (strict = false): AdminReadingPassage => {
     const activeShape = shape();
-    renderReadingPreview(preview, {
-      group: state.activeGroup,
-      level: level.value as AdminLevel,
-      part: state.activeGroup === "goethe" ? (part.value as AdminGoethePart) : null,
-      title: title.value,
-      passage_text: activeShape === "goethe_source_choice" ? sourceChoiceInstruction(adControls) : passage.value,
-      context_label: activeShape === "goethe_true_false_notice" ? contextLabel.value || null : null,
-      image_url: state.selected.image_url,
-      render_kind: activeShape === "goethe_true_false_notice" ? noticeEditor.getValue().render_kind : "text",
-      content: activeShape === "goethe_true_false_notice" ? noticeEditor.getValue().content : null,
-      image_path: activeShape === "goethe_true_false_notice" ? noticeEditor.getValue().image_path : null,
-      transcript: activeShape === "goethe_true_false_notice" ? noticeEditor.getValue().transcript : null,
-      topic: state.activeGroup === "general" ? topic.value || null : null,
-      status: state.selected.status,
-      order_index: state.selected.order_index,
-      questions: activeShape === "goethe_source_choice" ? sourceQuestions() : collectQuestionBlocksSafely(questionControls),
-      ad_stimuli: activeShape === "goethe_source_choice" ? collectAdStimuliSafely(adControls) : [],
-    });
+    const notice = noticeEditor.getValue();
+    return {
+      id: state.selected.id, group: state.activeGroup, level: level.value as AdminLevel,
+      part: state.activeGroup === "goethe" ? part.value as AdminGoethePart : null,
+      title: title.value.trim(),
+      passage_text: activeShape === "goethe_source_choice" ? sourceChoiceInstruction(adControls)
+        : activeShape === "goethe_true_false_notice" ? notice.body : passage.value.trim(),
+      context_label: activeShape === "goethe_true_false_notice" ? contextLabel.value.trim() || null : null,
+      image_url: initial.image_url,
+      render_kind: activeShape === "goethe_true_false_notice" ? notice.render_kind : "text",
+      content: activeShape === "goethe_true_false_notice" ? notice.content : null,
+      image_path: activeShape === "goethe_true_false_notice" ? notice.image_path : null,
+      transcript: activeShape === "goethe_true_false_notice" ? notice.transcript : null,
+      topic: state.activeGroup === "general" ? topic.value.trim() || null : null,
+      status: state.selected.status, order_index: state.selected.order_index,
+      questions: activeShape === "goethe_source_choice"
+        ? strict ? collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource, adControls) : sourceQuestions()
+        : strict ? collectQuestionBlocks(questionControls) : collectQuestionBlocksSafely(questionControls),
+      ad_stimuli: activeShape === "goethe_source_choice" ? strict ? collectAdStimuli(adControls) : collectAdStimuliSafely(adControls) : [],
+    };
   };
+  const renderPreviewState = (): void => renderReadingPreview(preview, currentValue());
 
   const renderForm = (): void => {
     syncGoethePartOptions(part, level.value as AdminLevel);
@@ -704,6 +648,7 @@ function renderPassageEditor(
     const nextShape = shape();
     if (!confirmShapeSwitch(previousShape, nextShape, adControls)) {
       level.value = previousLevel;
+      syncGoethePartOptions(part, previousLevel as AdminLevel);
       part.value = previousPart;
       return;
     }
@@ -734,106 +679,93 @@ function renderPassageEditor(
   }
   updateCorrectSourceOptions(correctSource, adControls);
 
-  const markDirty = (): void => {
-    setDirtyStatus(status);
-  };
-
-  const savePassage = async (): Promise<void> => {
+  const draftKey = `reading-${state.activeGroup}`;
+  const discard = (): void => { state.draft = undefined; state.notice = undefined; removeDraft(draftKey); };
+  const savePassage = async (publication = state.selected.status): Promise<boolean> => {
+    if (editorIsBusy(host)) return false;
+    validation.clear();
+    if (validation.show(validatePassageClientFields(shape(), title, passage, sourceSituation, adControls))) return false;
+    let payload: AdminReadingPassage;
+    try { payload = { ...currentValue(true), status: publication }; }
+    catch (error) { setErrorStatus(status, error); return false; }
+    if (publication !== state.selected.status && !await confirmAdminAction(
+      publication === "published" ? "Publish this passage?" : "Move this passage to drafts?",
+      publication === "published" ? "This passage and its questions will become available in learner practice." : "Learners will no longer see this passage in practice.",
+      publication === "published" ? "Publish passage" : "Move to drafts",
+    )) return false;
+    setEditorBusy(host, true);
+    status.textContent = publication === "published" ? "Saving published passage…" : "Saving draft…";
+    let saved = false;
     try {
-      const wasNew = state.isNew;
-      const activeShape = shape();
-      validation.clear();
-      const clientErrors = validatePassageClientFields(activeShape, title, passage, sourceSituation, adControls);
-      if (validation.show(clientErrors)) return;
-      const noticeValue = noticeEditor.getValue();
-      const payload: AdminReadingPassage = {
-        id: state.selected.id,
-        group: state.activeGroup,
-        level: level.value as AdminLevel,
-        part: state.activeGroup === "goethe" ? (part.value as AdminGoethePart) : null,
-        topic: state.activeGroup === "general" ? topic.value.trim() || null : null,
-        title: title.value.trim(),
-        passage_text:
-          activeShape === "goethe_source_choice"
-            ? sourceChoiceInstruction(adControls)
-            : activeShape === "goethe_true_false_notice"
-              ? noticeValue.body
-              : passage.value.trim(),
-        image_url: state.selected.image_url,
-        render_kind: activeShape === "goethe_true_false_notice" ? noticeValue.render_kind : "text",
-        content: activeShape === "goethe_true_false_notice" ? noticeValue.content : null,
-        image_path: activeShape === "goethe_true_false_notice" ? noticeValue.image_path : null,
-        transcript: activeShape === "goethe_true_false_notice" ? noticeValue.transcript : null,
-        context_label: activeShape === "goethe_true_false_notice" ? contextLabel.value.trim() || null : null,
-        order_index: state.selected.order_index,
-        status: state.selected.status,
-        ad_stimuli: activeShape === "goethe_source_choice" ? collectAdStimuli(adControls) : [],
-        questions: activeShape === "goethe_source_choice"
-          ? collectSourceChoiceQuestion(sourceSituation, sourceExplanation, correctSource, adControls)
-          : collectQuestionBlocks(questionControls),
-      };
-      state.selected = state.isNew
-        ? await createAdminReadingPassage(token, payload)
-        : await updateAdminReadingPassage(token, payload);
-      state.isNew = false;
-      heading.textContent = state.selected.title || "Untitled passage";
-      setSavedStatus(status);
-      await onSaved();
-      if (wasNew) renderPassageEditor(host, token, state, onSaved);
+      state.selected = state.isNew ? await createAdminReadingPassage(token, payload) : await updateAdminReadingPassage(token, payload);
+      state.isNew = false; discard(); editorSaved(host);
+      state.notice = state.selected.status === "published" ? "Saved. This passage is available to learners." : "Draft saved. Learners cannot see this passage.";
+      await onSaved(); saved = true;
     } catch (error) {
       if (!validation.show(fieldErrorsFromUnknown(error))) setErrorStatus(status, error);
+    } finally { setEditorBusy(host, false); }
+    if (saved) {
+      renderPassageEditor(host, token, state, onSaved);
+      host.querySelector<HTMLButtonElement>("[data-save]")?.focus({ preventScroll: true });
     }
+    return saved;
   };
-
-  editorForm.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" || (!event.metaKey && !event.ctrlKey)) return;
-    event.preventDefault();
-    void savePassage();
-  });
-  editorForm.addEventListener("input", markDirty);
-  editorForm.addEventListener("change", markDirty);
-
-  const save = button(state.isNew ? "Create passage" : "Save passage", "button primary");
-  save.addEventListener("click", () => {
-    void savePassage();
-  });
+  editorForm.onkeydown = (event) => {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void savePassage(); }
+  };
+  const save = button(state.selected.status === "published" ? "Save changes" : "Save draft", "button primary");
+  save.dataset.save = "true";
+  save.setAttribute("aria-keyshortcuts", "Control+Enter Meta+Enter");
+  save.onclick = () => void savePassage();
+  const publicationAction = button(state.selected.status === "published" ? "Move to drafts" : "Publish", "button");
+  publicationAction.onclick = () => void savePassage(state.selected.status === "published" ? "draft" : "published");
 
   addTemplate.addEventListener("click", () => {
+    questionControls.forEach((control) => { (control.node as HTMLDetailsElement).open = false; });
     questionControls.push(questionBlockForShape(emptyQuestion(questionControls.length, activeSpec()?.defaultOptions), shape(), activeSpec()));
     renderQuestions();
+    (questionControls[questionControls.length - 1].node as HTMLDetailsElement).open = true;
     renderForm();
+    editorChanged(editorForm);
   });
 
-  const cancel = button("Cancel", "button");
-  cancel.addEventListener("click", () => {
-    state.selected = state.isNew ? emptyPassage(state.activeGroup) : state.selected;
+  const cancel = button("Discard changes", "button");
+  cancel.onclick = async () => {
+    if (state.draft && !await confirmAdminAction("Discard changes?", "Your unsaved changes to this passage will be removed.", "Discard changes")) return;
+    discard(); editorSaved(host);
+    if (state.isNew) state.selected = emptyPassage(state.activeGroup);
     renderPassageEditor(host, token, state, onSaved);
-  });
+  };
 
   renderForm();
 
   const header = el("div", "admin-editor-header");
   const heading = el("h2", "focus-title", state.isNew ? "New passage" : state.selected.title);
-  heading.contentEditable = "false";
-  header.append(heading);
+  heading.tabIndex = -1;
+  const publicationStatus = el("p", "prompt admin-publication-status", state.selected.status === "published"
+    ? "Published · Saving updates learner content." : "Draft · Only admins can see this passage.");
+  const titleGroup = el("div", "admin-editor-title");
+  titleGroup.append(heading, publicationStatus);
+  header.append(titleGroup);
   if (!state.isNew) {
-    const remove = button("Delete", "admin-text-button danger-text-button");
-    remove.addEventListener("click", async () => {
-      if (!state.selected.id || !window.confirm(`Delete ${state.selected.title}?`)) return;
+    const remove = button("Delete passage", "admin-text-button danger-text-button");
+    remove.onclick = async () => {
+      if (editorIsBusy(host) || !state.selected.id || !await confirmAdminAction(`Delete ${state.selected.title}?`, "The passage and its questions will be permanently removed.", "Delete passage")) return;
+      setEditorBusy(host, true);
+      let deleted = false;
       try {
         await deleteAdminReadingPassage(token, state.selected.id);
-        state.selected = emptyPassage(state.activeGroup);
-        state.isNew = true;
-        await onSaved();
-        renderPassageEditor(host, token, state, onSaved);
-      } catch (error) {
-        setErrorStatus(status, error);
-      }
-    });
+        discard(); editorSaved(host); state.selected = emptyPassage(state.activeGroup); state.isNew = true;
+        state.notice = "Passage deleted."; await onSaved(); deleted = true;
+      } catch (error) { setErrorStatus(status, error); }
+      finally { setEditorBusy(host, false); }
+      if (deleted) renderPassageEditor(host, token, state, onSaved);
+    };
     header.append(remove);
   }
 
   const actions = editorActionBar(status, cancel, save);
+  actions.querySelector(".admin-action-buttons")?.prepend(publicationAction);
   formScroll.append(metaGrid, formFields);
   editorForm.append(formScroll, actions);
 
@@ -841,12 +773,26 @@ function renderPassageEditor(
   previewColumn.append(preview);
   const editorLayout = el("div", "admin-passage-editor");
   editorLayout.append(editorForm, previewColumn);
-  host.replaceChildren(header, editorLayout);
+  const viewToggle = SegmentedControl({
+    label: "Reading workspace", value: "editor", role: "radiogroup",
+    options: [{ value: "editor", label: "Editor" }, { value: "preview", label: "Preview" }],
+    onChange: (value) => { editorLayout.dataset.view = value; },
+  });
+  viewToggle.classList.add("admin-preview-toggle");
+  editorLayout.dataset.view = "editor";
+  host.replaceChildren(header, viewToggle, editorLayout);
+  registerEditor(host, editorForm, {
+    dirty: Boolean(state.draft), save: () => savePassage(),
+    discard: () => { discard(); renderPassageEditor(host, token, state, onSaved); },
+    capture: () => { state.draft = currentValue(); storeDraft(draftKey, state); },
+    changed: () => { setDirtyStatus(status); renderPreviewState(); },
+  });
 }
 
 type AdminImportDialogOptions = {
   title: string;
   accept: string;
+  kind: "words" | "reading";
   parse: (file: File) => Promise<Record<string, unknown>[]>;
   preview: (items: Record<string, unknown>[]) => Promise<AdminImportResult>;
   commit: (items: Record<string, unknown>[]) => Promise<AdminImportResult>;
@@ -856,78 +802,78 @@ type AdminImportDialogOptions = {
 function openAdminImportDialog(options: AdminImportDialogOptions): void {
   let parsedItems: Record<string, unknown>[] = [];
   let previewResult: AdminImportResult | null = null;
-  const backdrop = el("div", "admin-modal-backdrop");
-  const modal = el("section", "admin-modal");
-  modal.setAttribute("role", "dialog");
-  modal.setAttribute("aria-modal", "true");
-  const title = el("h2", "focus-title", options.title);
+  let committing = false;
+  let previewing = false;
+  const { dialog, content, actions, close } = adminDialog(options.title,
+    options.kind === "words" ? "Upload CSV or JSON. Existing words are updated by their German word; new words are created."
+      : "Upload JSON with passages, questions, and answers. Existing IDs are updated. New passages default to drafts; explicit published status makes them visible to learners.");
+  const templates = el("div", "admin-template-links");
+  const urls: string[] = [];
+  for (const [name, text, type] of options.kind === "words"
+    ? [["words.csv", wordsCsvTemplate, "text/csv"], ["words.json", wordsJsonTemplate, "application/json"]]
+    : [["reading-passages.json", readingJsonTemplate, "application/json"]]) {
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(new Blob([text], { type }));
+    urls.push(url); link.href = url; link.download = name; link.textContent = `Download ${name} template`;
+    templates.append(link);
+  }
+  dialog.addEventListener("close", () => urls.forEach((url) => URL.revokeObjectURL(url)), { once: true });
+  dialog.addEventListener("cancel", (event) => { if (committing) event.preventDefault(); });
   const file = document.createElement("input");
-  file.type = "file";
-  file.accept = options.accept;
-  file.className = "admin-input";
-  const status = el("p", "prompt admin-import-status", "Choose a template file to preview.");
+  file.type = "file"; file.accept = options.accept; file.className = "admin-input";
+  const status = editorStatus("Choose a file to validate and preview. No content changes until you import.");
   const resultHost = el("div", "admin-import-results");
   const cancel = button("Cancel", "button");
   const runImport = button("Import", "button primary");
   runImport.disabled = true;
-
-  const close = (): void => {
-    backdrop.remove();
-  };
-
-  cancel.addEventListener("click", close);
-  backdrop.addEventListener("click", (event) => {
-    if (event.target === backdrop) close();
-  });
-  file.addEventListener("change", async () => {
+  cancel.onclick = close;
+  file.onchange = async () => {
     const selectedFile = file.files?.[0];
-    parsedItems = [];
-    previewResult = null;
-    runImport.disabled = true;
-    resultHost.replaceChildren();
+    parsedItems = []; previewResult = null; runImport.disabled = true; resultHost.replaceChildren();
     if (!selectedFile) return;
+    previewing = true; file.disabled = true;
     try {
-      status.textContent = "Previewing import...";
+      status.textContent = "Validating file and checking existing content…";
       parsedItems = await options.parse(selectedFile);
+      if (options.kind === "reading") parsedItems = parsedItems.map((item) => ({ ...item, status: item.status ?? "draft" }));
       previewResult = await options.preview(parsedItems);
-      renderImportResult(resultHost, previewResult);
+      renderImportResult(resultHost, previewResult, true);
       runImport.disabled = previewResult.errors.length > 0 || previewResult.valid === 0;
-      status.textContent = previewResult.errors.length
-        ? "Fix the file and choose it again."
-        : "Preview looks ready.";
-    } catch (error) {
-      status.textContent = error instanceof Error ? error.message : "Import preview failed.";
-    }
-  });
-  runImport.addEventListener("click", async () => {
-    if (!previewResult || previewResult.errors.length || parsedItems.length === 0) return;
+      runImport.textContent = `Import ${previewResult.valid} ${previewResult.valid === 1 ? "item" : "items"}`;
+      status.textContent = previewResult.errors.length ? "No changes made. Fix the listed rows and choose the file again." : "Preview ready. Check the changes before importing.";
+    } catch (error) { status.textContent = adminErrorMessage(error); }
+    finally { previewing = false; file.disabled = false; }
+  };
+  runImport.onclick = async () => {
+    if (committing || previewing || !previewResult || previewResult.errors.length || !parsedItems.length) return;
+    committing = true; runImport.disabled = true; file.disabled = true; cancel.disabled = true;
+    dialog.setAttribute("aria-busy", "true");
     try {
-      status.textContent = "Importing...";
-      runImport.disabled = true;
+      status.textContent = "Importing content. Keep this window open…";
       const result = await options.commit(parsedItems);
-      renderImportResult(resultHost, result);
+      renderImportResult(resultHost, result, false);
       if (result.errors.length) {
-        status.textContent = "Nothing was imported. Fix the file and try again.";
-        return;
+        status.textContent = "No content was imported. Fix the listed rows and choose the file again.";
+        previewResult = null;
+      } else {
+        status.textContent = `Import complete. ${result.created} created, ${result.updated} updated.`;
+        previewResult = null; runImport.hidden = true; cancel.textContent = "Close";
+        await options.onImported();
       }
-      status.textContent = "Import complete.";
-      await options.onImported();
-    } catch (error) {
-      status.textContent = error instanceof Error ? error.message : "Import failed.";
-      runImport.disabled = false;
-    }
-  });
-
-  const actions = el("div", "admin-action-buttons");
+    } catch (error) { status.textContent = adminErrorMessage(error); runImport.disabled = false; }
+    finally { committing = false; file.disabled = false; cancel.disabled = false; dialog.setAttribute("aria-busy", "false"); }
+  };
+  content.append(templates);
+  if (options.kind === "words") content.append(el("p", "prompt", "Practice topics in CSV use LEVEL:topic_slug; for example A1:travel_transport;A2:city_places."));
+  content.append(wordField(file, "File"), status, resultHost);
   actions.append(cancel, runImport);
-  modal.append(title, wordField(file, "File"), status, resultHost, actions);
-  backdrop.append(modal);
-  document.body.append(backdrop);
   file.focus();
 }
 
 async function parseJsonImportFile(file: File): Promise<Record<string, unknown>[]> {
-  const payload = JSON.parse(await file.text()) as unknown;
+  let payload: unknown;
+  try { payload = JSON.parse(await file.text()); }
+  catch { throw new Error("This file is not valid JSON. Check quotes and commas, then choose the file again."); }
   const items = Array.isArray(payload)
     ? payload
     : payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown }).items)
@@ -1017,13 +963,13 @@ function parseFocusEntriesCell(value: string): AdminFocusEntry[] {
     .filter((entry) => entry.topic);
 }
 
-function renderImportResult(host: HTMLElement, result: AdminImportResult): void {
+function renderImportResult(host: HTMLElement, result: AdminImportResult, preview = false): void {
   const summary = el("div", "admin-import-summary");
   summary.append(
     importMetric("Total", result.total),
     importMetric("Valid", result.valid),
-    importMetric("Create", result.created),
-    importMetric("Update", result.updated),
+    importMetric(preview ? "Will create" : "Created", result.created),
+    importMetric(preview ? "Will update" : "Updated", result.updated),
     importMetric("Errors", result.errors.length),
   );
   const children: HTMLElement[] = [summary];
@@ -1059,7 +1005,14 @@ function adminMasterDetailLayout(): { wrap: HTMLElement; listPanel: HTMLElement;
   const wrap = el("div", "admin-grid");
   const listPanel = el("div", "admin-list");
   const editor = el("div", "admin-editor");
-  wrap.append(listPanel, editor);
+  const back = button("Back to results", "button admin-back-to-list");
+  back.onclick = () => {
+    wrap.dataset.view = "list";
+    wrap.querySelector<HTMLInputElement>(".admin-list input[type=search]")?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0 });
+  };
+  wrap.dataset.view = "list";
+  wrap.append(back, listPanel, editor);
   return { wrap, listPanel, editor };
 }
 
@@ -1067,26 +1020,10 @@ function editorActionBar(status: HTMLElement, cancel: HTMLButtonElement, save: H
   const actions = el("div", "admin-action-bar");
   const actionButtons = el("div", "admin-action-buttons");
   actionButtons.append(cancel, save);
-  actions.append(status, actionButtons);
+  const feedback = el("div", "admin-save-feedback");
+  feedback.append(status, el("span", "prompt admin-shortcut-hint", "Save: Ctrl / ⌘ + Enter"));
+  actions.append(feedback, actionButtons);
   return actions;
-}
-
-function readingGroupTabs(
-  activeGroup: AdminReadingGroup,
-  onSelect: (group: AdminReadingGroup) => boolean,
-): HTMLElement {
-  const wrap = el("div", "admin-reading-tabs");
-  wrap.append(SegmentedControl({
-    label: "Reading collection",
-    value: activeGroup,
-    fill: true,
-    options: [
-      { value: "general", label: "General" },
-      { value: "goethe", label: "Goethe", title: "Goethe-Institut" },
-    ],
-    onChange: onSelect,
-  }));
-  return wrap;
 }
 
 type QuestionBlock = {
@@ -1176,7 +1113,8 @@ function answerSet(question: AdminReadingQuestion): string {
 
 function trueFalseQuestionBlock(question: AdminReadingQuestion, shape: ReadingShape): QuestionBlock {
   let selected: TrueFalseAnswer = canonicalTrueFalseAnswer(question);
-  const node = el("div", "admin-question-block");
+  const node = document.createElement("details");
+  node.className = "admin-question-block";
   const title = el("h3", "admin-question-title", "Question");
   const prompt = textarea("Prompt", question.prompt, 3);
   const explanation = textarea("Explanation after answer", question.explanation ?? "", 3);
@@ -1184,6 +1122,7 @@ function trueFalseQuestionBlock(question: AdminReadingQuestion, shape: ReadingSh
   const header = questionBlockHeader(title, remove);
   const answer = SegmentedControl<TrueFalseAnswer>({
     label: "Correct answer",
+    role: "radiogroup",
     value: selected,
     options: [
       { value: "Richtig", label: "Richtig" },
@@ -1203,7 +1142,8 @@ function standardQuestionBlock(question: AdminReadingQuestion, shape: ReadingSha
     ? [...question.answers].sort((first, second) => first.order_index - second.order_index)
     : emptyQuestion(question.order_index).answers;
 
-  const node = el("div", "admin-question-block");
+  const node = document.createElement("details");
+  node.className = "admin-question-block";
   const title = el("h3", "admin-question-title", "Question");
   const prompt = textarea("Prompt", question.prompt, 3);
   const explanation = textarea("Explanation after answer", question.explanation ?? "", 3);
@@ -1216,6 +1156,11 @@ function standardQuestionBlock(question: AdminReadingQuestion, shape: ReadingSha
   const renderOptions = (): void => {
     optionsWrap.replaceChildren(...optionEditors.map((option, index) => {
       option.radio.value = String(index);
+      const labelAnswer = (): void => option.radio.setAttribute("aria-label", `Correct answer: option ${index + 1}${option.text.value.trim() ? `, ${option.text.value.trim()}` : ""}`);
+      labelAnswer();
+      option.text.oninput = labelAnswer;
+      option.text.setAttribute("aria-label", `Answer option ${index + 1}`);
+      option.remove.setAttribute("aria-label", `Remove option ${index + 1}`);
       option.remove.disabled = optionEditors.length <= 2;
       return option.row;
     }));
@@ -1229,6 +1174,7 @@ function standardQuestionBlock(question: AdminReadingQuestion, shape: ReadingSha
       optionEditors.splice(index, 1);
       if (wasCorrect) optionEditors[0].radio.checked = true;
       renderOptions();
+      editorChanged(node);
     });
     optionEditors.push(option);
     renderOptions();
@@ -1244,12 +1190,15 @@ function standardQuestionBlock(question: AdminReadingQuestion, shape: ReadingSha
   const addOptionButton = button("+ Add option", "button compact-button");
   addOptionButton.addEventListener("click", () => {
     addOption();
+    optionEditors[optionEditors.length - 1].text.focus();
+    editorChanged(node);
   });
 
   node.append(
     header,
     wordField(prompt),
     wordField(optionsWrap, "Options"),
+    el("p", "prompt", "Select the radio beside the answer learners should choose."),
     addOptionButton,
     wordField(explanation),
   );
@@ -1267,8 +1216,9 @@ function standardQuestionBlock(question: AdminReadingQuestion, shape: ReadingSha
 }
 
 function questionBlockHeader(title: HTMLElement, remove: HTMLButtonElement): HTMLElement {
-  const header = el("div", "admin-question-block-header");
+  const header = el("summary", "admin-question-block-header");
   header.append(title, remove);
+  remove.addEventListener("click", (event) => event.preventDefault());
   return header;
 }
 
@@ -1280,6 +1230,7 @@ function optionEditor(radioName: string, answerText: string, isCorrect: boolean)
   radio.checked = isCorrect;
   radio.ariaLabel = "Correct answer";
   const text = textarea("Answer option", answerText, 2);
+  text.id = `admin-answer-${++adminControlId}`;
   const remove = button("×", "admin-icon-button danger-icon-button");
   remove.ariaLabel = "Remove option";
   remove.title = "Remove option";
@@ -1440,11 +1391,7 @@ function collectQuestionBlocks(blocks: QuestionBlock[]): AdminReadingQuestion[] 
 }
 
 function collectQuestionBlocksSafely(blocks: QuestionBlock[]): AdminReadingQuestion[] {
-  try {
-    return collectQuestionBlocks(blocks);
-  } catch {
-    return [];
-  }
+  return blocks.map(questionFromBlockSafely);
 }
 
 function questionFromBlockSafely(block: QuestionBlock, index: number): AdminReadingQuestion {
@@ -1547,7 +1494,7 @@ function collectAdStimuliSafely(blocks: AdStimulusBlock[]): AdminReadingAdStimul
 }
 
 function renderReadingPreview(host: HTMLElement, passage: AdminReadingPassage): void {
-  const isSourceChoice = passage.group === "goethe" && passage.part === "teil_2";
+  const isSourceChoice = resolveReadingShape(passage.group, passage.level, passage.part ?? "teil_1") === "goethe_source_choice";
   const label = el("h3", "admin-preview-label", "Preview");
   const frame = el("div", "admin-preview-frame");
   const text = el("div", "admin-preview-text");
@@ -1628,7 +1575,7 @@ function emptyPassage(group: AdminReadingGroup): AdminReadingPassage {
     image_path: null,
     transcript: null,
     context_label: null,
-    status: "published",
+    status: "draft",
     order_index: 0,
     ad_stimuli: [],
     questions: [emptyQuestion(0)],
@@ -1747,6 +1694,7 @@ function articleSegmentedControl(
   let selected = GERMAN_ARTICLES.includes(value as GermanArticle) ? (value as GermanArticle) : null;
   const node = SegmentedControl<GermanArticle>({
     label: "Article",
+    role: "radiogroup",
     value: selected ?? "der",
     options: GERMAN_ARTICLES.map((article) => ({ value: article, label: article })),
     onChange: (next) => {
@@ -1758,11 +1706,12 @@ function articleSegmentedControl(
   const setEnabled = (nextEnabled: boolean): void => {
     if (nextEnabled && selected === null) selected = "der";
     if (!nextEnabled) selected = null;
+    node.setValue(selected ?? "der");
     node.dataset.disabled = nextEnabled ? "false" : "true";
     for (const segment of Array.from(node.querySelectorAll<HTMLButtonElement>(".segmented-control__item"))) {
       segment.disabled = !nextEnabled;
       const isSelected = nextEnabled && segment.dataset.value === selected;
-      segment.setAttribute("aria-selected", isSelected ? "true" : "false");
+      segment.setAttribute("aria-checked", String(isSelected));
       segment.tabIndex = nextEnabled && isSelected ? 0 : -1;
     }
   };
@@ -1809,14 +1758,17 @@ function focusEntriesRepeater(entries: AdminFocusEntry[]): FocusEntriesRepeater 
       if (index === -1 || rows.length <= 1) return;
       rows.splice(index, 1);
       renderRows();
+      editorChanged(wrap);
     });
     rows.push(row);
     renderRows();
   };
 
-  const add = button("+ Add focus entry", "button compact-button");
+  const add = button("Add practice topic", "button compact-button");
   add.addEventListener("click", () => {
     addRow();
+    rows[rows.length - 1].topic.focus();
+    editorChanged(wrap);
   });
 
   for (const entry of entries.length ? entries : [{ level: "A1", topic: "" } as AdminFocusEntry]) {
@@ -1829,8 +1781,8 @@ function focusEntriesRepeater(entries: AdminFocusEntry[]): FocusEntriesRepeater 
     .catch(() => undefined);
 
   const header = el("div", "admin-field-header");
-  header.append(el("span", "", "Focus entries"));
-  wrap.append(header, list, add, topics);
+  header.append(el("h3", "admin-section-title", "Practice topics"));
+  wrap.append(header, el("p", "prompt", "Choose where this word appears in level-based practice. For example: A1 · travel_transport. Start typing to find a topic."), list, add, topics);
   return {
     node: wrap,
     value: () =>
@@ -1846,14 +1798,14 @@ function focusEntriesRepeater(entries: AdminFocusEntry[]): FocusEntriesRepeater 
 function focusEntryRow(entry: AdminFocusEntry, datalistId: string): FocusEntryRow {
   const node = el("div", "admin-focus-row");
   const level = selectLevel(entry.level as AdminLevel);
-  level.ariaLabel = "Focus level";
+  level.ariaLabel = "Practice level";
   const topic = input("Topic", entry.topic);
   topic.setAttribute("list", datalistId);
   topic.placeholder = "Topic";
   const remove = button("×", "admin-icon-button danger-icon-button");
   remove.type = "button";
-  remove.ariaLabel = "Remove focus entry";
-  remove.title = "Remove focus entry";
+  remove.ariaLabel = "Remove practice topic";
+  remove.title = "Remove practice topic";
   node.append(wordField(level, "Level"), wordField(topic, "Topic"), remove);
   return { node, level, topic, remove };
 }
@@ -1896,32 +1848,6 @@ function syncGoethePartOptions(select: HTMLSelectElement, level: AdminLevel): vo
     }),
   );
   select.value = selected;
-}
-
-function ListCard({ title, meta, selected, onSelect }: ListCardProps): HTMLButtonElement {
-  const item = button("", "list-card");
-  item.type = "button";
-  item.dataset.selected = selected ? "true" : "false";
-  item.append(listCardTitle(title), el("span", "list-card-meta", meta));
-  item.addEventListener("click", () => {
-    void onSelect();
-  });
-  return item;
-}
-
-function pluralize(count: number, singular: string, plural: string): string {
-  return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function listCardTitle(title: string, fallback = "Untitled passage"): HTMLElement {
-  const wrap = el("strong", "list-card-title");
-  const trimmedTitle = title.trim();
-  if (trimmedTitle) {
-    wrap.append(el("span", "list-card-title-text", trimmedTitle));
-  } else {
-    wrap.append(el("em", "list-card-untitled", fallback));
-  }
-  return wrap;
 }
 
 function hasAdvertDraft(adControls: AdStimulusBlock[]): boolean {
@@ -2009,22 +1935,20 @@ function confirmShapeSwitch(
   return window.confirm("The two adverts you entered will not be saved for this reading type.");
 }
 
-function confirmDiscardingShapeData(
-  selected: AdminReadingPassage,
-  currentGroup: AdminReadingGroup,
-  nextGroup: AdminReadingGroup,
-): boolean {
-  if (currentGroup === nextGroup || selected.ad_stimuli.length === 0) return true;
-  return window.confirm("The two adverts you entered will not be saved in General.");
-}
-
 function wordField(control: HTMLElement, fallbackLabel?: string, required = false): HTMLElement {
-  const wrap = el("label", "admin-field");
+  const labelable = control.matches("input, select, textarea");
+  const wrap = el(labelable ? "label" : "div", "admin-field");
   const label = fallbackLabel ?? control.dataset.label ?? "Level";
   wrap.dataset.field = label;
   if (control.dataset.fieldKey) wrap.dataset.fieldKey = control.dataset.fieldKey;
   if (required) control.setAttribute("aria-required", "true");
-  wrap.append(fieldLabel(label, required), control);
+  const labelNode = fieldLabel(label, required);
+  if (!labelable) {
+    labelNode.id = `admin-field-label-${++adminControlId}`;
+    control.setAttribute("aria-labelledby", labelNode.id);
+    if (!control.hasAttribute("role")) control.setAttribute("role", "group");
+  }
+  wrap.append(labelNode, control);
   return wrap;
 }
 
@@ -2036,50 +1960,28 @@ function fieldLabel(label: string, required: boolean): HTMLElement {
   return node;
 }
 
-function matchesPassageSearch(passage: AdminReadingPassageSummary, search: string): boolean {
-  const term = search.trim().toLowerCase();
-  if (!term) return true;
-  const haystack = [
-    passage.title,
-    passage.group,
-    readingGroupLabel(passage.group),
-    passage.level,
-    passage.part ? partLabel(passage.part) : "",
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(term);
-}
-
-function matchesWordSearch(word: AdminWord, search: string): boolean {
-  const term = search.trim().toLowerCase();
-  if (!term) return true;
-  const haystack = [
-    word.word,
-    word.article ?? "",
-    word.part_of_speech,
-    word.meaning,
-    ...word.focus_entries.flatMap((entry) => [entry.level, entry.topic]),
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(term);
-}
-
 function adminError(error: unknown): HTMLElement {
-  return el("div", "error", error instanceof Error ? humanErrorMessage(error) : "Admin request failed");
+  const node = el("div", "error", adminErrorMessage(error));
+  node.setAttribute("role", "alert");
+  return node;
+}
+
+function adminErrorMessage(error: unknown): string {
+  return error instanceof Error ? humanErrorMessage(error) : "The request could not be completed. Try again.";
+}
+
+function editorStatus(message = ""): HTMLElement {
+  const node = el("p", "prompt admin-dirty-state", message);
+  node.setAttribute("role", "status");
+  node.setAttribute("aria-live", "polite");
+  node.setAttribute("aria-atomic", "true");
+  return node;
 }
 
 function setDirtyStatus(status: HTMLElement): void {
   clearStatusAction(status);
   status.dataset.state = "dirty";
   status.textContent = "Unsaved changes";
-}
-
-function setSavedStatus(status: HTMLElement): void {
-  clearStatusAction(status);
-  delete status.dataset.state;
-  status.textContent = "Saved.";
 }
 
 function setErrorStatus(status: HTMLElement, error: unknown): void {
@@ -2091,7 +1993,7 @@ function setErrorStatus(status: HTMLElement, error: unknown): void {
 function clearStatusAction(status: HTMLElement): void {
   status.onclick = null;
   status.onkeydown = null;
-  status.removeAttribute("role");
+  status.setAttribute("role", "status");
   status.tabIndex = -1;
 }
 
@@ -2235,7 +2137,18 @@ function parseErrorPayload(error: unknown): unknown {
 }
 
 function humanErrorMessage(error: Error): string {
-  return parseErrorPayload(error) ? "Check the highlighted fields." : error.message;
+  const payload = parseErrorPayload(error);
+  if (payload && typeof payload === "object" && "detail" in payload) {
+    const detail = (payload as { detail: unknown }).detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) return detail.map((issue) => {
+      if (!issue || typeof issue !== "object") return "Check the supplied content.";
+      const item = issue as ServerValidationIssue;
+      return `${readableFieldName(lastLocationPart(item.loc))}: ${item.msg ?? validationInstruction(item)}`;
+    }).join(" ");
+  }
+  if (/fetch|network/i.test(error.message)) return "Could not reach the server. Check your connection and try again. Your edits are still here.";
+  return error.message || "The request could not be completed. Try again.";
 }
 
 function readableFieldName(field: string): string {
@@ -2255,6 +2168,8 @@ function showFieldError(control: HTMLElement, message: string): void {
   control.setAttribute("aria-invalid", "true");
   const error = field.querySelector<HTMLElement>(".admin-field-error") ?? el("p", "admin-field-error");
   error.textContent = message;
+  error.id ||= `admin-field-error-${++adminControlId}`;
+  control.setAttribute("aria-describedby", error.id);
   field.append(error);
 }
 
@@ -2264,11 +2179,14 @@ function clearFieldError(control: HTMLElement): void {
   field?.querySelector(".admin-field-error")?.remove();
   control.classList.remove("field-error");
   control.removeAttribute("aria-invalid");
+  control.removeAttribute("aria-describedby");
 }
 
 function focusInvalidControl(control: HTMLElement): void {
-  control.scrollIntoView({ block: "center", behavior: "smooth" });
-  window.setTimeout(() => control.focus(), 120);
+  const details = control.closest<HTMLDetailsElement>("details");
+  if (details) details.open = true;
+  control.scrollIntoView({ block: "center" });
+  control.focus({ preventScroll: true });
 }
 
 function setValidationStatus(status: HTMLElement, count: number, onClick: () => void): void {

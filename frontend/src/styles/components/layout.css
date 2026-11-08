@@ -5,6 +5,17 @@
   padding: 48px 0;
 }
 
+.shell:not(.admin-shell) {
+  padding-bottom: 104px;
+}
+
+.app-load-error {
+  display: grid;
+  justify-items: start;
+  gap: 24px;
+  max-width: 720px;
+}
+
 .layout {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));

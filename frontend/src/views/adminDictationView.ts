@@ -13,14 +13,18 @@ export function renderDictationAdmin(host: HTMLElement, token: string): () => vo
   let loading = false;
   let loadError: unknown;
   let actionError: unknown;
+  let focusTarget: string | null = null;
+  const expandedVideos = new Set<string>();
 
   const render = (status: ListStatus = "idle", error?: unknown): void => {
+    const scrollTop = host.querySelector(".admin-dictation-list")?.scrollTop ?? 0;
     const section = el("section", "admin-dictation");
     const header = el("div", "admin-list-header");
     const heading = el("h2", "focus-title", "Reported videos");
     const refresh = button(loading ? "Refreshing…" : "Refresh", "button compact-button");
     refresh.disabled = loading || pendingVideoId !== null;
-    refresh.addEventListener("click", () => void loadVideos());
+    refresh.addEventListener("click", () => { focusTarget = "refresh"; void loadVideos(); });
+    refresh.dataset.moderationFocus = "refresh";
     header.append(heading, refresh);
 
     const summary = el(
@@ -54,15 +58,24 @@ export function renderDictationAdmin(host: HTMLElement, token: string): () => vo
     }
     section.append(header, summary, list);
     host.replaceChildren(section);
+    list.scrollTop = scrollTop;
+    if (!loading && pendingVideoId === null && focusTarget) {
+      host.querySelectorAll<HTMLButtonElement>("[data-moderation-focus]").forEach((control) => {
+        if (control.dataset.moderationFocus === focusTarget) control.focus({ preventScroll: true });
+      });
+    }
   };
 
   const renderModerationRow = (video: AdminDictationVideo): HTMLElement => {
     const row = el("article", "admin-dictation-row");
+    const thumbnailFrame = el("div", "admin-dictation-thumbnail");
     const thumbnail = document.createElement("img");
-    thumbnail.className = "admin-dictation-thumbnail";
+    thumbnail.className = "admin-dictation-image";
     thumbnail.src = `https://i.ytimg.com/vi/${encodeURIComponent(video.video_id)}/mqdefault.jpg`;
     thumbnail.alt = "";
     thumbnail.loading = "lazy";
+    thumbnail.addEventListener("error", () => thumbnail.remove(), { once: true });
+    thumbnailFrame.append(thumbnail);
 
     const details = el("div", "admin-dictation-details");
     const titleLink = document.createElement("a");
@@ -82,14 +95,39 @@ export function renderDictationAdmin(host: HTMLElement, token: string): () => vo
       video.is_hidden ? "Hidden" : "In learner library",
     );
     details.append(titleLink, meta, state);
+    const review = document.createElement("details");
+    review.className = "admin-moderation-details";
+    review.open = expandedVideos.has(video.video_id);
+    review.addEventListener("toggle", () => {
+      review.open ? expandedVideos.add(video.video_id) : expandedVideos.delete(video.video_id);
+    });
+    review.append(el("summary", "", "Report reasons and review history"));
+    const reasons = video.report_reasons ?? {};
+    const reasonLabels: Record<string, string> = { not_german: "Not German", inappropriate: "Inappropriate content", broken: "Video unavailable", other: "Other" };
+    for (const [reason, count] of Object.entries(reasons)) {
+      review.append(el("p", "prompt", `${reasonLabels[reason] ?? reason}: ${count}`));
+    }
+    const knownReports = Object.values(reasons).reduce((sum, count) => sum + count, 0);
+    if (knownReports < video.report_count) review.append(el("p", "prompt", `${video.report_count - knownReports} older reports have no recorded reason.`));
+    const history = video.review_history ?? [];
+    if (history.length) {
+      review.append(el("h3", "admin-section-title", "Recent review actions"));
+      const events = el("ol", "admin-review-history");
+      for (const event of history) {
+        events.append(el("li", "prompt", `${event.is_hidden ? "Hidden from learners" : "Restored to library"} · ${formatDate(event.created_at, true)}`));
+      }
+      review.append(events);
+    } else review.append(el("p", "prompt", "No review actions recorded yet."));
+    details.append(review);
 
     const action = button(
       pendingVideoId === video.video_id ? "Saving…" : video.is_hidden ? "Restore video" : "Hide video",
       video.is_hidden ? "button" : "button admin-dictation-hide",
     );
     action.disabled = pendingVideoId !== null || loading;
-    action.addEventListener("click", () => void updateVideo(video));
-    row.append(thumbnail, details, action);
+    action.dataset.moderationFocus = video.video_id;
+    action.addEventListener("click", () => { focusTarget = video.video_id; void updateVideo(video); });
+    row.append(thumbnailFrame, details, action);
     return row;
   };
 
@@ -140,10 +178,10 @@ export function renderDictationAdmin(host: HTMLElement, token: string): () => vo
   };
 }
 
-function formatDate(value: string): string {
+function formatDate(value: string, includeTime = false): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown date";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", ...(includeTime ? { timeStyle: "short" as const } : {}) }).format(date);
 }
 
 function errorMessage(error: unknown): HTMLElement {
