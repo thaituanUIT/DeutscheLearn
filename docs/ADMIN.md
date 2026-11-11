@@ -103,8 +103,11 @@ Reported videos remain in the queue after moderation so admins can restore them 
 ### Normalize Saved Captions
 
 New dictation imports remove recognized bracketed audio cues such as `[Musik]`,
-`[Applaus]`, and `[laughter]` before sentence grouping. Unicode and whitespace are
-normalized; other bracketed text is preserved. Cue-only segments are discarded.
+`[Applaus]`, `[laughter]`, and `* Musik *` before sentence grouping. Single, double,
+and triple asterisk wrappers are supported. Unicode and whitespace are
+normalized; other bracketed text is preserved. A cue must match the entire bracketed
+label, including a recognized modifier such as `leise Musik`. Ordinary speech such as
+`Musik ist schön` or `(Ich liebe Musik)` is retained. Cue-only segments are discarded.
 
 To clean existing videos whose language is exactly `German (auto-generated)`, preview
 the changes and then apply them using the configured database:

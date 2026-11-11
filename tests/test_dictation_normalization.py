@@ -16,11 +16,27 @@ from scripts.normalize_dictation import main as normalize_saved_videos
 
 @pytest.mark.parametrize(("raw", "expected"), [
     ("[Musik]", ""),
+    ("* Musik *", ""),
+    ("*Musik*", ""),
+    ("** Musik **", ""),
+    ("***Musik***", ""),
+    ("Guten * leise Musik * Morgen *Applaus* !", "Guten Morgen!"),
+    ("*Music* Hallo. **laughter**", "Hallo."),
+    ("*Ich liebe Musik*", "*Ich liebe Musik*"),
+    ("**Die Musik ist schön**", "**Die Musik ist schön**"),
+    ("2 * 3 * 4", "2 * 3 * 4"),
+    ("* Musik", "* Musik"),
     ("[MUSIK] Guten   Morgen! [Applaus]", "Guten Morgen!"),
     ("Guten [leise Musik] Morgen [Lachen] !", "Guten Morgen!"),
     ("(music) Hallo. [laughter]", "Hallo."),
     ("Wir sind in [Berlin] (seit gestern).", "Wir sind in [Berlin] (seit gestern)."),
     ("Musik ist schön.", "Musik ist schön."),
+    ("Ich höre Musik und wir lachen.", "Ich höre Musik und wir lachen."),
+    ("Er sagt (Ich liebe Musik).", "Er sagt (Ich liebe Musik)."),
+    ("[Die Musik ist schön]", "[Die Musik ist schön]"),
+    ("Das ist [Sound of Music].", "Das ist [Sound of Music]."),
+    ("Wir sitzen (in der Stille).", "Wir sitzen (in der Stille)."),
+    ("[Musik spielt] Hallo [soft music]!", "Hallo!"),
     ("scho\u0308n\n hier", "schön hier"),
 ])
 def test_normalize_dictation_text(raw: str, expected: str) -> None:
@@ -28,9 +44,10 @@ def test_normalize_dictation_text(raw: str, expected: str) -> None:
     assert normalize_dictation_text(expected) == expected
 
 
-def test_saved_segments_preserve_timing_and_remove_cue_only_segments() -> None:
+@pytest.mark.parametrize("cue", ["[Musik]", "* Musik *", "**Musik**"])
+def test_saved_segments_preserve_timing_and_remove_cue_only_segments(cue: str) -> None:
     segments = [
-        {"start": 0, "duration": 2, "text": "[Musik]"},
+        {"start": 0, "duration": 2, "text": cue},
         {"start": 2, "duration": 3, "text": "Hallo [Applaus] Welt!", "extra": "keep"},
     ]
     result = normalize_dictation_segments(segments)
@@ -39,10 +56,11 @@ def test_saved_segments_preserve_timing_and_remove_cue_only_segments() -> None:
     assert normalize_dictation_segments(result) == result
 
 
-def test_ingestion_removes_cues_before_grouping() -> None:
+@pytest.mark.parametrize("cue", ["[Musik]", "* Musik *", "**Musik**"])
+def test_ingestion_removes_cues_before_grouping(cue: str) -> None:
     segments = group_transcript_snippets([
-        SimpleNamespace(start=0, duration=2, text="[Musik]"),
-        SimpleNamespace(start=3, duration=2, text="Guten [Applaus] Morgen!"),
+        SimpleNamespace(start=0, duration=2, text=cue),
+        SimpleNamespace(start=3, duration=2, text="Guten *Applaus* Morgen!"),
     ])
     assert len(segments) == 1
     assert segments[0].text == "Guten Morgen!"
