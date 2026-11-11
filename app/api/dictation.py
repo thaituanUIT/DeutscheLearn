@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 import requests
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from requests.exceptions import RequestException, RetryError
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -90,7 +90,7 @@ def dictation_transcript(
             detail="The shared dictation library is full. New videos are paused until it is reviewed.",
         )
     client_ip = request.client.host if request.client else "unknown"
-    enforce_dictation_fetch_limits(db, client_ip)
+    quota_buckets = enforce_dictation_fetch_limits(db, client_ip)
 
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
@@ -158,15 +158,16 @@ def dictation_transcript(
 
     snippets = list(transcript)
     transcript_chars = sum(len(" ".join(snippet.text.split())) for snippet in snippets)
+    if transcript_chars > settings.dictation_max_transcript_chars or len(snippets) > 5000:
+        release_dictation_fetch_quota(db, quota_buckets)
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="This transcript is too long to add to the shared dictation library.",
+        )
     if sum(len(normalize_dictation_text(snippet.text)) for snippet in snippets) < 40:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The German captions did not contain enough speech for dictation. Try another video.",
-        )
-    if transcript_chars > settings.dictation_max_transcript_chars or len(snippets) > 5000:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="This transcript is too long to add to the shared dictation library.",
         )
     segments = group_transcript_snippets(snippets)
     if not segments:
@@ -175,6 +176,7 @@ def dictation_transcript(
             detail="The German captions did not contain any usable speech. Try another video.",
         )
     if len(segments) > settings.dictation_max_transcript_segments:
+        release_dictation_fetch_quota(db, quota_buckets)
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="This transcript has too many caption lines to add to the shared library.",
@@ -357,7 +359,7 @@ def dictation_client_key(client_ip: str) -> str:
     return hmac.new(key, client_ip.encode(), hashlib.sha256).hexdigest()
 
 
-def enforce_dictation_fetch_limits(db: Session, client_ip: str) -> None:
+def enforce_dictation_fetch_limits(db: Session, client_ip: str) -> tuple[str, ...]:
     settings = get_settings()
     now = datetime.now(UTC)
     naive_now = now.replace(tzinfo=None)
@@ -397,6 +399,7 @@ def enforce_dictation_fetch_limits(db: Session, client_ip: str) -> None:
                     detail = "You've added several new videos recently. Try again later; saved videos remain available."
                 raise HTTPException(status_code=error_status, detail=detail)
         db.commit()
+        return tuple(bucket_key for bucket_key, _, _ in buckets)
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
@@ -406,6 +409,19 @@ def enforce_dictation_fetch_limits(db: Session, client_ip: str) -> None:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Transcript fetching is temporarily unavailable. Saved videos remain available.",
         ) from exc
+
+
+def release_dictation_fetch_quota(db: Session, bucket_keys: tuple[str, ...]) -> None:
+    """Refund only this request's original buckets, including across hour/day changes."""
+    db.execute(
+        update(DictationFetchCounter)
+        .where(
+            DictationFetchCounter.bucket_key.in_(bucket_keys),
+            DictationFetchCounter.request_count > 0,
+        )
+        .values(request_count=DictationFetchCounter.request_count - 1)
+    )
+    db.commit()
 
 
 def enforce_dictation_report_limits(db: Session, client_ip: str) -> None:

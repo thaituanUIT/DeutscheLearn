@@ -187,6 +187,77 @@ def test_cached_transcript_does_not_reserve_fetch_quota() -> None:
         assert db.scalars(select(DictationFetchCounter)).all() == []
 
 
+def test_full_library_does_not_consume_attempt_and_still_serves_cached_video(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_dictation_counters()
+    video = new_video()
+    video_id = video.video_id
+    with SessionLocal() as db:
+        db.add(video)
+        db.commit()
+    monkeypatch.setattr("app.api.dictation.get_settings", lambda: dictation_settings(
+        dictation_max_saved_videos=1,
+    ))
+    with TestClient(app) as client:
+        rejected = client.post("/api/dictation/transcript", json={
+            "video_url": f"https://youtu.be/{uuid4().hex[:11]}",
+        })
+        cached = client.post("/api/dictation/transcript", json={
+            "video_url": f"https://youtu.be/{video_id}",
+        })
+    assert rejected.status_code == 507
+    assert cached.status_code == 200
+    with SessionLocal() as db:
+        assert db.scalars(select(DictationFetchCounter)).all() == []
+
+
+@pytest.mark.parametrize("limit", ["characters", "segments", "snippets"])
+def test_size_rejection_refunds_only_its_attempt(
+    monkeypatch: pytest.MonkeyPatch, limit: str,
+) -> None:
+    from youtube_transcript_api import YouTubeTranscriptApi
+
+    clear_dictation_counters()
+    settings = dictation_settings(
+        dictation_new_videos_per_ip_hour=2,
+        dictation_max_transcript_chars=1000 if limit == "characters" else 100000,
+        dictation_max_transcript_segments=10,
+    )
+    monkeypatch.setattr("app.api.dictation.get_settings", lambda: settings)
+
+    class Transcript(list):
+        language = "German (auto-generated)"
+        is_generated = True
+
+    text = "Guten Morgen, heute üben wir die deutsche Sprache."
+    if limit == "characters":
+        snippets = [SimpleNamespace(start=0, duration=30, text=text * 30)]
+    elif limit == "segments":
+        snippets = [SimpleNamespace(start=i * 3, duration=2, text=text) for i in range(11)]
+    else:
+        snippets = [SimpleNamespace(start=i, duration=1, text="[Musik]") for i in range(5000)]
+        snippets.append(SimpleNamespace(start=5000, duration=3, text=text))
+    track = SimpleNamespace(language_code="de", is_generated=True, fetch=lambda: Transcript(snippets))
+    monkeypatch.setattr(YouTubeTranscriptApi, "list", lambda self, video_id: [track])
+    with SessionLocal() as db:
+        enforce_dictation_fetch_limits(db, "testclient")
+        before = dict(db.execute(select(
+            DictationFetchCounter.bucket_key, DictationFetchCounter.request_count,
+        )).all())
+    with TestClient(app) as client:
+        for _ in range(2):
+            response = client.post("/api/dictation/transcript", json={
+                "video_url": f"https://youtu.be/{uuid4().hex[:11]}",
+            })
+            assert response.status_code == 413
+    with SessionLocal() as db:
+        after = dict(db.execute(select(
+            DictationFetchCounter.bucket_key, DictationFetchCounter.request_count,
+        )).all())
+    assert after == before
+
+
 def test_admin_can_hide_and_restore_reported_video(monkeypatch: pytest.MonkeyPatch) -> None:
     clear_dictation_counters()
     video = new_video(report_count=2)
